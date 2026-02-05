@@ -1,3 +1,11 @@
 spring:
   application:
     name: configserver
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/diepchu1999/car-rental-config-repo/
+          default-label: main
+server:
+  port: 8888
