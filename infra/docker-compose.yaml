@@ -1,0 +1,46 @@
+name: car-rental-db
+
+networks:
+  car-rental-net:
+    driver: bridge
+
+volumes:
+  postgres_user_data:
+  pgadmin_data:
+
+services:
+  # ----------------------------
+  # User Service Database
+  # ----------------------------
+  postgres-user:
+    image: postgres:16
+    container_name: postgres-user
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: user
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_user_data:/var/lib/postgresql/data
+    networks:
+      - car-rental-net
+
+
+  # ----------------------------
+  # pgAdmin (PostgreSQL Admin UI)
+  # ----------------------------
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@local.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    networks:
+      - car-rental-net
