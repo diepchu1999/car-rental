@@ -7,16 +7,19 @@ import com.ares.user_service.domain.repository.UserRepository;
 import com.ares.user_service.infrastructure.persistence.entity.UserEntity;
 import com.ares.user_service.infrastructure.persistence.jpa.UserJpaRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.stream.Collectors;
 
 @Repository
 @RequiredArgsConstructor
+@Slf4j
 public class UserRepositoryAdapter implements UserRepository {
     private final UserJpaRepository jpaRepository;
 
@@ -34,9 +37,9 @@ public class UserRepositoryAdapter implements UserRepository {
                 size,
                 Sort.by(direction, sortParts[0])
         );
-
-        return jpaRepository.findWithFilter(status, role, pageable)
-                .map(this::toDomain);
+        Page<UserEntity> users = jpaRepository.findWithFilter(status, role, pageable);
+        log.debug("users: {}", new ArrayList<>(users.getContent()));
+        return users.map(this::toDomain);
     }
 
     private User toDomain(UserEntity entity) {
