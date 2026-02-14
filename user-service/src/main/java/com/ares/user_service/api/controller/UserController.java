@@ -1,13 +1,13 @@
 package com.ares.user_service.api.controller;
 
+import com.ares.user_service.api.request.CreateUserRequest;
 import com.ares.user_service.api.response.UserResponse;
 import com.ares.user_service.application.service.UserApplicationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("api/v1/users")
@@ -26,5 +26,11 @@ public class UserController {
     ) {
         return userApplicationService.getAllUsers(page, size, sort, status, role);
     }
-    
+
+
+    @PostMapping
+    public ResponseEntity<UserResponse> createUser(@RequestBody CreateUserRequest request){
+        UserResponse response = userApplicationService.createUser(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
 }

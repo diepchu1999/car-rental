@@ -1,17 +1,20 @@
 package com.ares.user_service.api.response;
+import com.ares.user_service.domain.model.UserRole;
+import com.ares.user_service.domain.model.UserStatus;
 import lombok.Builder;
 import lombok.Getter;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-@Getter
-@Builder
-public class UserResponse {
-    private UUID id;
-    private String email;
-    private String fullName;
-    private String status;
-    private List<String> roles;
-    private Instant createdAt;
-}
+
+public record UserResponse(
+        UUID id,
+        String username,
+        String email,
+        String firstName,
+        String lastName,
+        UserStatus status,
+        List<UserRole> roles,
+        Instant createdAt
+) {}

@@ -25,4 +25,6 @@ public interface UserJpaRepository extends JpaRepository<UserEntity, UUID> {
             @Param("role") String role,
             Pageable pageable
     );
+
+    boolean existsByEmail(String email);
 }

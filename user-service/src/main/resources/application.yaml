@@ -6,4 +6,19 @@ spring:
     import: "configserver:http://localhost:8888"
   
   profiles:
-    active: default
+    active: default #user config default
+
+# ==============================
+# KEYCLOAK CONFIG
+# ==============================
+
+# KEYCLOAK
+keycloak:
+  admin:
+    username: admin
+    password: admin
+    server-url: http://localhost:8090
+    realm: car-rental
+    client-id: user-service
+    client-uid: 22b4e19a-12a7-4777-8211-5345fc36e743
+    client-secret: 81OKVv9qWpKwX9YmMSn6m4yrATRAc3qZ

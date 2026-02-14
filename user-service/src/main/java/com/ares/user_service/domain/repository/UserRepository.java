@@ -11,4 +11,8 @@ public interface UserRepository {
             String status,
             String role
     );
+
+    boolean existsByEmail(String email);
+
+    User save (User user);
 }

@@ -5,7 +5,9 @@ import com.ares.user_service.domain.model.UserRole;
 import com.ares.user_service.domain.model.UserStatus;
 import com.ares.user_service.domain.repository.UserRepository;
 import com.ares.user_service.infrastructure.persistence.entity.UserEntity;
+import com.ares.user_service.infrastructure.persistence.entity.UserRoleEntity;
 import com.ares.user_service.infrastructure.persistence.jpa.UserJpaRepository;
+import com.ares.user_service.infrastructure.persistence.mapper.UserPersistenceMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -15,6 +17,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Repository
@@ -22,6 +26,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class UserRepositoryAdapter implements UserRepository {
     private final UserJpaRepository jpaRepository;
+    private final UserPersistenceMapper mapper;
 
     @Override
     public Page<User> findUsers(int page, int size, String sort, String status, String role) {
@@ -39,19 +44,20 @@ public class UserRepositoryAdapter implements UserRepository {
         );
         Page<UserEntity> users = jpaRepository.findWithFilter(status, role, pageable);
         log.debug("users: {}", new ArrayList<>(users.getContent()));
-        return users.map(this::toDomain);
+        return users.map(mapper::toDomain);
     }
 
-    private User toDomain(UserEntity entity) {
-        return new User(
-                entity.getId(),
-                entity.getEmail(),
-                entity.getFullName(),
-                UserStatus.valueOf(entity.getStatus()),
-                entity.getRoles().stream()
-                        .map(r -> UserRole.valueOf(r.getRole()))
-                        .collect(Collectors.toList()),
-                entity.getCreatedAt()
-        );
+
+    @Override
+    public boolean existsByEmail(String email) {
+        return jpaRepository.existsByEmail(email);
     }
-}
+
+    @Override
+    public User save(User user) {
+        UserEntity entity = mapper.toEntity(user);
+        return mapper.toDomain(jpaRepository.save(entity));
+    }
+
+
+    }
