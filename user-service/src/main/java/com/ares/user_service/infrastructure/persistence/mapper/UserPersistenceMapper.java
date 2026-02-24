@@ -23,6 +23,7 @@ public class UserPersistenceMapper {
 
         UserEntity entity = UserEntity.builder()
                 .id(user.getId())
+                .keyCloakId(user.getKeyCloakId())
                 .username(user.getUsername())
                 .email(user.getEmail())
                 .firstName(user.getFirstName())
@@ -67,6 +68,7 @@ public class UserPersistenceMapper {
 
         return User.builder()
                 .id(entity.getId())
+                .keyCloakId(entity.getKeyCloakId())
                 .username(entity.getUsername())
                 .email(entity.getEmail())
                 .firstName(entity.getFirstName())

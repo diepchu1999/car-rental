@@ -1,11 +1,8 @@
 package com.ares.user_service.infrastructure.persistence.adapter;
 
 import com.ares.user_service.domain.model.User;
-import com.ares.user_service.domain.model.UserRole;
-import com.ares.user_service.domain.model.UserStatus;
 import com.ares.user_service.domain.repository.UserRepository;
 import com.ares.user_service.infrastructure.persistence.entity.UserEntity;
-import com.ares.user_service.infrastructure.persistence.entity.UserRoleEntity;
 import com.ares.user_service.infrastructure.persistence.jpa.UserJpaRepository;
 import com.ares.user_service.infrastructure.persistence.mapper.UserPersistenceMapper;
 import lombok.RequiredArgsConstructor;
@@ -17,9 +14,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Optional;
+import java.util.UUID;
 
 @Repository
 @RequiredArgsConstructor
@@ -47,6 +43,12 @@ public class UserRepositoryAdapter implements UserRepository {
         return users.map(mapper::toDomain);
     }
 
+    @Override
+    public Optional<User> getUserById(String userId) {
+        return jpaRepository.findById(UUID.fromString(userId))
+                .map(mapper::toDomain);
+    }
+
 
     @Override
     public boolean existsByEmail(String email) {
@@ -59,5 +61,8 @@ public class UserRepositoryAdapter implements UserRepository {
         return mapper.toDomain(jpaRepository.save(entity));
     }
 
-
+    @Override
+    public void deleteUserById(String userId) {
+        jpaRepository.deleteById(UUID.fromString(userId));
     }
+}
