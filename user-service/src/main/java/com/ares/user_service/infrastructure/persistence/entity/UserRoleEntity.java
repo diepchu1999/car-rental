@@ -1,4 +1,5 @@
 package com.ares.user_service.infrastructure.persistence.entity;
+import com.ares.user_service.domain.model.UserRole;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -17,6 +18,7 @@ public class UserRoleEntity {
     @JoinColumn(name = "user_id")
     private UserEntity user;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private String role;
+    private UserRole role;
 }

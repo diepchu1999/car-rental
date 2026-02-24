@@ -1,20 +1,15 @@
-package com.ares.user_service.api.response;
+package com.ares.user_service.api.request;
+
 import com.ares.user_service.domain.model.UserRole;
 import com.ares.user_service.domain.model.UserStatus;
-import lombok.Builder;
-import lombok.Getter;
 
-import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
-public record UserResponse(
-        UUID id,
+public record UpdateUserRequest(
         String username,
         String email,
         String firstName,
         String lastName,
         UserStatus status,
-        List<UserRole> roles,
-        Instant createdAt
+        List<UserRole> roles
 ) {}
