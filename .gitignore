@@ -1,5 +1,8 @@
 HELP.md
 target/
+logs/
+infra/evaluate-loki/.data
+infra/evaluate-prometheus/.data
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
