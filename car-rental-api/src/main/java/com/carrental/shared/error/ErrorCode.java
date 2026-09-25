@@ -1,7 +1,7 @@
 package com.carrental.shared.error;
 
 /**
- * Định nghĩa mã lỗi ổn định dùng chung cho API chi nhánh và xe.
+ * Định nghĩa mã lỗi ổn định dùng chung cho các module của ứng dụng.
  *
  * <p>Tên hằng enum được trả trong trường error.code của response.
  * Phía gọi có thể dựa vào mã này để xử lý lỗi hoặc chọn thông báo
@@ -69,6 +69,48 @@ public enum ErrorCode {
      */
     VEHICLE_DOCUMENT_EXPIRED(
             "Vehicle inspection or compulsory liability insurance has expired."
+    ),
+
+    /**
+     * Khoảng yêu cầu chồng lên một khóa lịch đang chặn của xe.
+     *
+     * <p>Theo BR-104 và ADR-0005, lỗi này chỉ được xác định
+     * từ vi phạm ràng buộc chống chồng lịch của PostgreSQL.
+     * Không dùng cho lỗi toàn vẹn dữ liệu khác.
+     */
+    VEHICLE_NOT_AVAILABLE(
+            "The vehicle is not available for the requested period."
+    ),
+
+    /**
+     * Không tìm thấy khóa lịch theo mã reservation.
+     *
+     * <p>Mọi chuyển trạng thái dùng mã reservation để xác định
+     * đúng bản ghi, không dùng mã đơn thuê thay thế.
+     */
+    RESERVATION_NOT_FOUND(
+            "Reservation not found."
+    ),
+
+    /**
+     * Trạng thái khóa lịch không cho phép thao tác được yêu cầu.
+     *
+     * <p>Áp dụng máy trạng thái trong status-flow §2.
+     * Cũng dùng khi cập nhật có điều kiện thất bại vì trạng thái
+     * đã bị thay đổi bởi một thao tác đồng thời.
+     */
+    RESERVATION_INVALID_STATUS_TRANSITION(
+            "The requested reservation status transition is not allowed."
+    ),
+
+    /**
+     * Chỗ giữ đã hết hạn và không còn được phép xác nhận theo BR-103.
+     *
+     * <p>Thông báo không đóng cứng số phút vì thời hạn giữ chỗ
+     * là tham số cấu hình theo BR-225.
+     */
+    HOLD_EXPIRED(
+            "The reservation hold has expired."
     ),
 
     /**
