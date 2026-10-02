@@ -121,6 +121,39 @@ Không thêm `--volumes` nếu muốn giữ dữ liệu PostgreSQL và MinIO.
 8. Không bật **Store as project file** vì `.idea/` không được commit.
 9. Chạy lại bằng **Run** hoặc **Debug**.
 
+### Gọi lịch xe từ module khác
+
+Tiêm `com.carrental.availability.api.AvailabilityDirectory` để giữ chỗ, khóa vận hành,
+chuyển trạng thái hoặc tìm xe bận. Đây là cổng nội bộ, không có REST endpoint riêng.
+Chỉ import các kiểu thuộc `availability.api`; không gọi trực tiếp use case hoặc persistence.
+
+Khoảng truyền vào `hold` và `findBusyVehicleIds` chưa cộng đệm; truyền đệm riêng để availability
+áp dụng đúng một lần. Bên gọi không chọn TTL. Các chuyển trạng thái dùng mã reservation `KL-<6>`,
+không dùng mã đơn. Kết quả tra cứu rảnh không bảo đảm giữ được chỗ sau đó: PostgreSQL vẫn quyết
+định xung đột khi ghi. Các thao tác ghi tham gia transaction bên gọi, không tự commit độc lập.
+
+### Job nhả giữ chỗ quá hạn
+
+Theo BR-103, backend tự chuyển `HELD` thành `RELEASED` khi `hold_expires_at` đã đến hạn.
+Job mặc định bật, dùng `applicationClock` chung và không tính lại TTL từ cấu hình hiện tại.
+Chỉ `status` và `status_changed_at` được cập nhật; không xóa bản ghi lịch.
+
+Nhịp chạy lấy từ `car-rental.availability.hold-sweep-interval`
+(`CAR_RENTAL_HOLD_SWEEP_INTERVAL`, mặc định `PT30S`). Job đợi một nhịp sau khởi động;
+sau mỗi lượt kết thúc mới đợi tiếp một nhịp, không chạy bù dồn các lượt bị chậm.
+Nhịp phải lớn hơn không. Đây là cấu hình vận hành, không đi qua port chính sách TTL.
+
+Hai instance cùng chạy được bảo vệ bởi điều kiện `status = 'HELD'` và
+`hold_expires_at <= mốc_dọn` trong cùng câu `UPDATE`. Bản đã nhả hoặc đã xác nhận
+không bị job ghi đè. Nếu một lượt gặp lỗi, transaction rollback, scheduler ghi nhận
+lỗi và tiếp tục ở lượt định kỳ sau. Job chỉ nhả khóa lịch, không xử lý đơn thuê hay tiền.
+
+Test mặc định tắt job nền bằng `car-rental.availability.hold-sweep-enabled=false`
+trong `src/test/resources/application.properties` để các fixture thời gian cũ không tự thay đổi.
+File này không được đóng gói vào ứng dụng local. Các test expiry gọi use case chủ động;
+`ReservationHoldExpirySchedulerTest` dùng context riêng để kiểm bật/tắt, nhịp chạy và
+khả năng tiếp tục sau lỗi. Không thêm biến bắt buộc vào `.env`.
+
 ## Bước tiếp theo
 
 Task 4: xem [hướng dẫn nghiệm thu shared, branch và vehicle](car-rental-docs/vi/dev-notes/task-04-shared-branch-vehicle.md).

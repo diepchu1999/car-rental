@@ -713,13 +713,21 @@ với hoa hồng (BR-208).
 | Trần ứng trả chi phí năng lượng (BR-422) | 500.000đ/chuyến |
 | Số ngày báo trước khi giấy tờ hết hạn (BR-017) | 30 ngày |
 | **Thời hạn giữ chỗ** (BR-103) | 1 tiếng |
-| Nhịp chạy job dọn giữ chỗ quá hạn (BR-103) | 30 giây |
 
 Lý do: Tech Owner chưa có xe, chưa có khách, chưa có dữ liệu thị trường — mọi con số hiện tại là
 phỏng đoán có tham chiếu. Đóng cứng phỏng đoán vào code nghĩa là mỗi lần sửa phải chờ một đợt
 phát hành. Danh sách ngày lễ càng rõ: mỗi năm lịch nghỉ khác nhau, không ai muốn phát hành lại app
 vì Tết rơi vào ngày khác.
-*Nguồn: Tech Owner duyệt 24/08/2026.*
+
+**Không thuộc bảng này — tham số vận hành.** Nhịp chạy job dọn giữ chỗ quá hạn (BR-103), khởi điểm
+**30 giây**, cũng không đóng cứng trong code, nhưng nằm ở **cấu hình ứng dụng** và **không** có hiệu
+lực theo thời gian. Nó quyết định máy chạy thế nào, không quyết định khách trả bao nhiêu hay được
+gì — câu hỏi "lúc khách đặt đơn thì nhịp dọn là bao nhiêu" không có ý nghĩa nghiệp vụ.
+
+**Tạm thời, cho tới khi có module `config`:** thời hạn giữ chỗ đọc từ cấu hình ứng dụng. Admin chưa
+chỉnh được trên màn hình quản trị, chưa có lịch sử hiệu lực, và đổi giá trị phải khởi động lại hệ
+thống. Mỗi chỗ giữ vẫn đóng băng hạn của nó tại lúc tạo, nên đổi cấu hình không ảnh hưởng chỗ đang giữ.
+*Nguồn: Tech Owner duyệt 24/08/2026. Làm rõ 30/09/2026.*
 
 ---
 
@@ -1161,6 +1169,7 @@ phần của mình.
 | Danh mục giấy tờ bắt buộc khi duyệt xe đối tác (BR-009) | GĐ2 |
 | Vai nào thực hiện duyệt KYC đối tác | GĐ2 |
 | Khoảng đệm có khác nhau giữa nhận tại chi nhánh và giao tận nơi không | |
+| Khoá vận hành (bảo dưỡng, điều chuyển, chủ xe tự khoá) xong sớm hoặc tạo nhầm: có được nhả phần còn lại hoặc huỷ không | Hiện tại hoàn tất vẫn chặn tới hết khoảng đã đặt, và không có cách huỷ — status-flow §2. Chưa ai gọi nên chưa gấp |
 
 ---
 
