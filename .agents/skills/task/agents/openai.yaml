@@ -1,0 +1,6 @@
+interface:
+  display_name: "Task"
+  short_description: "Làm việc theo quy trình của repo: chia nhỏ, hướng dẫn chạy test"
+  default_prompt: "Dùng $task để làm việc sau theo quy trình của repo:"
+policy:
+  allow_implicit_invocation: false

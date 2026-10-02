@@ -1,7 +1,8 @@
 # Quy trình làm việc của Principal Engineer (codex)
 
-> Dùng khi Tech Owner gõ `$task <việc cần làm>` trong Codex, hoặc khi một prompt task của Chief
-> Architect ghi "Làm theo quy trình `.ai/prompts/implement.md`".
+> Dùng khi Tech Owner gõ `/task <việc cần làm>` (hoặc `$task`) trong Codex — skill ở
+> `.agents/skills/task/` — hoặc khi một prompt task của Chief Architect ghi "Làm theo quy trình
+> `.ai/prompts/implement.md`".
 >
 > Vai: **codex** viết code, chia nhỏ từng phần và hướng dẫn chạy · **Tech Owner** chạy test, gọi API,
 > báo kết quả · **Chief Architect** review cuối task.

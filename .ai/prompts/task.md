@@ -7,7 +7,7 @@
 >
 > Từ Task 5b (02/10/2026). Trước đó Tech Owner tự gõ code `main`.
 >
-> Đừng nhầm với `$task` của Codex: lệnh đó **làm** việc (`.ai/prompts/implement.md`). File này là cách
+> Đừng nhầm với `/task` của Codex: lệnh đó **làm** việc (`.ai/prompts/implement.md`). File này là cách
 > **soạn prompt**.
 
 ---
