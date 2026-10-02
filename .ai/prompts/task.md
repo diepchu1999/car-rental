@@ -1,9 +1,14 @@
 # Quy trình soạn prompt task cho codex
 
-> Dùng chung cho Claude Code và Codex. Wrapper của từng công cụ chỉ trỏ tới file này.
+> Dùng bởi `/task` của Claude Code (`.claude/commands/task.md` chỉ trỏ tới file này).
 >
-> Vai: **Chief Architect** soạn prompt · **Tech Owner** tự gõ code `main` ·
-> **codex** (Principal Engineer) hướng dẫn, và tự viết test.
+> Vai: **Chief Architect** soạn prompt và review cuối · **codex** (Principal Engineer) viết code,
+> chia nhỏ từng phần và hướng dẫn chạy · **Tech Owner** chạy test, gọi API, báo kết quả.
+>
+> Từ Task 5b (02/10/2026). Trước đó Tech Owner tự gõ code `main`.
+>
+> Đừng nhầm với `$task` của Codex: lệnh đó **làm** việc (`.ai/prompts/implement.md`). File này là cách
+> **soạn prompt**.
 
 ---
 
@@ -33,40 +38,29 @@ Xuất ra **một khối markdown liền** để Tech Owner copy nguyên khối 
 Repo ở `/Users/diepchu/project/car-rental/`. Nêu trạng thái hiện tại của code, và **liệt kê cụ thể
 những tài liệu codex phải đọc trước** — chỉ những cái liên quan tới task này, không liệt kê hết.
 
-Nêu phân vai: Tech Owner tự gõ code và chạy lệnh · Chief Architect đã viết tài liệu, sẽ review sau ·
-codex là Principal Engineer.
+Nêu phân vai: codex viết code · Tech Owner chạy test và gọi API theo hướng dẫn của codex ·
+Chief Architect đã viết tài liệu, sẽ review sau cùng.
 
-### §2 QUAN TRỌNG NHẤT — cách codex phải hướng dẫn
-Chép nguyên văn, **không rút gọn**:
+### §2 Quy trình làm việc của codex
+Dòng đầu tiên của §2 trong prompt, chép nguyên văn:
 
-> **Chia việc:**
->
-> | Phạm vi | Ai làm |
-> |---|---|
-> | `src/main/**` — gồm cả migration và file `.sql` | **Tech Owner tự gõ.** Bạn hướng dẫn, không tự sửa file |
-> | `src/test/**` | **Bạn tự viết và tự chạy** |
-> | Chạy `./mvnw clean verify` | **Bạn chạy**, rồi báo kết quả |
->
-> Với phần `src/main/**`, Tech Owner tự gõ hoặc copy. Vì vậy:
->
-> 1. **Hướng dẫn từng bước một, theo thứ tự chạy được.**
-> 2. **Viết đầy đủ nội dung từng file.** Không cắt bớt bằng `...`, không viết "phần còn lại tương tự".
->    Sửa một phần file có sẵn thì chỉ rõ đoạn cũ và đoạn mới, đủ ngữ cảnh để không dán nhầm chỗ.
-> 3. **Nói rõ file nào, đường dẫn nào**, tạo mới hay sửa.
-> 4. **Sau mỗi bước, giải thích ngắn gọn vừa làm gì và vì sao** — Tech Owner đang học trong lúc xây.
-> 5. **Kèm lệnh kiểm chứng sau mỗi phần**, nói rõ kết quả đúng trông như thế nào, và nếu sai thì
->    thường sai ở đâu.
-> 6. **Viết bằng tiếng Việt.**
-> 7. Không làm quá phạm vi. Thấy việc đáng làm nhưng ngoài phạm vi thì ghi chú ở cuối, đừng tự làm.
+> **Làm theo quy trình `.ai/prompts/implement.md`** — chia việc, cách hướng dẫn chạy test và Postman,
+> chốt chặn đều ở đó.
 
-Task lớn thì thêm: chia phần rõ ràng, **dừng chờ Tech Owner xác nhận sau mỗi phần**.
+**Không chép lại các quy tắc đó vào prompt.** Chép lại thì hai bản sẽ lệch nhau, và codex không biết
+tin bản nào. Tech Owner cũng có thể gõ thẳng `$task <việc>` trong Codex cho việc nhỏ — cùng một quy trình.
 
-**Vì Tech Owner không đọc file test**, sau khi viết test bạn phải **tóm tắt bằng tiếng Việt từng
-test khẳng định điều gì** — một dòng mỗi test. Không dán code test ra, chỉ nói nó kiểm cái gì.
-Đây là cách duy nhất Tech Owner biết được thứ gì đã được phủ và thứ gì chưa.
+Chỉ ghi thêm những điều **riêng của task này**, ví dụ:
+- Module không có REST → ghi rõ, để codex không bịa endpoint chỉ để có cái mà test.
+- Tiêu chí nào phải chứng minh test **đỏ được** khi tắt cơ chế bảo vệ.
+- Gợi ý chia phần khi thứ tự quan trọng (migration trước, code dùng nó sau).
 
-### §3 Bước kế hoạch — thêm khi task lớn hoặc tinh tế
-Bắt codex **trình bày cách làm trước, chờ duyệt, rồi mới viết code**.
+**Tech Owner không đọc code** — cả `main` lẫn test. Họ chỉ thấy hành vi qua kết quả chạy. Nên tiêu chí
+nghiệm thu ở §6 phải là thứ họ **tự chạy được và tự thấy được**.
+
+### §3 Bước kế hoạch — điều kế hoạch phải trả lời
+`implement.md` luôn bắt codex trình bày kế hoạch và chờ duyệt. Với task lớn hoặc tinh tế, prompt nêu thêm
+**những câu kế hoạch phải trả lời được**.
 
 Bài học thật: ở Task 3 và Task 4, bước này khiến codex tìm ra **lỗi trong chính tài liệu kiến trúc**
 trước khi một dòng code nào được viết. Nếu bỏ qua, những lỗi đó đã nằm trong code.
@@ -85,7 +79,7 @@ tới cái chưa tồn tại thì xử lý sao.
   Được phép **đề xuất** commit message.
 
 ### §6 Tiêu chí nghiệm thu
-Phải là thứ Tech Owner **tự chạy lệnh kiểm được**, không phải "codex bảo xong".
+Phải là thứ Tech Owner **tự chạy lệnh hoặc tự gửi request kiểm được**, không phải "codex bảo xong".
 
 Ba loại tiêu chí đã chứng minh giá trị:
 - **Phép thử phá hoại** — ràng buộc CSDL thì phải *cố tình vi phạm* rồi xem có bị chặn không.
@@ -105,4 +99,6 @@ phình thành ba.
 ### §8 Báo cáo cuối task
 - Những lựa chọn kỹ thuật đã chọn và **vì sao**.
 - Chỗ nào thấy tài liệu chưa rõ hoặc mâu thuẫn — **ghi lại, đừng tự quyết**.
+- **Bộ request Postman của cả task**, gom một chỗ theo thứ tự chạy, để Tech Owner lưu thành collection.
+- Danh sách file đã tạo hoặc sửa trong cả task.
 - Đề xuất commit message (Tech Owner tự chạy lệnh).

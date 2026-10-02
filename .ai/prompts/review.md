@@ -2,9 +2,11 @@
 
 > Dùng chung cho Claude Code và Codex. Wrapper của từng công cụ chỉ trỏ tới file này.
 >
-> Đây là **review vòng 2**. Vòng 1 do codex làm, soi "code có chạy đúng không".
-> Vòng 2 soi thứ khác: **có khớp quy tắc không, có phá ranh giới không, bất biến có thật sự
-> được ép không.**
+> Đây là **review vòng 2**. Vòng 1 là codex viết code và Tech Owner chạy test, gọi API — soi
+> "chạy có đúng không". Vòng 2 soi thứ khác: **có khớp quy tắc không, có phá ranh giới không,
+> bất biến có thật sự được ép không.**
+>
+> Review theo **diff từ commit trước task** — Tech Owner commit trước khi giao task cho codex.
 
 ---
 
@@ -75,13 +77,16 @@ tắc khác cũng chỉ là gợi ý.
   một cảnh báo đã biết là sai.
 - Kết thúc bằng một câu hỏi rõ: gộp vào task sau hay tách task dọn riêng.
 
-## 7. Đọc cả file test — vì không còn ai khác đọc
+## 7. Đọc toàn bộ code — vì không còn ai khác đọc
 
-Từ Task 5, **codex tự viết test, Tech Owner chỉ gõ code `main`**. Nghĩa là **không ai đọc file test
-trừ review vòng 2**.
+Từ Task 5b, **codex viết cả code `main` lẫn test, Tech Owner chỉ chạy**. Nghĩa là **không ai đọc code
+— kể cả `main` — trừ review vòng 2**. Tech Owner thấy hành vi qua kết quả chạy, nhưng không thấy code
+đạt được hành vi đó bằng cách nào.
 
-Trước đây Tech Owner gõ tay nên ít nhất còn liếc qua. Giờ thì không. Nên review phải mở file test ra
-đọc, và soi ba thứ:
+Thêm một việc: **đối chiếu các bước codex bảo Tech Owner chạy với tiêu chí nghiệm thu.** Bước nào chạy
+xong xanh mà không chứng minh được tiêu chí nào thì nó chỉ tạo cảm giác an toàn.
+
+Với file test, soi ba thứ:
 
 - **Test có khẳng định hành vi thật không**, hay chỉ khẳng định thứ luôn đúng? Một test gọi hàm rồi
   `assertNotNull` là test rỗng.
