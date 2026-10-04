@@ -64,6 +64,7 @@
 | Giữ chỗ | `HELD` | Khoá lịch tạm trong lúc khách thanh toán — hết hạn sau 1 tiếng |
 | Khoảng đệm | `turnaround_buffer` | Thời gian giữa hai lượt thuê để dọn và nạp nhiên liệu |
 | Khoá do giấy tờ | `COMPLIANCE_HOLD` | Khoá lịch vì đăng kiểm hoặc TNDS hết hạn — khoảng không chặn trên |
+| Dời điểm bắt đầu khoá giấy tờ | `moveComplianceHoldStart` | Chỉ khi giấy tờ được gia hạn (BR-015). **Không gọi là "hoãn"** (`postpone`): BR-013 dùng "hoãn đăng kiểm" cho việc vi phạm pháp luật |
 
 > **"Giữ chỗ" và "khoá lịch" không đồng nghĩa.** Khoá lịch là khái niệm chung: đơn thuê, bảo dưỡng,
 > đăng kiểm, điều chuyển, chủ xe tự khoá — tất cả đều là khoá lịch. Giữ chỗ là **một trạng thái**

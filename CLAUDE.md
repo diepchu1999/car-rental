@@ -14,7 +14,7 @@ tài liệu · Principal Engineer (codex) hiện thực theo tài liệu đã ch
 |---|---|
 | Nghiệp vụ giai đoạn 1 | ✅ **155 quy tắc BR đã chốt** |
 | Kiến trúc | ✅ 15 ADR ACCEPTED, 10 guideline, 11 rule khoá bằng test |
-| Code | 🟡 Đang làm — `shared`, `branch`, `vehicle` xong; `availability` chờ Task 5b; 1.033 test xanh |
+| Code | 🟡 Đang làm — `shared`, `branch`, `vehicle`, `availability` xong; 1.139 test xanh |
 | Môi trường | Local, chưa build production |
 
 ## Quy tắc số một
