@@ -49,8 +49,8 @@ public enum ReservationKind {
     /**
      * Khóa lịch do giấy tờ bắt buộc của xe hết hạn theo BR-015.
      *
-     * <p>Đây là loại khóa duy nhất được phép có khoảng thời gian
-     * không chặn trên. Việc theo dõi giấy tờ và tự tạo khóa
+     * <p>Khóa bắt buộc không chặn trên và luôn BLOCKED, không hoàn tất hoặc giải phóng.
+     * Việc theo dõi giấy tờ và tự tạo khóa
      * thuộc module fleet, không thuộc domain availability.
      */
     COMPLIANCE_HOLD

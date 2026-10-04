@@ -1,0 +1,6 @@
+interface:
+  display_name: "Review"
+  short_description: "Review code theo quy trình của repo"
+  default_prompt: "Dùng $review để review phạm vi code sau theo quy ước của repo."
+policy:
+  allow_implicit_invocation: false

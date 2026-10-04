@@ -14,7 +14,7 @@ tài liệu · Principal Engineer (codex) hiện thực theo tài liệu đã ch
 |---|---|
 | Nghiệp vụ giai đoạn 1 | ✅ **155 quy tắc BR đã chốt** |
 | Kiến trúc | ✅ 15 ADR ACCEPTED, 10 guideline, 11 rule khoá bằng test |
-| Code | 🟡 Đang làm — `shared`, `branch`, `vehicle` xong; 397 test xanh |
+| Code | 🟡 Đang làm — `shared`, `branch`, `vehicle`, `availability` xong; 1.139 test xanh |
 | Môi trường | Local, chưa build production |
 
 ## Quy tắc số một
@@ -57,7 +57,7 @@ test nào cần chạy lại, và cái gì có thể hỏng theo.
 **Nghiệp vụ** — `car-rental-docs/vi/business/`
 | File | Khi nào cần |
 |---|---|
-| `business-rules.md` | Luôn luôn — 149 quy tắc, và mục "chưa chốt" ở cuối |
+| `business-rules.md` | Luôn luôn — 155 quy tắc, và mục "chưa chốt" ở cuối |
 | `glossary.md` | Trước khi đặt tên bất cứ thứ gì |
 | `domain-map.md` | Khi cần biết việc này thuộc vùng nào |
 | `status-flow.md` | Khi chạm tới trạng thái đơn, khoá lịch, tiền, hợp đồng |
@@ -117,6 +117,8 @@ Những điều trên được khoá bằng `ArchitectureRulesTest` (R1 → R11)
 - **Mọi thao tác ghi tiền** — idempotency key, kể cả thao tác do người thực hiện.
 - **Trừ hạn mức mã giảm giá** — cập nhật nguyên tử.
 - **Đổi xe giữ cọc** — giữ được chỗ mới **trước khi** nhả chỗ cũ.
+- **Mọi câu ghi vào bảng có ràng buộc loại trừ** — savepoint + thử lại `40P01` tối đa 3 lần, kể cả
+  `UPDATE` chỉ đổi `status` (backend-guideline §3). Deadlock ở đây là bình thường, không phải sự cố.
 
 Mọi tính năng chạm bốn thứ này — lịch, tiền, phân công người, hạn mức — phải có **test đồng thời
 thật** với PostgreSQL thật. Test tuần tự không chứng minh gì.

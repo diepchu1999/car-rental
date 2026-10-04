@@ -39,6 +39,26 @@ WHERE code = :code AND used_count < max_usage;
 ```
 Kiểm số dòng bị ảnh hưởng: `1` là thành công, `0` là hết lượt.
 
+### Ghi vào bảng có ràng buộc loại trừ — savepoint và thử lại deadlock
+
+Áp cho `availability.reservation`, và cho bảng phân công tài xế, nhân viên giao xe sau này.
+
+Hai câu ghi chồng lịch chạy cùng lúc có thể deadlock (`40P01`) — kể cả `UPDATE` chỉ đổi `status`.
+Cơ chế và số đo ở `database-guideline.md` §4. Quy tắc:
+
+1. **Mọi câu ghi** vào bảng đó chạy trong **savepoint** của transaction bên gọi
+   (`TransactionTemplate` với `PROPAGATION_NESTED`, dựng trong persistence adapter).
+2. Chỉ thử lại khi SQLSTATE là **`40P01`**, nhận diện qua `PSQLException`. Không bắt cả
+   `PessimisticLockingFailureException` — nó gồm cả lock timeout `55P03`.
+3. Tối đa **3 lần** tính cả lần đầu, giữ nguyên tham số. Hết lượt thì ném lại **đúng** lỗi deadlock đầu
+   tiên — **không** đổi thành lỗi nghiệp vụ "xe đã bận", vì bên kia có thể rollback và xe vẫn trống.
+4. Việc này nằm ở **adapter**. Application không biết SQLSTATE (R11).
+
+Vì sao savepoint mà không thử lại cả transaction: transaction thuộc về bên gọi (`booking` giữ chỗ trong
+transaction của nó). Savepoint cho phép thử lại đúng một câu ghi mà không bắt mọi bên gọi phải biết
+chuyện này. Lần thử lại sẽ chờ bên thắng kết thúc: bên thắng commit thì nhận `23P01` — đúng là xe bận;
+bên thắng rollback thì ghi thành công — đúng là xe trống.
+
 ### Idempotency cho mọi thao tác tiền
 Kể cả thao tác do người thực hiện — nhân viên bấm hai lần là chuyện thường (ADR-0011).
 
@@ -103,8 +123,14 @@ Mã lỗi là **hợp đồng ổn định** — mobile bản cũ hiển thị t
 | Hai luồng cùng xác nhận một khoản thanh toán | Chỉ ghi nhận một lần |
 | Nhiều khách cùng dùng mã giảm giá còn 1 lượt | Đúng một người được |
 | Hai luồng cùng phân công một tài xế chồng giờ | Đúng 1 thành công |
+| Giữ chỗ chạy song song với khoá vận hành hoặc với xác nhận trên cùng khoảng, lặp ≥ 100 lần | 0 lỗi hạ tầng (không có `40P01` lọt ra) |
 
 Kịch bản thứ ba đáng chú ý: `tstzrange` mặc định là `[)` nên hai khoảng liền kề **không** chồng nhau.
 Đó là hành vi ta muốn, và test này khoá nó lại.
 
 Test tuần tự không chứng minh được gì về những trường hợp trên.
+
+**Test đồng thời phải chứng minh được là nó đỏ được.** Lỗi đồng thời thường chỉ hiện ở một phần nhỏ số
+lần chạy, nên một lần xanh không nói gì. Với cơ chế chống lỗi (như thử lại deadlock), tắt cơ chế đó trên
+một bản sao rồi chạy lại test: phải đỏ. Task 5: tắt thử lại thì cuộc đua giữ chỗ/khoá vận hành đỏ
+36/200 lần; bật lại thì 0/100.

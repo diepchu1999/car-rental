@@ -24,6 +24,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;     -- hash số định danh
 |---|---|---|
 | Chi nhánh | `CN-<6>` | `CN-3TR7WK` |
 | Xe | `XE-<6>` | `XE-8KQ4M2` |
+| Khoá lịch | `KL-<6>` | `KL-5HV2QN` |
 | Đơn thuê | `DT-<yymm>-<6>` | `DT-2608-3XK9PQ` |
 | Thanh toán | `TT-<yymm>-<8>` | `TT-2608-4M2XK9PQ` |
 | Biên bản bàn giao | `BB-<yymm>-<6>` | `BB-2608-1AB2CD` |
@@ -31,6 +32,9 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;     -- hash số định danh
 | Chi trả đối tác | `CT-<yymm>-<6>` | `CT-2608-5NM8XV` |
 
 Mã sinh ở tầng application, có ràng buộc `UNIQUE`.
+
+Khoá lịch không kèm `<yymm>` dù là dữ liệu giao dịch: bản ghi đã mang sẵn `period`, nên tháng tạo
+không cho người đọc thêm thông tin gì.
 
 ## 3. Migration
 Flyway. Mọi thay đổi qua migration, **không sửa file đã chạy**, đặt tên có tiền tố module:
@@ -115,6 +119,20 @@ CREATE INDEX idx_reservation_vehicle_period
     ON availability.reservation USING gist (vehicle_id, period);
 CREATE INDEX idx_reservation_hold_expiry
     ON availability.reservation (hold_expires_at) WHERE status = 'HELD';
+
+-- Bổ sung ở V005 (V004 đã chạy nên không sửa lại).
+ALTER TABLE availability.reservation
+  -- Cặp kind/status hợp lệ theo status-flow §2: khoá vận hành không qua HELD,
+  -- CONFIRMED, IN_USE; đơn thuê không bao giờ BLOCKED.
+  ADD CONSTRAINT chk_kind_status CHECK (
+      (kind = 'RENTAL' AND status IN ('HELD', 'CONFIRMED', 'IN_USE', 'RELEASED', 'COMPLETED'))
+      OR (kind <> 'RENTAL' AND status IN ('BLOCKED', 'COMPLETED'))
+  ),
+  -- Khoá do giấy tờ luôn không chặn trên và luôn BLOCKED (BR-015).
+  -- Cùng với chk_unbounded_only_compliance: COMPLIANCE_HOLD <=> không chặn trên.
+  ADD CONSTRAINT chk_compliance_open_blocked CHECK (
+      kind <> 'COMPLIANCE_HOLD' OR (upper_inf(period) AND status = 'BLOCKED')
+  );
 ```
 
 ### Ba điều không được phá
@@ -147,6 +165,13 @@ không chặn nhầm ai.
 
 `RELEASED` thì ngược lại — chỗ giữ đã nhả thì không được chặn gì nữa.
 
+**Hệ quả phải nhớ:** bản ghi **không chặn trên** mà sang `COMPLETED` thì chặn **mãi mãi**. Vì vậy
+`COMPLIANCE_HOLD` không bao giờ được hoàn tất — `chk_compliance_open_blocked` ép điều đó. Task 5 đã
+suýt để lọt lỗi này vì status-flow §2 từng vẽ khoá giấy tờ đi chung đường `BLOCKED → COMPLETED`.
+
+Khoá vận hành hữu hạn (bảo dưỡng, điều chuyển…) sang `COMPLETED` thì vẫn chặn tới hết khoảng đã đặt,
+kể cả khi xong sớm. Có nên nhả phần còn lại không — chưa chốt.
+
 ### Khoá do giấy tờ hết hạn — khoảng không chặn trên
 
 `kind = 'COMPLIANCE_HOLD'` dùng cho trường hợp đăng kiểm hoặc TNDS hết hạn (BR-015).
@@ -162,10 +187,39 @@ VALUES (:vehicle_id, tstzrange(:expires_at, NULL, '[)'), 'COMPLIANCE_HOLD', 'BLO
 mọi đơn thuê sau `D` đều bị từ chối.
 
 Gia hạn giấy tờ thì **`UPDATE` điểm bắt đầu** tới hạn mới, không xoá rồi tạo lại. Xoá rồi tạo lại tạo
-ra một khoảnh khắc xe không bị chặn, và dưới đồng thời thì khoảnh khắc đó đủ để lọt một đơn.
+ra một khoảnh khắc xe không bị chặn, và dưới đồng thời thì khoảnh khắc đó đủ để lọt một đơn. Điểm bắt
+đầu chỉ được dời **về sau** — thu hẹp khoảng thì không thể sinh chồng lịch mới.
 
-Mỗi xe có tối đa một `COMPLIANCE_HOLD` đang hiệu lực cho mỗi loại giấy tờ. Nếu cả đăng kiểm lẫn TNDS
-cùng hết hạn thì lấy mốc sớm hơn.
+Mỗi xe có tối đa **một** `COMPLIANCE_HOLD` — **không** phải một cho mỗi loại giấy tờ: hai khoảng không
+chặn trên trên cùng một xe luôn chồng nhau, nên ràng buộc loại trừ từ chối cái thứ hai. Điểm bắt đầu là
+hạn **sớm nhất** trong các giấy tờ bắt buộc; gia hạn một giấy tờ thì dời tới hạn sớm nhất mới.
+(Bản trước của đoạn này ghi "một cho mỗi loại giấy tờ" — sai, ràng buộc không cho phép.)
+
+Khoá phải được tạo **ngay khi biết ngày hết hạn** — lúc duyệt xe (BR-005) — không đợi tới ngày `D`.
+Đợi thì một đơn đã đặt qua mốc `D` sẽ khiến CSDL từ chối tạo khoá, và BR-016 mất tác dụng.
+
+### Câu ghi nào kích hoạt ràng buộc loại trừ — và vì sao phải bọc savepoint
+
+Ràng buộc loại trừ được kiểm **sau khi** ghi mục index mới. Hai câu ghi chồng lịch chạy cùng lúc có thể
+cùng thấy bản ghi chưa commit của nhau và chờ nhau: **deadlock** (`40P01`). Bất biến không thủng — chỉ
+một bên commit — nhưng bên thua nhận lỗi 500 thay vì 409.
+
+Câu ghi nào kích hoạt kiểm tra:
+
+| Câu ghi | Kích hoạt? | Đã đo (Task 5) |
+|---|---|---|
+| `INSERT` vào vùng chặn | Có | 10 deadlock / 8.703 giao dịch, 2 luồng |
+| `UPDATE` đổi `period` (dời điểm bắt đầu) | Có | — cùng cơ chế |
+| `UPDATE` **chỉ đổi `status`**, trạng thái mới vẫn trong vùng chặn (xác nhận, bàn giao, hoàn tất) | **Có** | 7 deadlock / 56 lần đổi trạng thái khi có INSERT chồng chạy song song |
+| `UPDATE` sang `RELEASED` | Không — bản ghi mới ra khỏi vùng chặn | — |
+
+Dòng thứ ba không hiển nhiên: `status` nằm trong mệnh đề `WHERE` của index loại trừ, nên PostgreSQL
+**không** dùng HOT update được (đo: 0/56 lần là HOT) — mỗi lần đổi trạng thái lại ghi mục index mới và
+kiểm lại ràng buộc.
+
+Cách xử lý (backend-guideline §3): **mọi câu ghi** vào bảng có ràng buộc loại trừ chạy trong savepoint
+của transaction bên gọi, thử lại `40P01` tối đa 3 lần. Bọc cả câu sang `RELEASED` cho đồng nhất — ít một
+ngoại lệ phải nhớ. Bỏ `ON CONFLICT` **không** giúp gì: đo ra tần suất deadlock tương đương.
 
 ### Cùng cơ chế cho người
 ```sql

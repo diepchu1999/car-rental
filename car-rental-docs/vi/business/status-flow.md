@@ -102,8 +102,8 @@ Với thuê **tự lái**, thêm điều kiện: người nhận xe khớp giấ
 Mọi lý do khiến xe bận đều dùng chung máy trạng thái này.
 
 ```text
-   (đơn thuê)                          (bảo dưỡng · đăng kiểm · điều chuyển ·
-        │                               chủ xe khoá · giấy tờ hết hạn)
+   (đơn thuê)                          (bảo dưỡng · đăng kiểm ·
+        │                               điều chuyển · chủ xe khoá)
         ▼                                        │
    ┌─────────┐  hết hạn 1 tiếng   ┌──────────┐   │
    │  HELD   │───────────────────►│ RELEASED │   │
@@ -120,6 +120,28 @@ Mọi lý do khiến xe bận đều dùng chung máy trạng thái này.
    └────────────┘             └───────────┘  └───────────┘
 ```
 
+Khoá do giấy tờ hết hạn (`COMPLIANCE_HOLD`) có máy trạng thái **riêng** — nó không đi đường "xong việc":
+
+```text
+   (giấy tờ hết hạn ngày D)
+        │
+        ▼
+   ┌──────────────┐   gia hạn giấy tờ: dời điểm bắt đầu tới hạn mới (BR-015)
+   │   BLOCKED    │──┐
+   │   [D, ∞)     │◄─┘
+   └──────────────┘
+   Không có cạnh ra: không bao giờ COMPLETED, không bao giờ RELEASED.
+```
+
+**Vì sao không được hoàn tất khoá giấy tờ:** `COMPLETED` vẫn chặn (để giữ khoảng đệm của đơn thuê —
+database-guideline §4), mà khoảng này không có chặn trên. Hoàn tất nó nghĩa là khoá xe **vĩnh viễn**,
+và xe lặng lẽ biến mất khỏi tìm kiếm. Bản trước của sơ đồ này vẽ "giấy tờ hết hạn" đi chung đường
+`BLOCKED → COMPLETED` — sai, phát hiện ở review vòng 2 Task 5.
+
+**Khoá vận hành xong sớm hoặc tạo nhầm:** `BLOCKED → COMPLETED` vẫn chặn tới hết khoảng đã đặt, và
+hiện không có cách huỷ một khoá. Có nên nhả phần còn lại hay không — **chưa chốt** (business-rules.md,
+mục "Quy tắc chưa chốt").
+
 | Bất biến | Quy tắc |
 |---|---|
 | Không hai khoá lịch nào chồng thời gian trên cùng một xe | BR-104 |
@@ -127,6 +149,8 @@ Mọi lý do khiến xe bận đều dùng chung máy trạng thái này.
 | Khoảng đệm (2 giờ / 1 giờ gói giờ) nằm **bên trong** khoảng khoá | BR-109, BR-116 |
 | `BLOCKED` đi thẳng vào trạng thái chặn, không qua `HELD` | BR-011, BR-012, BR-007 |
 | Khoá do giấy tờ hết hạn là khoảng **không chặn trên**, gia hạn thì dời điểm bắt đầu | BR-015 |
+| Khoá do giấy tờ hết hạn **không bao giờ** sang `COMPLETED` hay `RELEASED` — chỉ dời điểm bắt đầu | BR-015, BR-012 |
+| Mỗi xe tối đa **một** khoá do giấy tờ; điểm bắt đầu là hạn **sớm nhất** trong các giấy tờ bắt buộc | BR-015 |
 | Chỉ vùng `availability` được tạo và đổi trạng thái khoá lịch | domain-map §4 |
 
 ---

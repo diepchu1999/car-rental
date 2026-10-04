@@ -43,6 +43,7 @@ com/carrental/<module>/
     │   │   ├── request/
     │   │   └── response/
     │   └── admin/            # /api/v1/admin/**   → admin-web
+    ├── in/internal/          # cài đặt api/<X>Directory — cổng module khác gọi vào
     ├── in/scheduler/         # job định kỳ: dọn HELD quá hạn, nhắc kỳ thanh toán
     └── out/
         ├── persistence/      # Native SQL
@@ -50,6 +51,7 @@ com/carrental/<module>/
         │   ├── <X>WriteAdapter.java
         │   ├── <X>SqlPaths.java
         │   └── <X>RowMappers.java
+        ├── configuration/    # đọc tham số từ cấu hình ứng dụng — tạm, chờ module config (ADR-0013)
         ├── storage/          # S3/MinIO
         └── notification/     # push/SMS/email
 ```
@@ -123,6 +125,8 @@ Không tầng nào nhảy cóc.
 ## 5. Cross-module
 
 - Module B expose `api/<B>Directory` (interface) + `api/<B>Ref` (record: id + code + field tối thiểu).
+- Module B cài đặt `<B>Directory` ở `adapter/in/internal/` — với B, module khác gọi vào cũng là một
+  lối vào như REST hay scheduler.
 - Module A import **chỉ** `com.carrental.<B>.api.*`.
 - Toàn vẹn tham chiếu kiểm ở application qua `Directory`, không bằng khoá ngoại (ADR-0008).
 

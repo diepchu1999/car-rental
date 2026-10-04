@@ -46,6 +46,38 @@ Khoảng đệm được cộng vào khi tạo bản ghi, **không phải** khi 
 **3. `HELD` bắt buộc có hạn.** BR-103: 1 tiếng. Ép bằng `CHECK`, và có job dọn bản quá hạn. Không có
 hạn thì xe bị khoá vĩnh viễn bởi những đơn khách bỏ dở.
 
+## Làm rõ 02/10/2026 — ba điều Task 5 phát hiện
+
+Không đổi quyết định: ràng buộc loại trừ vẫn là cơ chế **duy nhất** chống trùng lịch. Đây là ba chỗ bản
+gốc ở trên nói thiếu hoặc sai.
+
+**1. `COMPLETED` nằm trong mệnh đề `WHERE`.** Câu SQL ở mục Quyết định thiếu nó. Đúng là
+`status IN ('HELD', 'CONFIRMED', 'IN_USE', 'BLOCKED', 'COMPLETED')` — để khoảng đệm sau khi trả xe vẫn
+chặn. Ví dụ và lý do ở `database-guideline.md` §4; V004 đã dùng bản đúng.
+
+**2. Hệ quả của điểm 1: khoảng không chặn trên không bao giờ được sang `COMPLETED`.** Nếu không, xe bị
+khoá vĩnh viễn. Khoá do giấy tờ (BR-015) chỉ được dời điểm bắt đầu. Ép bằng `chk_compliance_open_blocked`
+(V005). Lỗi này lọt qua tài liệu (status-flow §2), không phải qua code — review vòng 2 bắt được.
+
+**3. Ràng buộc loại trừ có thể gây deadlock.** Ràng buộc được kiểm **sau khi** ghi, nên hai câu ghi chồng
+lịch chạy cùng lúc có thể chờ nhau. Đo trên PostgreSQL 17.5 với đúng schema V004:
+
+| Tình huống | Kết quả |
+|---|---|
+| 2 luồng `INSERT` chồng lịch, 12 giây | 10 deadlock / 8.703 giao dịch |
+| Như trên, bỏ `ON CONFLICT` | 10 deadlock / 12.719 — `ON CONFLICT` không phải nguyên nhân |
+| Như trên, bọc savepoint + thử lại `40P01` | 0 / 15.722 |
+| `UPDATE` chỉ đổi `status` song song với `INSERT` chồng lịch | 7 deadlock / 56 lần đổi trạng thái |
+
+Bất biến **không thủng** — PostgreSQL huỷ một bên, chỉ một bên commit. Cái hỏng là bên thua nhận 500
+thay vì 409. Quyết định bổ sung: mọi câu ghi vào bảng có ràng buộc loại trừ chạy trong savepoint, thử lại
+`40P01` tối đa 3 lần, ở persistence adapter (`backend-guideline.md` §3). Áp cho cả bảng phân công tài xế
+và nhân viên giao xe.
+
+Đã cân nhắc và loại: đổi `40P01` thành "xe đã bận" (sai khi bên kia rollback), thử lại cả transaction ở
+ranh giới (mọi bên gọi phải biết), advisory lock theo xe (cơ chế thứ hai, và chính nó deadlock khi đổi xe
+giữ cọc khoá hai xe cùng lúc).
+
 ## Hệ quả
 - Chỉ vùng `availability` được ghi vào bảng này. Khoá bằng test kiến trúc.
 - Adapter bắt vi phạm ràng buộc và dịch thành lỗi nghiệp vụ → HTTP 409. Đây là **ngoại lệ có chủ

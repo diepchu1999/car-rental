@@ -27,3 +27,8 @@ management:
 
 car-rental:
   time-zone: ${CAR_RENTAL_TIME_ZONE:Asia/Ho_Chi_Minh}
+  availability:
+    # BR-103, BR-225: thời hạn giữ chỗ; nguồn cấu hình local trước khi có module config.
+    hold-duration: ${CAR_RENTAL_HOLD_DURATION:PT1H}
+    # Tham số vận hành: nhịp dọn giữ chỗ quá hạn, không qua port chính sách.
+    hold-sweep-interval: ${CAR_RENTAL_HOLD_SWEEP_INTERVAL:PT30S}

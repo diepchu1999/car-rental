@@ -138,6 +138,8 @@ Các cổng chính:
 | `booking` giữ chỗ | `availability` | `AvailabilityDirectory.hold(...)` |
 | `search` lọc xe đang bận | `availability` | `AvailabilityDirectory.findBusyVehicleIds(...)` |
 | `fleet` khoá lịch bảo dưỡng | `availability` | `AvailabilityDirectory.block(...)` |
+| `fleet` tạo khoá giấy tờ **lúc duyệt xe**, không đợi tới ngày hết hạn | `availability` | `AvailabilityDirectory.block(..., COMPLIANCE_HOLD)` |
+| `fleet` dời khoá giấy tờ khi giấy tờ được gia hạn | `availability` | `AvailabilityDirectory.moveComplianceHoldStart(...)` |
 | `compliance` truy vết người lái | `booking`, `dispatch` | `BookingDirectory`, `DriverAssignmentDirectory` |
 | Mọi module đọc tham số | `config` | `ConfigurationPort` — **chỉ ở thời điểm tạo đơn** (ADR-0014) |
 
