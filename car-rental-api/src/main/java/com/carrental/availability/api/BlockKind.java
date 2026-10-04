@@ -41,7 +41,7 @@ public enum BlockKind {
     /**
      * Xe bị khóa do giấy tờ bắt buộc hết hạn theo BR-015.
      *
-     * <p>Đây là loại khóa duy nhất được nhận khoảng không chặn trên.
+     * <p>Khóa bắt buộc không chặn trên và luôn BLOCKED, không hoàn tất hoặc giải phóng.
      * Việc theo dõi giấy tờ để phát sinh yêu cầu thuộc module fleet.
      */
     COMPLIANCE_HOLD

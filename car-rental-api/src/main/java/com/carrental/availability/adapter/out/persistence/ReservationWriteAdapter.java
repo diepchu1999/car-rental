@@ -26,6 +26,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.function.Supplier;
 
 /**
  * Hiện thực cổng ghi khóa lịch bằng Native SQL và JDBC.
@@ -44,14 +45,15 @@ class ReservationWriteAdapter implements WriteReservationPort {
 
     private static final String EXCLUSION_VIOLATION_SQL_STATE = "23P01";
     private static final String DEADLOCK_SQL_STATE = "40P01";
-    private static final int MAX_INSERT_ATTEMPTS = 3;
+    private static final int MAX_WRITE_ATTEMPTS = 3;
     private static final String OVERLAP_CONSTRAINT = "reservation_no_overlap";
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final String insertSql;
     private final String updateStatusSql;
+    private final String moveComplianceHoldStartSql;
     private final String releaseExpiredHoldsSql;
-    private final TransactionTemplate nestedInsert;
+    private final TransactionTemplate nestedWrite;
 
     /**
      * Khởi tạo adapter và tải SQL một lần.
@@ -69,9 +71,10 @@ class ReservationWriteAdapter implements WriteReservationPort {
         this.jdbcTemplate = jdbcTemplate;
         this.insertSql = sqlLoader.load(ReservationSqlPaths.INSERT);
         this.updateStatusSql = sqlLoader.load(ReservationSqlPaths.UPDATE_STATUS);
+        this.moveComplianceHoldStartSql = sqlLoader.load(ReservationSqlPaths.MOVE_COMPLIANCE_HOLD_START);
         this.releaseExpiredHoldsSql = sqlLoader.load(ReservationSqlPaths.RELEASE_EXPIRED_HOLDS);
-        this.nestedInsert = new TransactionTemplate(transactionManager);
-        this.nestedInsert.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
+        this.nestedWrite = new TransactionTemplate(transactionManager);
+        this.nestedWrite.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
     }
 
     /**
@@ -105,46 +108,31 @@ class ReservationWriteAdapter implements WriteReservationPort {
 
         MapSqlParameterSource parameters = insertParameters(reservation);
 
-        DataAccessException firstDeadlock = null;
-        for (int attempt = 1; ; attempt++) {
-            try {
-                List<Long> ids = Objects.requireNonNull(nestedInsert.execute(status ->
-                        jdbcTemplate.queryForList(insertSql, parameters, Long.class)));
+        try {
+            List<Long> ids = executeWrite(() -> jdbcTemplate.queryForList(insertSql, parameters, Long.class));
 
-                if (ids.isEmpty()) {
-                    return OptionalLong.empty();
-                }
-
-                if (ids.size() != 1) {
-                    throw new IncorrectResultSizeDataAccessException(1, ids.size());
-                }
-
-                Long id = ids.getFirst();
-
-                if (id == null) {
-                    throw new DataRetrievalFailureException(
-                            "Reservation insert returned a null ID."
-                    );
-                }
-
-                return OptionalLong.of(id);
-            } catch (DataAccessException failure) {
-                if (isDeadlock(failure)) {
-                    if (firstDeadlock == null) {
-                        firstDeadlock = failure;
-                    }
-                    if (attempt < MAX_INSERT_ATTEMPTS) {
-                        continue;
-                    }
-                    throw firstDeadlock;
-                }
-                if (failure instanceof DataIntegrityViolationException integrityFailure
-                        && isReservationOverlap(integrityFailure)) {
-                    throw new ReservationOverlapException(failure);
-                }
-
-                throw failure;
+            if (ids.isEmpty()) {
+                return OptionalLong.empty();
             }
+
+            if (ids.size() != 1) {
+                throw new IncorrectResultSizeDataAccessException(1, ids.size());
+            }
+
+            Long id = ids.getFirst();
+
+            if (id == null) {
+                throw new DataRetrievalFailureException(
+                        "Reservation insert returned a null ID."
+                );
+            }
+
+            return OptionalLong.of(id);
+        } catch (DataIntegrityViolationException failure) {
+            if (isReservationOverlap(failure)) {
+                throw new ReservationOverlapException(failure);
+            }
+            throw failure;
         }
     }
 
@@ -154,6 +142,7 @@ class ReservationWriteAdapter implements WriteReservationPort {
      * <p>Chỉ false khi UPDATE không tác động dòng nào. Lỗi database hoặc
      * số dòng bất thường phải báo lỗi, không giả thành xung đột trạng thái.
      * Không đọc Clock, kiểm cạnh chuyển hoặc tính lại hạn trong adapter.
+     * Mỗi lần ghi dùng savepoint và chỉ thử lại deadlock theo ADR-0005.
      *
      * @param code mã khóa lịch
      * @param expectedStatus trạng thái mong đợi trước khi ghi
@@ -174,7 +163,7 @@ class ReservationWriteAdapter implements WriteReservationPort {
                 .addValue("expectedStatus", expectedStatus.name(), Types.VARCHAR)
                 .addValue("newStatus", newStatus.name(), Types.VARCHAR)
                 .addValue("changedAt", toOffsetDateTime(changedAt), Types.TIMESTAMP_WITH_TIMEZONE);
-        int affected = jdbcTemplate.update(updateStatusSql, parameters);
+        int affected = executeWrite(() -> jdbcTemplate.update(updateStatusSql, parameters));
         if (affected == 0) {
             return false;
         }
@@ -187,10 +176,40 @@ class ReservationWriteAdapter implements WriteReservationPort {
     }
 
     /**
+     * Dời mốc khóa giấy tờ bằng CAS theo BR-015, qua cùng helper savepoint/retry.
+     * Chỉ sửa khoảng trên bản ghi có mã, loại, trạng thái và mốc cũ khớp; không đọc Clock.
+     *
+     * @param code mã khóa
+     * @param expectedStartInclusive mốc vừa được application đọc
+     * @param newStartInclusive mốc mới sau mốc cũ đã được domain kiểm tra
+     * @return true nếu cập nhật một dòng, false nếu không khớp; số dòng bất thường gây lỗi
+     */
+    @Override
+    public boolean moveComplianceHoldStart(String code, Instant expectedStartInclusive, Instant newStartInclusive) {
+        Objects.requireNonNull(code, "code must not be null.");
+        Objects.requireNonNull(expectedStartInclusive, "expectedStartInclusive must not be null.");
+        Objects.requireNonNull(newStartInclusive, "newStartInclusive must not be null.");
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("code", code, Types.VARCHAR)
+                .addValue("expectedStartInclusive", toOffsetDateTime(expectedStartInclusive), Types.TIMESTAMP_WITH_TIMEZONE)
+                .addValue("newStartInclusive", toOffsetDateTime(newStartInclusive), Types.TIMESTAMP_WITH_TIMEZONE);
+        int affected = executeWrite(() -> jdbcTemplate.update(moveComplianceHoldStartSql, parameters));
+        if (affected == 0) {
+            return false;
+        }
+        if (affected == 1) {
+            return true;
+        }
+        throw new IncorrectUpdateSemanticsDataAccessException(
+                "Expected to move zero or one compliance hold, but got: " + affected);
+    }
+
+    /**
      * Nhả HELD đến hạn theo mốc application cung cấp; không đọc hoặc tính lại hạn.
      *
      * <p>Điều kiện ngay trong UPDATE bảo vệ trước job khác và xác nhận đồng thời.
-     * Không tự mở transaction, không thử lại hoặc đổi lỗi lưu trữ thành xe bận.
+     * Dùng savepoint trong transaction bên gọi, chỉ thử lại 40P01 với cùng mốc dọn.
+     * Không đổi lỗi lưu trữ thành xe bận.
      *
      * @param expiredAt mốc dọn và mốc đổi trạng thái, không null
      * @return số dòng cập nhật không âm
@@ -200,11 +219,44 @@ class ReservationWriteAdapter implements WriteReservationPort {
         Objects.requireNonNull(expiredAt, "expiredAt must not be null.");
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("expiredAt", toOffsetDateTime(expiredAt), Types.TIMESTAMP_WITH_TIMEZONE);
-        int affected = jdbcTemplate.update(releaseExpiredHoldsSql, parameters);
+        int affected = executeWrite(() -> jdbcTemplate.update(releaseExpiredHoldsSql, parameters));
         if (affected < 0) {
             throw new IncorrectUpdateSemanticsDataAccessException("Expected a non-negative expired hold count.");
         }
         return affected;
+    }
+
+    /**
+     * Chạy một câu ghi trong savepoint và chỉ thử lại deadlock PostgreSQL theo ADR-0005.
+     *
+     * <p>TransactionTemplate rollback savepoint trước khi ngoại lệ đến vòng lặp này.
+     * Tối đa ba lần tính cả lần đầu; hết lượt ném lại đúng lỗi deadlock đầu tiên.
+     * Callback dùng bộ tham số đã dựng bên ngoài, không đọc lại Clock, sinh mã hay tính hạn.
+     * Không thử lại 55P03, không dịch lỗi nghiệp vụ, không thử lại toàn bộ use case.
+     * Transaction vật lý thuộc bên gọi, không dùng REQUIRES_NEW.
+     *
+     * @param operation một câu ghi với tham số giữ nguyên giữa các lần
+     * @param <T> kiểu kết quả JDBC
+     * @return kết quả khác null của câu ghi thành công
+     * @throws DataAccessException nếu không phải deadlock hoặc đã hết ba lần thử
+     */
+    private <T> T executeWrite(Supplier<T> operation) {
+        DataAccessException firstDeadlock = null;
+        for (int attempt = 1; ; attempt++) {
+            try {
+                return Objects.requireNonNull(nestedWrite.execute(status -> operation.get()));
+            } catch (DataAccessException failure) {
+                if (!isDeadlock(failure)) {
+                    throw failure;
+                }
+                if (firstDeadlock == null) {
+                    firstDeadlock = failure;
+                }
+                if (attempt >= MAX_WRITE_ATTEMPTS) {
+                    throw firstDeadlock;
+                }
+            }
+        }
     }
 
     /**

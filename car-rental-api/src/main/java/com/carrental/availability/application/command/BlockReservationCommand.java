@@ -11,7 +11,8 @@ import java.time.Instant;
  * Đầu vào khóa vận hành theo BR-007, BR-011, BR-012, BR-015 và BR-104.
  *
  * <p>Không nhận mã khóa, mã đơn, TTL hoặc đệm thuê xe. Khoảng vận hành được giữ nguyên.
- * Chỉ COMPLIANCE_HOLD được không chặn trên; RENTAL phải đi qua luồng hold.
+ * COMPLIANCE_HOLD bắt buộc không chặn trên; các loại vận hành khác phải hữu hạn.
+ * RENTAL phải đi qua luồng hold.
  *
  * @param vehicleId định danh xe lớn hơn không
  * @param period khoảng vận hành cần khóa
@@ -39,6 +40,9 @@ public record BlockReservationCommand(
         if (period.isUnbounded() && kind != ReservationKind.COMPLIANCE_HOLD) {
             throw DomainException.invalidInput("Only COMPLIANCE_HOLD may have an unbounded period.");
         }
+        if (kind == ReservationKind.COMPLIANCE_HOLD && !period.isUnbounded()) {
+            throw DomainException.invalidInput("COMPLIANCE_HOLD must have an unbounded period.");
+        }
     }
 
     /**
@@ -46,7 +50,7 @@ public record BlockReservationCommand(
      *
      * @param vehicleId định danh xe, có thể null nếu thiếu
      * @param startInclusive thời điểm bắt đầu, bắt buộc
-     * @param endExclusive cận trên mở; null chỉ hợp lệ với COMPLIANCE_HOLD
+     * @param endExclusive cận trên mở; bắt buộc null với COMPLIANCE_HOLD, khác null với loại còn lại
      * @param kind nguyên nhân khóa vận hành
      * @param reason lý do tùy chọn, không cắt khoảng trắng
      * @return command đã kiểm tra

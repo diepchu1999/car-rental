@@ -19,6 +19,9 @@ final class ReservationSqlPaths {
     /** Đường dẫn UPDATE trạng thái có điều kiện trạng thái cũ. */
     static final String UPDATE_STATUS = "sql/availability/update_reservation_status.sql";
 
+    /** Đường dẫn dời mốc khóa giấy tờ có điều kiện mốc cũ theo BR-015. */
+    static final String MOVE_COMPLIANCE_HOLD_START = "sql/availability/move_compliance_hold_start.sql";
+
     /** Đường dẫn nhả HELD quá hạn bằng một UPDATE có điều kiện. */
     static final String RELEASE_EXPIRED_HOLDS = "sql/availability/release_expired_holds.sql";
 

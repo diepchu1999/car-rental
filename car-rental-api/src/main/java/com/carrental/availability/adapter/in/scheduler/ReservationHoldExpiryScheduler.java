@@ -1,7 +1,6 @@
 package com.carrental.availability.adapter.in.scheduler;
 
 import com.carrental.availability.application.port.in.ExpireReservationHoldsUseCase;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -12,10 +11,9 @@ import org.springframework.stereotype.Component;
  * Chờ một nhịp sau khởi động; sau mỗi lượt kết thúc mới đợi nhịp tiếp theo.
  * Hai instance có thể cùng chạy: UPDATE có điều kiện bảo vệ trạng thái ở CSDL.
  * Lỗi thoát ra được hạ tầng scheduler ghi nhận; lượt định kỳ sau vẫn được thực hiện.
+ * Không có công tắc tắt job vì tự động nhả giữ chỗ là yêu cầu của BR-103.
  */
 @Component
-@ConditionalOnProperty(prefix = "car-rental.availability", name = "hold-sweep-enabled",
-        havingValue = "true", matchIfMissing = true)
 class ReservationHoldExpiryScheduler {
 
     private final ExpireReservationHoldsUseCase useCase;

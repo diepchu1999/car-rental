@@ -3,8 +3,10 @@ package com.carrental.availability.application.service;
 import com.carrental.PostgresTestConfiguration;
 import com.carrental.availability.api.ReservationRef;
 import com.carrental.availability.application.command.BlockReservationCommand;
+import com.carrental.availability.application.command.ConfirmReservationCommand;
 import com.carrental.availability.application.command.HoldReservationCommand;
 import com.carrental.availability.application.port.in.BlockReservationUseCase;
+import com.carrental.availability.application.port.in.ConfirmReservationUseCase;
 import com.carrental.availability.application.port.in.HoldReservationUseCase;
 import com.carrental.availability.application.port.out.ReadReservationPort;
 import com.carrental.availability.domain.Reservation;
@@ -46,7 +48,7 @@ import java.util.function.Supplier;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Kiểm hold và block dùng chung ràng buộc chống chồng lịch theo BR-104, ADR-0005.
+ * Kiểm hold tranh chấp với block hoặc confirm qua ràng buộc chống chồng lịch theo BR-104, ADR-0005.
  *
  * <p>Hai transaction giữ hai kết nối PostgreSQL khác nhau rồi cùng được mở chốt.
  * Không mock dependency; chỉ tính thắng sau commit. Context riêng được đóng sau lớp test.
@@ -68,6 +70,8 @@ class ReservationBlockConcurrencyIntegrationTest {
     private BlockReservationUseCase block;
     @Autowired
     private HoldReservationUseCase hold;
+    @Autowired
+    private ConfirmReservationUseCase confirm;
     @Autowired
     private ReadReservationPort reads;
     @Autowired
@@ -177,6 +181,66 @@ class ReservationBlockConcurrencyIntegrationTest {
                 iterations, failures.size(), deadlocks, failures.size() - deadlocks);
         if (!failures.isEmpty()) {
             AssertionError summary = new AssertionError("Reservation races failed: " + failures.size() + "/" + iterations);
+            failures.forEach(summary::addSuppressed);
+            throw summary;
+        }
+    }
+
+    /**
+     * Lặp ít nhất 100 cuộc đua confirm/hold với xe mới, giữ nguyên proxy use case và PostgreSQL thật.
+     *
+     * <p>HELD gốc đã commit trước cuộc đua: confirm phải thành công, hold phải báo xe bận.
+     * Không chấp nhận deadlock lọt ra; đọc độc lập sau commit chỉ có bản gốc CONFIRMED.
+     * Mỗi lượt thất bại được ghi nhận, không chạy lại lượt đỏ để che lỗi.
+     * Có thể tăng số lượt bằng -Dreservation.race.iterations.
+     */
+    @Test
+    void repeatedConfirmAndHoldRacesHaveNoInfrastructureFailures() {
+        int iterations = Integer.getInteger("reservation.race.iterations", 100);
+        assertTrue(iterations >= 100, "Confirm/hold race requires at least 100 iterations.");
+        int deadlocks = 0;
+        List<Throwable> failures = new ArrayList<>();
+        for (int index = 0; index < iterations; index++) {
+            long vehicleId = VEHICLE_BASE + 1_000_000 + index;
+            try {
+                ReservationRef original = hold.hold(HoldReservationCommand.from(vehicleId, START, END,
+                        Duration.ZERO, "confirm-race-original"));
+                Reservation before = reads.loadAggregate(original.code()).orElseThrow();
+                assertEquals(ReservationStatus.HELD, before.status());
+                List<Attempt> attempts = runTogether(List.of(
+                        () -> {
+                            confirm.confirm(ConfirmReservationCommand.from(original.code()));
+                            return original;
+                        },
+                        () -> hold.hold(HoldReservationCommand.from(vehicleId, START, END,
+                                Duration.ZERO, "confirm-race-contender"))
+                ));
+                assertEquals(0, assertOneCommittedRow(attempts, vehicleId),
+                        "Confirmation must commit; the overlapping hold must fail.");
+                var rows = jdbc.queryForList(readSql, Map.of("vehicleIds", List.of(vehicleId)));
+                assertEquals(1, rows.size());
+                assertEquals(original.code(), rows.getFirst().get("code"));
+                assertEquals("CONFIRMED", rows.getFirst().get("status"));
+                Reservation after = reads.loadAggregate(original.code()).orElseThrow();
+                assertEquals(ReservationStatus.CONFIRMED, after.status());
+                assertEquals(before.period(), after.period());
+                assertEquals(before.holdExpiresAt(), after.holdExpiresAt());
+                assertEquals(before.createdAt(), after.createdAt());
+                assertEquals(before.bookingCode(), after.bookingCode());
+            } catch (Exception | AssertionError failure) {
+                failures.add(failure);
+                for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
+                    if (cause instanceof PSQLException postgres && "40P01".equals(postgres.getSQLState())) {
+                        deadlocks++;
+                        break;
+                    }
+                }
+            }
+        }
+        System.out.printf("Confirm/hold races: total=%d, failed=%d, deadlocks=%d, other=%d%n",
+                iterations, failures.size(), deadlocks, failures.size() - deadlocks);
+        if (!failures.isEmpty()) {
+            AssertionError summary = new AssertionError("Confirm/hold races failed: " + failures.size() + "/" + iterations);
             failures.forEach(summary::addSuppressed);
             throw summary;
         }

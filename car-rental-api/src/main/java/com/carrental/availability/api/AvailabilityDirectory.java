@@ -3,6 +3,7 @@ package com.carrental.availability.api;
 import com.carrental.shared.error.DomainException;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Set;
 
@@ -56,7 +57,7 @@ public interface AvailabilityDirectory {
      * Tạo khóa vận hành trực tiếp ở trạng thái BLOCKED.
      *
      * <p>Áp dụng BR-007, BR-011, BR-012, BR-015 và BR-104.
-     * Chỉ COMPLIANCE_HOLD được nhận khoảng không chặn trên.
+     * COMPLIANCE_HOLD bắt buộc không chặn trên; các loại còn lại phải hữu hạn.
      *
      * <p>period là khoảng vận hành cần khóa, không tự cộng đệm thuê xe.
      * Lý do được lưu nguyên văn, không nhận rồi bỏ đi.
@@ -117,7 +118,9 @@ public interface AvailabilityDirectory {
     void markInUse(String reservationCode);
 
     /**
-     * Chuyển IN_USE hoặc BLOCKED sang COMPLETED theo status-flow §2.
+     * Chuyển IN_USE hoặc khóa vận hành hữu hạn BLOCKED sang COMPLETED theo status-flow §2.
+     *
+     * <p>COMPLIANCE_HOLD luôn BLOCKED theo BR-015, không được hoàn tất hoặc giải phóng.
      *
      * <p>Giữ nguyên khoảng đã lưu. COMPLETED vẫn chặn trong khoảng đó
      * để bảo toàn đệm theo BR-109, BR-116 và database-guideline §4.
@@ -130,6 +133,19 @@ public interface AvailabilityDirectory {
      *                         sai trạng thái hoặc có xung đột cập nhật
      */
     void complete(String reservationCode);
+
+    /**
+     * Dời điểm bắt đầu khóa giấy tờ theo BR-015, chỉ gọi khi giấy tờ được gia hạn.
+     *
+     * <p>Khóa phải là COMPLIANCE_HOLD/BLOCKED; mốc mới phải sau mốc cũ.
+     * Không xóa/tạo lại, không đổi trạng thái hoặc status_changed_at.
+     * Tham gia transaction bên gọi; nếu mốc vừa đọc đã bị thay đổi thì báo CONFLICT.
+     *
+     * @param reservationCode mã khóa lịch đang tồn tại
+     * @param newStartInclusive mốc hết hạn mới, bắt buộc sau mốc đang lưu
+     * @throws DomainException nếu đầu vào sai, không tìm thấy, sai loại/trạng thái hoặc thua tranh chấp
+     */
+    void moveComplianceHoldStart(String reservationCode, Instant newStartInclusive);
 
     /**
      * Tìm những xe trong tập ứng viên đang bận đối với khoảng thuê yêu cầu.

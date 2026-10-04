@@ -58,7 +58,7 @@ class ReservationBlockServiceTest {
     @ParameterizedTest
     @EnumSource(value = ReservationKind.class, names = "RENTAL", mode = EnumSource.Mode.EXCLUDE)
     void createsBlockedWithoutHoldPolicyOrBuffer(ReservationKind kind) {
-        BlockReservationCommand command = command(kind, END);
+        BlockReservationCommand command = command(kind, kind == ReservationKind.COMPLIANCE_HOLD ? null : END);
         when(writes.insert(any(Reservation.class))).thenReturn(OptionalLong.of(91L));
         assertEquals(new ReservationRef(91L, CODES.getFirst()), service.block(command));
         assertStoredFields(command, capturedWrites(1).getFirst(), CODES.getFirst());

@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Kiểm DDL V004 bằng PostgreSQL thật theo ADR-0005, BR-103, BR-104,
+ * Kiểm DDL V004 và V005 bằng PostgreSQL thật theo ADR-0005, BR-103, BR-104,
  * BR-015, BR-109, BR-116 và database-guideline §4.
  *
  * <p>Ghi trực tiếp bằng JDBC để bỏ qua bảo vệ của domain.
@@ -76,12 +76,13 @@ class ReservationConstraintIntegrationTest {
         updateSql = sqlLoader.load(SQL_ROOT + "update_reservation_status_for_constraint_test.sql");
     }
 
-    /** Chứng minh Flyway áp dụng V004 bằng car_rental_app không phải superuser. */
-    @Test
-    void appliesMigrationUsingApplicationRole() {
+    /** Chứng minh Flyway áp dụng cả V004 và V005 bằng car_rental_app không phải superuser. */
+    @ParameterizedTest
+    @CsvSource({"4, V004__availability_tables.sql", "5, V005__availability_shape_checks.sql"})
+    void appliesMigrationUsingApplicationRole(int version, String script) {
         Map<String, Object> row = jdbc.queryForMap(
-                sqlLoader.load(SQL_ROOT + "read_migration_for_constraint_test.sql"), Map.of());
-        assertEquals(4, Integer.parseInt((String) row.get("version")));
+                sqlLoader.load(SQL_ROOT + "read_migration_for_constraint_test.sql"), Map.of("script", script));
+        assertEquals(version, Integer.parseInt((String) row.get("version")));
         assertEquals(true, row.get("success"));
         assertEquals("car_rental_app", row.get("installed_by"));
         assertEquals("car_rental_app", row.get("database_user"));
@@ -144,7 +145,53 @@ class ReservationConstraintIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"MAINTENANCE", "INSPECTION", "TRANSFER", "OWNER_BLOCK", "COMPLIANCE_HOLD"})
     void acceptsOperationalKinds(String kind) {
-        insert(blockedRow(CODE, kind));
+        MapSqlParameterSource row = blockedRow(CODE, kind);
+        if ("COMPLIANCE_HOLD".equals(kind)) {
+            row.addValue("end", null);
+        }
+        insert(row);
+    }
+
+    /** Kiểm đủ các cặp loại/trạng thái hợp lệ, không vô tình cấm lịch sử COMPLETED hoặc RELEASED của đơn thuê. */
+    @ParameterizedTest
+    @MethodSource("validKindStatuses")
+    void acceptsValidKindStatusPairs(String kind, String status) {
+        MapSqlParameterSource row = "RENTAL".equals(kind) ? heldRow(CODE) : blockedRow(CODE, kind);
+        row.addValue("status", status);
+        if ("COMPLIANCE_HOLD".equals(kind)) {
+            row.addValue("end", null);
+        }
+        insert(row);
+    }
+
+    /** Kiểm MAINTENANCE/HELD bị đúng CHECK cặp loại/trạng thái chặn dù TTL hoàn toàn hợp lệ. */
+    @Test
+    void rejectsHeldMaintenance() {
+        assertViolation(() -> insert(blockedRow(CODE, "MAINTENANCE")
+                        .addValue("status", "HELD").addValue("holdExpiresAt", EXPIRY)),
+                "23514", "chk_kind_status");
+    }
+
+    /** Kiểm RENTAL/BLOCKED bị đúng CHECK cặp loại/trạng thái chặn dù mã đơn có mặt. */
+    @Test
+    void rejectsBlockedRental() {
+        assertViolation(() -> insert(heldRow(CODE).addValue("status", "BLOCKED")),
+                "23514", "chk_kind_status");
+    }
+
+    /** Kiểm ghi SQL trực tiếp cũng không tạo được khóa giấy tờ hữu hạn theo BR-015. */
+    @Test
+    void rejectsFiniteComplianceHold() {
+        assertViolation(() -> insert(blockedRow(CODE, "COMPLIANCE_HOLD")),
+                "23514", "chk_compliance_open_blocked");
+    }
+
+    /** Kiểm UPDATE trực tiếp không thể hoàn tất khóa giấy tờ đang BLOCKED và không chặn trên. */
+    @Test
+    void rejectsCompletingComplianceHold() {
+        insert(blockedRow(CODE, "COMPLIANCE_HOLD").addValue("end", null));
+        assertViolation(() -> updateStatus(CODE, "COMPLETED", CREATED.plusMinutes(1)),
+                "23514", "chk_compliance_open_blocked");
     }
 
     /**
@@ -155,7 +202,8 @@ class ReservationConstraintIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"UNKNOWN", "rental"})
     void rejectsUnknownKind(String kind) {
-        assertViolation(() -> insert(heldRow(CODE).addValue("kind", kind)),
+        // BLOCKED hợp lệ với nhánh kind <> RENTAL, nên chỉ danh mục kind bị vi phạm.
+        assertViolation(() -> insert(blockedRow(CODE, kind)),
                 "23514", "chk_reservation_kind");
     }
 
@@ -167,8 +215,9 @@ class ReservationConstraintIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"UNKNOWN", "held"})
     void rejectsUnknownStatus(String status) {
+        // Trạng thái ngoài danh mục cũng vi phạm cặp kind/status; CHECK này được kiểm trước theo tên.
         assertViolation(() -> insert(heldRow(CODE).addValue("status", status)),
-                "23514", "chk_reservation_status");
+                "23514", "chk_kind_status");
     }
 
     /**
@@ -474,6 +523,16 @@ class ReservationConstraintIntegrationTest {
         return jdbc.update(updateSql, new MapSqlParameterSource()
                 .addValue("code", code, Types.VARCHAR).addValue("status", status, Types.VARCHAR)
                 .addValue("changedAt", changedAt, Types.TIMESTAMP_WITH_TIMEZONE));
+    }
+
+    /** Cung cấp đủ cặp hợp lệ của đơn thuê, bốn loại vận hành hữu hạn và khóa giấy tờ theo status-flow §2. */
+    private static Stream<Arguments> validKindStatuses() {
+        Stream<Arguments> rental = Stream.of("HELD", "CONFIRMED", "IN_USE", "RELEASED", "COMPLETED")
+                .map(status -> Arguments.of("RENTAL", status));
+        Stream<Arguments> operational = Stream.of("MAINTENANCE", "INSPECTION", "TRANSFER", "OWNER_BLOCK")
+                .flatMap(kind -> Stream.of("BLOCKED", "COMPLETED").map(status -> Arguments.of(kind, status)));
+        return Stream.concat(Stream.concat(rental, operational),
+                Stream.of(Arguments.of("COMPLIANCE_HOLD", "BLOCKED")));
     }
 
     /**

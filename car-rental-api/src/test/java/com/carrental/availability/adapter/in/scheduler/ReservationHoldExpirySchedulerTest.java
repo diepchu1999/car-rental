@@ -45,44 +45,22 @@ class ReservationHoldExpirySchedulerTest {
         verifyNoMoreInteractions(useCase);
     }
 
-    /** Kiểm mặc định bật, lấy nhịp 45 giây từ cấu hình và đăng ký đúng một job fixed-delay. */
+    /** Kiểm không cần công tắc bật, lấy nhịp 45 giây và đăng ký đúng một job fixed-delay. */
     @Test
     void registersConfiguredFixedDelayAndInitialDelay() {
-        var useCase = mock(ExpireReservationHoldsUseCase.class);
-        TaskScheduler scheduler = mock(TaskScheduler.class);
-        when(scheduler.getClock()).thenReturn(java.time.Clock.systemUTC());
-        when(scheduler.scheduleWithFixedDelay(any(Runnable.class), any(Instant.class), any(Duration.class)))
-                .thenReturn(mock(ScheduledFuture.class));
-        Instant before = Instant.now();
-        runner(useCase).withPropertyValues("car-rental.availability.hold-sweep-interval=PT45S")
-                .withBean("taskScheduler", TaskScheduler.class, () -> scheduler)
-                .run(context -> {
-                    assertNull(context.getStartupFailure());
-                    assertEquals(1, context.getBeansOfType(ReservationHoldExpiryScheduler.class).size());
-                    assertEquals(1, context.getBean(ScheduledAnnotationBeanPostProcessor.class)
-                            .getScheduledTasks().size());
-                    var task = ArgumentCaptor.forClass(Runnable.class);
-                    var start = ArgumentCaptor.forClass(Instant.class);
-                    verify(scheduler).scheduleWithFixedDelay(task.capture(), start.capture(), eq(Duration.ofSeconds(45)));
-                    assertFalse(start.getValue().isBefore(before.plusSeconds(45)));
-                    assertFalse(start.getValue().isAfter(Instant.now().plusSeconds(45)));
-                    verifyNoInteractions(useCase);
-                    task.getValue().run();
-                    verify(useCase).expireHolds();
-                });
+        assertScheduledDelay("PT45S");
     }
 
-    /** Kiểm công tắc test tắt cả adapter job và hạ tầng kích hoạt @Scheduled. */
+    /** Kiểm nhịp test 24 giờ cũng là độ trễ ban đầu, job vẫn được đăng ký thay vì bị tắt. */
     @Test
-    void disablesBackgroundSchedulingExplicitly() {
-        var useCase = mock(ExpireReservationHoldsUseCase.class);
-        runner(useCase).withPropertyValues("car-rental.availability.hold-sweep-enabled=false")
-                .run(context -> {
-                    assertNull(context.getStartupFailure());
-                    assertTrue(context.getBeansOfType(ReservationHoldExpiryScheduler.class).isEmpty());
-                    assertTrue(context.getBeansOfType(ScheduledAnnotationBeanPostProcessor.class).isEmpty());
-                    verifyNoInteractions(useCase);
-                });
+    void registersLongTestIntervalWithoutRunningImmediately() {
+        assertScheduledDelay("PT24H");
+    }
+
+    /** Kiểm khóa cấu hình cũ không còn tắt được adapter hoặc hạ tầng scheduler theo BR-103. */
+    @Test
+    void legacyDisablePropertyCannotDisableScheduling() {
+        assertScheduledDelay("PT45S", "car-rental.availability.hold-sweep-enabled=false");
     }
 
     /** Kiểm timer thật vẫn gọi lượt sau khi lượt đầu ném lỗi; không sleep hoặc gọi tay sweep. */
@@ -104,6 +82,38 @@ class ReservationHoldExpirySchedulerTest {
                     assertNull(context.getStartupFailure());
                     assertTrue(nextSucceeded.await(5, TimeUnit.SECONDS), "The next scheduled sweep must run.");
                     assertTrue(calls.get() >= 2);
+                });
+    }
+
+    /**
+     * Kiểm đăng ký lịch qua scheduler giả, không đợi thời gian thật hoặc gọi trực tiếp phương thức sweep.
+     * Callback do Spring tạo chỉ được kích hoạt sau khi đã khẳng định use case chưa chạy.
+     */
+    private static void assertScheduledDelay(String interval, String... extraProperties) {
+        var useCase = mock(ExpireReservationHoldsUseCase.class);
+        TaskScheduler scheduler = mock(TaskScheduler.class);
+        when(scheduler.getClock()).thenReturn(java.time.Clock.systemUTC());
+        when(scheduler.scheduleWithFixedDelay(any(Runnable.class), any(Instant.class), any(Duration.class)))
+                .thenReturn(mock(ScheduledFuture.class));
+        Duration expectedDelay = Duration.parse(interval);
+        Instant before = Instant.now();
+        runner(useCase).withPropertyValues("car-rental.availability.hold-sweep-interval=" + interval)
+                .withPropertyValues(extraProperties)
+                .withBean("taskScheduler", TaskScheduler.class, () -> scheduler)
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    assertEquals(1, context.getBeansOfType(ReservationHoldExpiryScheduler.class).size());
+                    assertEquals(1, context.getBean(ScheduledAnnotationBeanPostProcessor.class)
+                            .getScheduledTasks().size());
+                    var task = ArgumentCaptor.forClass(Runnable.class);
+                    var start = ArgumentCaptor.forClass(Instant.class);
+                    verify(scheduler).scheduleWithFixedDelay(task.capture(), start.capture(), eq(expectedDelay));
+                    assertFalse(start.getValue().isBefore(before.plus(expectedDelay)));
+                    assertFalse(start.getValue().isAfter(Instant.now().plus(expectedDelay)));
+                    verifyNoInteractions(useCase);
+                    task.getValue().run();
+                    verify(useCase).expireHolds();
+                    verifyNoMoreInteractions(useCase);
                 });
     }
 

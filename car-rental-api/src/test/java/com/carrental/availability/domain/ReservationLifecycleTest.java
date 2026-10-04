@@ -144,6 +144,29 @@ class ReservationLifecycleTest {
         assertEquals(BUFFER_END, after.period().endExclusive());
     }
 
+    /** Kiểm cả bốn loại vận hành hữu hạn vẫn hoàn tất và giữ nguyên khoảng theo BR-012. */
+    @ParameterizedTest
+    @EnumSource(value = ReservationKind.class, names = {"RENTAL", "COMPLIANCE_HOLD"}, mode = EnumSource.Mode.EXCLUDE)
+    void completesFiniteOperationalKinds(ReservationKind kind) {
+        Reservation before = Reservation.createBlocked("reservation-test-1", 42L, PERIOD,
+                kind, "Scheduled work", CREATED);
+        Reservation after = before.complete(RETURNED);
+        assertTransition(before, after, ReservationStatus.BLOCKED, ReservationStatus.COMPLETED, RETURNED);
+    }
+
+    /** Kiểm BR-015: mọi thao tác chuyển trạng thái đều bị từ chối, khóa giấy tờ vẫn nguyên vẹn. */
+    @ParameterizedTest
+    @ValueSource(strings = {"confirm", "release", "markInUse", "complete"})
+    void rejectsEveryStatusTransitionForComplianceHold(String operation) {
+        ReservationPeriod period = ReservationPeriod.unboundedFrom(PICKUP);
+        Reservation before = Reservation.createBlocked("reservation-test-1", 42L, period,
+                ReservationKind.COMPLIANCE_HOLD, "Expired document", CREATED);
+        assertInvalidTransition(() -> applyOperation(before, operation, RETURNED));
+        assertEquals(ReservationStatus.BLOCKED, before.status());
+        assertEquals(CREATED, before.statusChangedAt());
+        assertEquals(period, before.period());
+    }
+
     /**
      * Kiểm không hoàn tất từ trạng thái chưa bàn giao hoặc từ trạng thái cuối.
      *

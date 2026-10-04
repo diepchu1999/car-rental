@@ -20,9 +20,9 @@ class BlockReservationCommandTest {
     private static final Instant START = Instant.parse("2030-10-01T03:00:00Z");
     private static final Instant END = START.plusSeconds(7200);
 
-    /** Kiểm cả năm loại vận hành nhận khoảng hữu hạn qua factory và constructor. */
+    /** Kiểm bốn loại vận hành ngoài giấy tờ nhận khoảng hữu hạn qua factory và constructor. */
     @ParameterizedTest
-    @EnumSource(value = ReservationKind.class, names = "RENTAL", mode = EnumSource.Mode.EXCLUDE)
+    @EnumSource(value = ReservationKind.class, names = {"RENTAL", "COMPLIANCE_HOLD"}, mode = EnumSource.Mode.EXCLUDE)
     void acceptsFiniteOperationalKinds(ReservationKind kind) {
         BlockReservationCommand command = BlockReservationCommand.from(42L, START, END, kind, " Workshop ");
         assertEquals(new BlockReservationCommand(42L, ReservationPeriod.finite(START, END), kind, " Workshop "), command);
@@ -30,6 +30,15 @@ class BlockReservationCommandTest {
         assertEquals(START, command.period().startInclusive());
         assertEquals(END, command.period().endExclusive());
         assertEquals(kind, command.kind());
+    }
+
+    /** Kiểm compliance hữu hạn bị chặn ở cả factory lẫn constructor theo BR-015. */
+    @Test
+    void rejectsFiniteCompliancePeriod() {
+        assertInvalid(() -> BlockReservationCommand.from(42L, START, END,
+                ReservationKind.COMPLIANCE_HOLD, null));
+        assertInvalid(() -> new BlockReservationCommand(42L, ReservationPeriod.finite(START, END),
+                ReservationKind.COMPLIANCE_HOLD, null));
     }
 
     /** Kiểm compliance biểu diễn cận trên null thật, không dùng một ngày giả. */

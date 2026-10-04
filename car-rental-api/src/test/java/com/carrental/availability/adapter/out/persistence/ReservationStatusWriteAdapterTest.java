@@ -12,6 +12,8 @@ import org.springframework.dao.IncorrectUpdateSemanticsDataAccessException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.sql.Types;
 import java.time.Instant;
@@ -36,7 +38,10 @@ class ReservationStatusWriteAdapterTest {
         jdbc = mock(NamedParameterJdbcTemplate.class);
         SqlLoader loader = new SqlLoader();
         sql = loader.load(ReservationSqlPaths.UPDATE_STATUS);
-        adapter = new ReservationWriteAdapter(jdbc, loader, mock(PlatformTransactionManager.class));
+        PlatformTransactionManager transactions = mock(PlatformTransactionManager.class);
+        when(transactions.getTransaction(any(TransactionDefinition.class)))
+                .thenAnswer(invocation -> new SimpleTransactionStatus());
+        adapter = new ReservationWriteAdapter(jdbc, loader, transactions);
     }
 
     /** Kiểm một UPDATE duy nhất với đúng mã, trạng thái cũ/mới và thời điểm UTC. */

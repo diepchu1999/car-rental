@@ -11,6 +11,8 @@ import org.springframework.dao.IncorrectUpdateSemanticsDataAccessException;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.SimpleTransactionStatus;
 
 import java.sql.Types;
 import java.time.Instant;
@@ -34,12 +36,17 @@ class ReservationExpiryWriteAdapterTest {
     void setUp() {
         jdbc = mock(NamedParameterJdbcTemplate.class);
         transactions = mock(PlatformTransactionManager.class);
+        when(transactions.getTransaction(any(TransactionDefinition.class))).thenAnswer(invocation -> {
+            assertEquals(TransactionDefinition.PROPAGATION_NESTED,
+                    invocation.<TransactionDefinition>getArgument(0).getPropagationBehavior());
+            return new SimpleTransactionStatus();
+        });
         SqlLoader loader = new SqlLoader();
         sql = loader.load(ReservationSqlPaths.RELEASE_EXPIRED_HOLDS);
         adapter = new ReservationWriteAdapter(jdbc, loader, transactions);
     }
 
-    /** Kiểm một lệnh ghi với mốc UTC đúng kiểu, trả đúng số dòng và không tự mở transaction. */
+    /** Kiểm một lệnh ghi với mốc UTC đúng kiểu, trả đúng số dòng và dùng scope NESTED. */
     @ParameterizedTest
     @ValueSource(ints = {0, 1, 20})
     void bindsSingleCutoffAndReturnsCount(int count) {
@@ -51,7 +58,9 @@ class ReservationExpiryWriteAdapterTest {
         assertEquals(NOW.atOffset(ZoneOffset.UTC), captor.getValue().getValue("expiredAt"));
         assertEquals(Types.TIMESTAMP_WITH_TIMEZONE, captor.getValue().getSqlType("expiredAt"));
         verifyNoMoreInteractions(jdbc);
-        verifyNoInteractions(transactions);
+        verify(transactions).getTransaction(any(TransactionDefinition.class));
+        verify(transactions).commit(any());
+        verifyNoMoreInteractions(transactions);
     }
 
     /** Kiểm thiếu mốc dọn bị từ chối trước JDBC. */
@@ -68,7 +77,7 @@ class ReservationExpiryWriteAdapterTest {
         assertThrows(IncorrectUpdateSemanticsDataAccessException.class, () -> adapter.releaseExpiredHolds(NOW));
     }
 
-    /** Kiểm lỗi database truyền nguyên trạng, không retry dành cho INSERT. */
+    /** Kiểm lỗi kết nối truyền nguyên trạng, không được thử lại như deadlock. */
     @Test
     void propagatesStorageFailure() {
         var failure = new DataAccessResourceFailureException("Storage unavailable.");

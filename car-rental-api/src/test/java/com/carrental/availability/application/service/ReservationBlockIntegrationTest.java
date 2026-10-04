@@ -75,7 +75,7 @@ class ReservationBlockIntegrationTest {
     @ParameterizedTest
     @EnumSource(value = ReservationKind.class, names = "RENTAL", mode = EnumSource.Mode.EXCLUDE)
     void persistsOperationalKindAndExactPeriod(ReservationKind kind) {
-        BlockReservationCommand command = command(kind, END, "  Workshop  ");
+        BlockReservationCommand command = command(kind, kind == ReservationKind.COMPLIANCE_HOLD ? null : END, "  Workshop  ");
         ReservationRef ref = block.block(command);
         assertStored(command, ref);
         verify(codeGenerator).generate("KL");
@@ -110,7 +110,7 @@ class ReservationBlockIntegrationTest {
     @ParameterizedTest
     @EnumSource(value = ReservationKind.class, names = "RENTAL", mode = EnumSource.Mode.EXCLUDE)
     void operationalBlockRejectsOverlappingHold(ReservationKind kind) {
-        block.block(command(kind, END, null));
+        block.block(command(kind, kind == ReservationKind.COMPLIANCE_HOLD ? null : END, null));
         assertVehicleBusy(() -> hold.hold(HoldReservationCommand.from(VEHICLE_ID,
                 START.plusSeconds(3600), END.plusSeconds(3600), Duration.ZERO, "overlapping-booking")));
         verify(codeGenerator, times(2)).generate("KL");

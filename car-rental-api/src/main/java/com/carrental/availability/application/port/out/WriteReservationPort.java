@@ -64,6 +64,8 @@ public interface WriteReservationPort {
      * <p>Không sửa period, hạn giữ chỗ, thời điểm tạo, mã, xe, loại khóa,
      * mã đơn hoặc lý do. Đặc biệt COMPLETED không làm mất khoảng đệm
      * theo BR-109, BR-116. Không tự commit hoặc mở transaction độc lập.
+     * Adapter dùng savepoint, chỉ thử lại 40P01 tối đa ba lần với nguyên tham số;
+     * hết lượt truyền đúng lỗi deadlock đầu tiên, không giả thành xung đột trạng thái.
      *
      * @param code mã reservation có nội dung
      * @param expectedStatus trạng thái vừa được application đọc
@@ -75,12 +77,28 @@ public interface WriteReservationPort {
                          ReservationStatus newStatus, Instant changedAt);
 
     /**
+     * Dời mốc BR-015 nếu mã, loại COMPLIANCE_HOLD, trạng thái BLOCKED và mốc cũ cùng khớp.
+     *
+     * <p>Application đã kiểm mốc mới tăng bằng domain. Chỉ sửa period, không đổi
+     * status_changed_at hoặc xóa/chèn lại. Adapter dùng savepoint và chỉ thử lại 40P01
+     * tối đa ba lần với cùng tham số; hết lượt truyền lỗi deadlock đầu tiên.
+     *
+     * @param code mã khóa lịch
+     * @param expectedStartInclusive mốc bắt đầu vừa được application đọc
+     * @param newStartInclusive mốc mới đã được domain cho phép
+     * @return true nếu ghi một dòng; false nếu bản ghi không còn khớp điều kiện
+     */
+    boolean moveComplianceHoldStart(String code, Instant expectedStartInclusive, Instant newStartInclusive);
+
+    /**
      * Nhả nguyên tử các bản ghi còn HELD với hold_expires_at <= expiredAt theo BR-103.
      *
      * <p>Đây là chuyển trạng thái theo tập: điều kiện trạng thái và hạn nằm trong
      * cùng UPDATE, không tải danh sách rồi gọi release từng bản ghi. Không nhả
      * CONFIRMED nếu xác nhận thắng tranh chấp. Chỉ sửa status và status_changed_at;
      * không xóa hồ sơ, đổi khoảng hoặc tính lại hạn. Chạy lại không sửa bản đã nhả.
+     * Adapter dùng savepoint, chỉ thử lại 40P01 tối đa ba lần với cùng expiredAt;
+     * hết lượt truyền đúng lỗi deadlock đầu tiên.
      *
      * @param expiredAt mốc dọn đồng thời là mốc chuyển trạng thái, từ Clock chung
      * @return số bản ghi được nhả; số không là kết quả hợp lệ

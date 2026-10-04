@@ -7,12 +7,14 @@ import com.carrental.availability.application.command.ConfirmReservationCommand;
 import com.carrental.availability.application.command.ReleaseReservationCommand;
 import com.carrental.availability.application.command.MarkReservationInUseCommand;
 import com.carrental.availability.application.command.CompleteReservationCommand;
+import com.carrental.availability.application.command.MoveComplianceHoldStartCommand;
 import com.carrental.availability.application.port.in.HoldReservationUseCase;
 import com.carrental.availability.application.port.in.BlockReservationUseCase;
 import com.carrental.availability.application.port.in.ConfirmReservationUseCase;
 import com.carrental.availability.application.port.in.ReleaseReservationUseCase;
 import com.carrental.availability.application.port.in.MarkReservationInUseUseCase;
 import com.carrental.availability.application.port.in.CompleteReservationUseCase;
+import com.carrental.availability.application.port.in.MoveComplianceHoldStartUseCase;
 import com.carrental.availability.application.port.in.ExpireReservationHoldsUseCase;
 import com.carrental.availability.application.port.out.ReadReservationPort;
 import com.carrental.availability.application.port.out.ReadReservationPolicyPort;
@@ -46,7 +48,7 @@ import java.util.OptionalLong;
 @Service
 class ReservationCommandService implements HoldReservationUseCase, BlockReservationUseCase, ConfirmReservationUseCase,
         ReleaseReservationUseCase, MarkReservationInUseUseCase, CompleteReservationUseCase,
-        ExpireReservationHoldsUseCase {
+        ExpireReservationHoldsUseCase, MoveComplianceHoldStartUseCase {
 
     private static final String CODE_PREFIX = "KL";
 
@@ -222,7 +224,8 @@ class ReservationCommandService implements HoldReservationUseCase, BlockReservat
     }
 
     /**
-     * Hoàn tất IN_USE hoặc BLOCKED, không co khoảng để bảo toàn đệm BR-109, BR-116.
+     * Hoàn tất IN_USE hoặc khóa vận hành hữu hạn BLOCKED, không co khoảng để bảo toàn đệm BR-109, BR-116.
+     * Khóa COMPLIANCE_HOLD bị domain từ chối theo BR-015.
      *
      * @param command mã khóa lịch đã xong chuyến hoặc công việc vận hành
      * @throws DomainException nếu đầu vào sai, không tìm thấy, sai trạng thái hoặc thua tranh chấp
@@ -232,6 +235,25 @@ class ReservationCommandService implements HoldReservationUseCase, BlockReservat
     public void complete(CompleteReservationCommand command) {
         Reservation original = loadReservation(Validations.required(command, "command").code());
         saveTransition(original, original.complete(clock.instant()));
+    }
+
+    /**
+     * Dời mốc trên chính khóa giấy tờ theo BR-015, chỉ gọi khi giấy tờ được gia hạn.
+     * Không đọc Clock/chính sách hoặc sinh mã; không thử lại khi CAS thua tranh chấp.
+     *
+     * @param command mã khóa và mốc mới sau mốc cũ
+     * @throws DomainException nếu dữ liệu sai, không tìm thấy, sai loại/trạng thái hoặc mốc đã đổi
+     */
+    @Override
+    @Transactional(propagation = Propagation.REQUIRED)
+    public void moveComplianceHoldStart(MoveComplianceHoldStartCommand command) {
+        MoveComplianceHoldStartCommand checked = Validations.required(command, "command");
+        Reservation original = loadReservation(checked.code());
+        Reservation changed = original.moveComplianceHoldStart(checked.newStartInclusive());
+        if (!writePort.moveComplianceHoldStart(original.code(), original.period().startInclusive(),
+                changed.period().startInclusive())) {
+            throw DomainException.conflict(ErrorCode.RESERVATION_INVALID_STATUS_TRANSITION);
+        }
     }
 
     /**

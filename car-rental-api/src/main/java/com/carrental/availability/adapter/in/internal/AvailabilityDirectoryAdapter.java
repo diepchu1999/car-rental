@@ -9,6 +9,7 @@ import com.carrental.availability.application.command.CompleteReservationCommand
 import com.carrental.availability.application.command.ConfirmReservationCommand;
 import com.carrental.availability.application.command.HoldReservationCommand;
 import com.carrental.availability.application.command.MarkReservationInUseCommand;
+import com.carrental.availability.application.command.MoveComplianceHoldStartCommand;
 import com.carrental.availability.application.command.ReleaseReservationCommand;
 import com.carrental.availability.application.port.in.BlockReservationUseCase;
 import com.carrental.availability.application.port.in.CompleteReservationUseCase;
@@ -16,6 +17,7 @@ import com.carrental.availability.application.port.in.ConfirmReservationUseCase;
 import com.carrental.availability.application.port.in.HoldReservationUseCase;
 import com.carrental.availability.application.port.in.ListBusyVehiclesUseCase;
 import com.carrental.availability.application.port.in.MarkReservationInUseUseCase;
+import com.carrental.availability.application.port.in.MoveComplianceHoldStartUseCase;
 import com.carrental.availability.application.port.in.ReleaseReservationUseCase;
 import com.carrental.availability.application.query.ListBusyVehiclesQuery;
 import com.carrental.availability.domain.ReservationKind;
@@ -23,6 +25,7 @@ import com.carrental.shared.validation.Validations;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.Set;
 
@@ -45,6 +48,7 @@ class AvailabilityDirectoryAdapter implements AvailabilityDirectory {
     private final ReleaseReservationUseCase releases;
     private final MarkReservationInUseUseCase departures;
     private final CompleteReservationUseCase completions;
+    private final MoveComplianceHoldStartUseCase complianceMoves;
     private final ListBusyVehiclesUseCase queries;
 
     /** Nhận các cổng đầu vào; không phụ thuộc port ghi/đọc hoặc adapter persistence. */
@@ -52,7 +56,7 @@ class AvailabilityDirectoryAdapter implements AvailabilityDirectory {
             HoldReservationUseCase holds, BlockReservationUseCase blocks,
             ConfirmReservationUseCase confirmations, ReleaseReservationUseCase releases,
             MarkReservationInUseUseCase departures, CompleteReservationUseCase completions,
-            ListBusyVehiclesUseCase queries
+            ListBusyVehiclesUseCase queries, MoveComplianceHoldStartUseCase complianceMoves
     ) {
         this.holds = holds;
         this.blocks = blocks;
@@ -61,6 +65,7 @@ class AvailabilityDirectoryAdapter implements AvailabilityDirectory {
         this.departures = departures;
         this.completions = completions;
         this.queries = queries;
+        this.complianceMoves = complianceMoves;
     }
 
     /** Chuyển khoảng thuê chưa cộng đệm vào command; use case tự áp dụng đệm và TTL. */
@@ -101,6 +106,12 @@ class AvailabilityDirectoryAdapter implements AvailabilityDirectory {
     @Override
     public void complete(String reservationCode) {
         completions.complete(CompleteReservationCommand.from(reservationCode));
+    }
+
+    /** Chỉ gọi khi giấy tờ được gia hạn; chuyển nguyên mã và mốc mới sang use case BR-015. */
+    @Override
+    public void moveComplianceHoldStart(String reservationCode, Instant newStartInclusive) {
+        complianceMoves.moveComplianceHoldStart(MoveComplianceHoldStartCommand.from(reservationCode, newStartInclusive));
     }
 
     /** Tạo query từ khoảng chưa cộng đệm và tập ứng viên; không giữ chỗ hoặc kiểm lại khi ghi. */

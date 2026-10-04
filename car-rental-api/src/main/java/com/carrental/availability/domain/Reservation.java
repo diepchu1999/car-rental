@@ -100,6 +100,19 @@ public final class Reservation {
             );
         }
 
+        if (this.kind == ReservationKind.COMPLIANCE_HOLD) {
+            if (!this.period.isUnbounded()) {
+                throw DomainException.invalidInput(
+                        "COMPLIANCE_HOLD must have an unbounded period."
+                );
+            }
+            if (this.status != ReservationStatus.BLOCKED) {
+                throw DomainException.invalidInput(
+                        "COMPLIANCE_HOLD must have BLOCKED status."
+                );
+            }
+        }
+
         if (this.kind == ReservationKind.RENTAL) {
             this.bookingCode = Validations.requiredText(
                     bookingCode,
@@ -215,6 +228,7 @@ public final class Reservation {
      * <p>Áp dụng BR-007, BR-011, BR-012, BR-015 và các nguyên nhân
      * bận được BR-104 đưa vào chung bảng khóa lịch.
      * Không cho dùng đường này để tạo khóa RENTAL.
+     * COMPLIANCE_HOLD bắt buộc không chặn trên và luôn BLOCKED theo BR-015.
      *
      * <p>Lý do được giữ nguyên để persistence lưu lại.
      * Cho phép null theo hợp đồng cột reason trong DDL đã duyệt.
@@ -377,12 +391,13 @@ public final class Reservation {
     /**
      * Hoàn tất chuyến hoặc công việc vận hành theo status-flow §2.
      *
-     * <p>Chỉ cho phép IN_USE hoặc BLOCKED chuyển sang COMPLETED.
+     * <p>Cho phép IN_USE hoặc khóa vận hành hữu hạn BLOCKED chuyển sang COMPLETED.
+     * COMPLIANCE_HOLD luôn BLOCKED theo BR-015, không được hoàn tất hoặc giải phóng.
      * Giữ nguyên khoảng đã lưu để không làm mất đệm theo
      * BR-109, BR-116 và database-guideline §4.
      *
-     * <p>Không co khoảng theo giờ trả thật và không xử lý gia hạn
-     * giấy tờ tại đây; các luồng đó nằm ngoài task hiện tại.
+     * <p>Không co khoảng theo giờ trả thật. Gia hạn giấy tờ phải dời điểm bắt đầu
+     * của chính khóa theo BR-015, không dùng thao tác hoàn tất.
      *
      * @param changedAt thời điểm thực hiện lấy từ Clock chung
      * @return bản mới ở trạng thái COMPLETED
@@ -391,14 +406,38 @@ public final class Reservation {
     public Reservation complete(Instant changedAt) {
         Instant transitionTime = Validations.required(changedAt, "changedAt");
 
-        if (status != ReservationStatus.IN_USE
-                && status != ReservationStatus.BLOCKED) {
+        if (kind == ReservationKind.COMPLIANCE_HOLD
+                || (status != ReservationStatus.IN_USE
+                && status != ReservationStatus.BLOCKED)) {
             throw DomainException.ruleViolation(
                     ErrorCode.RESERVATION_INVALID_STATUS_TRANSITION
             );
         }
 
         return changeStatus(ReservationStatus.COMPLETED, transitionTime);
+    }
+
+    /**
+     * Dời điểm bắt đầu khóa giấy tờ theo BR-015; chỉ gọi khi giấy tờ được gia hạn.
+     *
+     * <p>Chỉ COMPLIANCE_HOLD/BLOCKED được thu hẹp khoảng bằng mốc mới sau mốc cũ.
+     * Giữ nguyên cận trên không chặn, định danh và mọi trường khác, kể cả status_changed_at.
+     * Không đọc Clock, không kết thúc khóa và không tạo định danh mới.
+     *
+     * @param newStartInclusive mốc bắt đầu mới, bắt buộc sau mốc đang lưu
+     * @return aggregate mới có khoảng thu hẹp; bản nguồn không bị sửa
+     * @throws DomainException nếu thiếu mốc, mốc không tăng hoặc loại/trạng thái không cho phép
+     */
+    public Reservation moveComplianceHoldStart(Instant newStartInclusive) {
+        Instant checkedStart = Validations.required(newStartInclusive, "newStartInclusive");
+        if (kind != ReservationKind.COMPLIANCE_HOLD || status != ReservationStatus.BLOCKED) {
+            throw DomainException.ruleViolation(ErrorCode.RESERVATION_INVALID_STATUS_TRANSITION);
+        }
+        if (!checkedStart.isAfter(period.startInclusive())) {
+            throw DomainException.invalidInput("newStartInclusive must be after the current start.");
+        }
+        return new Reservation(code, vehicleId, ReservationPeriod.unboundedFrom(checkedStart),
+                kind, status, bookingCode, reason, holdExpiresAt, createdAt, statusChangedAt);
     }
 
     /**

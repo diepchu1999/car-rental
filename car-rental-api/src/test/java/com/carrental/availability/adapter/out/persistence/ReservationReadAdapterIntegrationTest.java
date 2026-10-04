@@ -67,8 +67,10 @@ class ReservationReadAdapterIntegrationTest {
     @ParameterizedTest
     @EnumSource(value = ReservationKind.class, names = "RENTAL", mode = EnumSource.Mode.EXCLUDE)
     void restoresOperationalReservation(ReservationKind kind) {
+        ReservationPeriod period = kind == ReservationKind.COMPLIANCE_HOLD
+                ? ReservationPeriod.unboundedFrom(START) : ReservationPeriod.finite(START, END);
         Reservation expected = Reservation.createBlocked(CODE, VEHICLE_ID,
-                ReservationPeriod.finite(START, END), kind, "  Scheduled work  ", CREATED);
+                period, kind, "  Scheduled work  ", CREATED);
         writes.insert(expected).orElseThrow();
         assertSameFields(expected, reads.loadAggregate(CODE).orElseThrow());
     }

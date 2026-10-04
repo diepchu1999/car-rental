@@ -9,6 +9,7 @@ import com.carrental.availability.application.command.CompleteReservationCommand
 import com.carrental.availability.application.command.ConfirmReservationCommand;
 import com.carrental.availability.application.command.HoldReservationCommand;
 import com.carrental.availability.application.command.MarkReservationInUseCommand;
+import com.carrental.availability.application.command.MoveComplianceHoldStartCommand;
 import com.carrental.availability.application.command.ReleaseReservationCommand;
 import com.carrental.availability.application.port.in.BlockReservationUseCase;
 import com.carrental.availability.application.port.in.CompleteReservationUseCase;
@@ -16,6 +17,7 @@ import com.carrental.availability.application.port.in.ConfirmReservationUseCase;
 import com.carrental.availability.application.port.in.HoldReservationUseCase;
 import com.carrental.availability.application.port.in.ListBusyVehiclesUseCase;
 import com.carrental.availability.application.port.in.MarkReservationInUseUseCase;
+import com.carrental.availability.application.port.in.MoveComplianceHoldStartUseCase;
 import com.carrental.availability.application.port.in.ReleaseReservationUseCase;
 import com.carrental.availability.application.query.ListBusyVehiclesQuery;
 import com.carrental.availability.domain.ReservationKind;
@@ -54,10 +56,11 @@ class AvailabilityDirectoryAdapterTest {
     private ReleaseReservationUseCase releases;
     private MarkReservationInUseUseCase departures;
     private CompleteReservationUseCase completions;
+    private MoveComplianceHoldStartUseCase complianceMoves;
     private ListBusyVehiclesUseCase queries;
     private AvailabilityDirectory directory;
 
-    /** Tạo adapter với bảy cổng riêng để phát hiện gọi nhầm hoặc đọc trước khi giữ chỗ. */
+    /** Tạo adapter với các cổng riêng để phát hiện gọi nhầm hoặc đọc trước khi giữ chỗ. */
     @BeforeEach
     void setUp() {
         holds = mock(HoldReservationUseCase.class);
@@ -66,9 +69,10 @@ class AvailabilityDirectoryAdapterTest {
         releases = mock(ReleaseReservationUseCase.class);
         departures = mock(MarkReservationInUseUseCase.class);
         completions = mock(CompleteReservationUseCase.class);
+        complianceMoves = mock(MoveComplianceHoldStartUseCase.class);
         queries = mock(ListBusyVehiclesUseCase.class);
         directory = new AvailabilityDirectoryAdapter(holds, blocks, confirmations, releases,
-                departures, completions, queries);
+                departures, completions, queries, complianceMoves);
     }
 
     /** Kiểm giữ nguyên khoảng chưa cộng đệm, bookingCode, trả đúng ref và không gọi cổng tra cứu. */
@@ -86,11 +90,12 @@ class AvailabilityDirectoryAdapterTest {
     @ParameterizedTest
     @EnumSource(BlockKind.class)
     void mapsEveryBlockKindAndPreservesReason(BlockKind kind) {
-        var command = BlockReservationCommand.from(41L, START, END,
+        var period = kind == BlockKind.COMPLIANCE_HOLD ? new Period(START, null) : PERIOD;
+        var command = BlockReservationCommand.from(41L, START, period.endExclusive(),
                 ReservationKind.valueOf(kind.name()), " Scheduled work ");
         var ref = new ReservationRef(92L, "KL-DEF456");
         when(blocks.block(command)).thenReturn(ref);
-        assertSame(ref, directory.block(41L, PERIOD, kind, " Scheduled work "));
+        assertSame(ref, directory.block(41L, period, kind, " Scheduled work "));
         verify(blocks).block(command);
         assertExactlyOneInvocation();
     }
@@ -128,6 +133,14 @@ class AvailabilityDirectoryAdapterTest {
             }
             default -> throw new AssertionError("Unknown operation: " + operation);
         }
+        assertExactlyOneInvocation();
+    }
+
+    /** Kiểm dời mốc giữ nguyên mã và Instant, chỉ ủy quyền đúng use case BR-015. */
+    @Test
+    void delegatesComplianceMoveWithoutChangingInputs() {
+        directory.moveComplianceHoldStart(" KL-MOVE01 ", END);
+        verify(complianceMoves).moveComplianceHoldStart(MoveComplianceHoldStartCommand.from(" KL-MOVE01 ", END));
         assertExactlyOneInvocation();
     }
 
@@ -188,6 +201,11 @@ class AvailabilityDirectoryAdapterTest {
                 assertSame(failure, assertThrows(RuntimeException.class,
                         () -> directory.findBusyVehicleIds(PERIOD, Duration.ZERO, List.of(41L))));
             }
+            case "move" -> {
+                doThrow(failure).when(complianceMoves).moveComplianceHoldStart(any());
+                assertSame(failure, assertThrows(RuntimeException.class,
+                        () -> directory.moveComplianceHoldStart("KL-MOVE01", END)));
+            }
             default -> throw new AssertionError("Unknown operation: " + operation);
         }
         assertExactlyOneInvocation();
@@ -204,8 +222,12 @@ class AvailabilityDirectoryAdapterTest {
                 api -> api.block(41L, null, BlockKind.MAINTENANCE, null),
                 api -> api.block(41L, PERIOD, null, null),
                 api -> api.block(41L, new Period(START, null), BlockKind.MAINTENANCE, null),
+                api -> api.block(41L, PERIOD, BlockKind.COMPLIANCE_HOLD, null),
                 api -> api.confirm(null), api -> api.release(" "),
                 api -> api.markInUse(""), api -> api.complete(null),
+                api -> api.moveComplianceHoldStart(null, END),
+                api -> api.moveComplianceHoldStart(" ", END),
+                api -> api.moveComplianceHoldStart("KL-MOVE01", null),
                 api -> api.findBusyVehicleIds(null, Duration.ZERO, List.of()),
                 api -> api.findBusyVehicleIds(new Period(START, null), Duration.ZERO, List.of()),
                 api -> api.findBusyVehicleIds(PERIOD, Duration.ZERO, Arrays.asList(41L, null)),
@@ -215,7 +237,7 @@ class AvailabilityDirectoryAdapterTest {
 
     /** Cung cấp hai nhóm lỗi cho mỗi thao tác thay vì chỉ kiểm một cổng đại diện. */
     private static Stream<Arguments> failedCalls() {
-        return Stream.of("hold", "block", "confirm", "release", "markInUse", "complete", "query")
+        return Stream.of("hold", "block", "confirm", "release", "markInUse", "complete", "query", "move")
                 .flatMap(operation -> Stream.of(
                         Arguments.of(operation, DomainException.conflict(ErrorCode.VEHICLE_NOT_AVAILABLE)),
                         Arguments.of(operation, new IllegalStateException("Storage unavailable."))));
@@ -223,7 +245,7 @@ class AvailabilityDirectoryAdapterTest {
 
     /** Liệt kê dependency để bắt mọi lời gọi ngoài đúng một cổng cần ủy quyền. */
     private Object[] dependencies() {
-        return new Object[]{holds, blocks, confirmations, releases, departures, completions, queries};
+        return new Object[]{holds, blocks, confirmations, releases, departures, completions, queries, complianceMoves};
     }
 
     /** Khẳng định tổng cộng đúng một tương tác, kể cả khi use case ném lỗi. */

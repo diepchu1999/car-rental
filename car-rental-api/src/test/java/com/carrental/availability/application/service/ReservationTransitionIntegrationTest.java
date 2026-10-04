@@ -84,13 +84,27 @@ class ReservationTransitionIntegrationTest {
         when(clock.instant()).thenReturn(NOW);
     }
 
-    /** Kiểm toàn bộ cạnh qua proxy và đối chiếu mọi thuộc tính, gồm khóa vận hành vô hạn. */
+    /** Kiểm toàn bộ cạnh hợp lệ qua proxy và đối chiếu mọi thuộc tính đã đóng băng. */
     @ParameterizedTest
     @MethodSource("validTransitions")
     void persistsTransitionWithoutChangingFrozenFields(String operation, Reservation before, Reservation expected) {
         writes.insert(before).orElseThrow();
         invoke(operation, before.code());
         assertStored(expected);
+    }
+
+    /** Kiểm khóa giấy tờ không đổi trạng thái qua use case thật; dữ liệu vẫn BLOCKED và không chặn trên. */
+    @ParameterizedTest
+    @ValueSource(strings = {"confirm", "release", "markInUse", "complete"})
+    void rejectsComplianceTransitionWithoutChangingStoredFields(String operation) {
+        Reservation before = Reservation.createBlocked(CODE, VEHICLE_ID,
+                ReservationPeriod.unboundedFrom(START), ReservationKind.COMPLIANCE_HOLD,
+                "Expired document", CREATED);
+        writes.insert(before).orElseThrow();
+        DomainException failure = assertThrows(DomainException.class, () -> invoke(operation, CODE));
+        assertEquals(ErrorCode.RESERVATION_INVALID_STATUS_TRANSITION, failure.errorCode());
+        assertEquals(DomainException.Category.RULE_VIOLATION, failure.category());
+        assertStored(before);
     }
 
     /** Kiểm đúng/sau hạn không xác nhận được và database vẫn lưu HELD với hạn cũ. */
@@ -251,23 +265,20 @@ class ReservationTransitionIntegrationTest {
         };
     }
 
-    /** Sáu cạnh cùng biến thể compliance vô hạn, giữ nguyên reason và period. */
+    /** Sáu cạnh hợp lệ của khóa thuê và khóa vận hành hữu hạn, giữ nguyên reason và period. */
     private static Stream<Arguments> validTransitions() {
         Reservation held = held(CODE, VEHICLE_ID);
         Reservation confirmed = held.confirm(CREATED.plusSeconds(10));
         Reservation inUse = confirmed.markInUse(CREATED.plusSeconds(20));
         Reservation blocked = Reservation.createBlocked(CODE, VEHICLE_ID, held.period(),
                 ReservationKind.MAINTENANCE, " Workshop ", CREATED);
-        Reservation unbounded = Reservation.createBlocked(CODE, VEHICLE_ID,
-                ReservationPeriod.unboundedFrom(START), ReservationKind.COMPLIANCE_HOLD, "Expired document", CREATED);
         return Stream.of(
                 Arguments.of("confirm", held, held.confirm(NOW)),
                 Arguments.of("release", held, held.release(NOW)),
                 Arguments.of("release", confirmed, confirmed.release(NOW)),
                 Arguments.of("markInUse", confirmed, confirmed.markInUse(NOW)),
                 Arguments.of("complete", inUse, inUse.complete(NOW)),
-                Arguments.of("complete", blocked, blocked.complete(NOW)),
-                Arguments.of("complete", unbounded, unbounded.complete(NOW))
+                Arguments.of("complete", blocked, blocked.complete(NOW))
         );
     }
 

@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.ApplicationContext;
+import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProcessor;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.transaction.TestTransaction;
@@ -65,11 +66,13 @@ class ReservationExpiryIntegrationTest {
         when(clock.instant()).thenReturn(NOW);
     }
 
-    /** Kiểm cấu hình test thật đã tắt job nền, không để fixture bị sửa bất chợt trong suite. */
+    /** Kiểm context thật vẫn đăng ký job, dùng nhịp 24 giờ để không tự sửa fixture trong suite. */
     @Test
-    void backgroundSchedulerIsDisabledInDatabaseTests() {
-        assertEquals("false", context.getEnvironment().getProperty("car-rental.availability.hold-sweep-enabled"));
-        assertFalse(context.containsBean("reservationHoldExpiryScheduler"));
+    void backgroundSchedulerRemainsRegisteredWithLongTestInterval() {
+        assertEquals("PT24H", context.getEnvironment().getProperty("car-rental.availability.hold-sweep-interval"));
+        assertEquals(Duration.ofHours(24), context.getBean("reservationHoldSweepInterval", Duration.class));
+        assertTrue(context.containsBean("reservationHoldExpiryScheduler"));
+        assertEquals(1, context.getBean(ScheduledAnnotationBeanPostProcessor.class).getScheduledTasks().size());
     }
 
     /** Kiểm hạn trước, đúng và sau mốc dọn một microsecond; chỉ hai bản đầu được nhả. */

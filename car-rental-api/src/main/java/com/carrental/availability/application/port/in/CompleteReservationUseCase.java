@@ -4,7 +4,8 @@ import com.carrental.availability.application.command.CompleteReservationCommand
 import com.carrental.shared.error.DomainException;
 
 /**
- * Cổng nội bộ để hoàn tất chuyến hoặc khóa vận hành, giữ nguyên khoảng có đệm theo BR-109, BR-116 và status-flow §2.
+ * Cổng nội bộ để hoàn tất chuyến hoặc khóa vận hành hữu hạn, giữ nguyên khoảng có đệm theo BR-109, BR-116 và status-flow §2.
+ * COMPLIANCE_HOLD luôn BLOCKED và không được hoàn tất theo BR-015.
  *
  * <p>Module khác phải gọi AvailabilityDirectory, không import use case này.
  */

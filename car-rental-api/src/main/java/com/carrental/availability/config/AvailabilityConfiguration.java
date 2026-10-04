@@ -39,7 +39,7 @@ class AvailabilityConfiguration {
      * Cung cấp nhịp dọn dương để scheduler sử dụng trực tiếp, không qua port.
      *
      * <p>Đây là tham số vận hành, không phải chính sách có lịch sử hiệu lực.
-     * Bean được kiểm tra khi khởi động kể cả khi scheduler được tắt trong test.
+     * Bean luôn được kiểm tra khi khởi động, kể cả khi test đặt nhịp dài để bảo vệ fixture.
      *
      * @param value thời lượng ISO-8601 từ cấu hình ứng dụng
      * @return nhịp dọn đã kiểm tra

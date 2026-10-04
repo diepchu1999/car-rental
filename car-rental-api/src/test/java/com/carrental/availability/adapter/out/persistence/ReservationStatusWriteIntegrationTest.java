@@ -107,23 +107,20 @@ class ReservationStatusWriteIntegrationTest {
                 "status-booking", Duration.ofHours(1), CREATED);
     }
 
-    /** Cung cấp sáu cạnh trạng thái và thêm biến thể compliance không chặn trên. */
+    /** Cung cấp sáu cạnh hợp lệ; khóa giấy tờ không có cạnh chuyển trạng thái theo BR-015. */
     private static Stream<Arguments> transitions() {
         Reservation held = held();
         Reservation confirmed = held.confirm(CREATED.plusSeconds(10));
         Reservation inUse = confirmed.markInUse(CREATED.plusSeconds(20));
         Reservation blocked = Reservation.createBlocked("KL-STAT01", VEHICLE_ID, held.period(),
                 ReservationKind.MAINTENANCE, "  Workshop  ", CREATED);
-        Reservation compliance = Reservation.createBlocked("KL-STAT01", VEHICLE_ID,
-                ReservationPeriod.unboundedFrom(START), ReservationKind.COMPLIANCE_HOLD, "Expired document", CREATED);
         return Stream.of(
                 Arguments.of(held, held.confirm(CHANGED)),
                 Arguments.of(held, held.release(CHANGED)),
                 Arguments.of(confirmed, confirmed.release(CHANGED)),
                 Arguments.of(confirmed, confirmed.markInUse(CHANGED)),
                 Arguments.of(inUse, inUse.complete(CHANGED)),
-                Arguments.of(blocked, blocked.complete(CHANGED)),
-                Arguments.of(compliance, compliance.complete(CHANGED))
+                Arguments.of(blocked, blocked.complete(CHANGED))
         );
     }
 

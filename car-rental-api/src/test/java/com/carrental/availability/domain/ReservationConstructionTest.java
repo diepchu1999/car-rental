@@ -74,13 +74,15 @@ class ReservationConstructionTest {
     @ParameterizedTest
     @EnumSource(value = ReservationKind.class, names = "RENTAL", mode = EnumSource.Mode.EXCLUDE)
     void createsOperationalReservationDirectlyBlocked(ReservationKind kind) {
+        ReservationPeriod period = kind == ReservationKind.COMPLIANCE_HOLD
+                ? ReservationPeriod.unboundedFrom(PERIOD.startInclusive()) : PERIOD;
         Reservation result = Reservation.createBlocked(
-                CODE, VEHICLE_ID, PERIOD, kind, REASON, CREATED
+                CODE, VEHICLE_ID, period, kind, REASON, CREATED
         );
 
         assertEquals(CODE, result.code());
         assertEquals(VEHICLE_ID, result.vehicleId());
-        assertEquals(PERIOD, result.period());
+        assertEquals(period, result.period());
         assertEquals(kind, result.kind());
         assertEquals(ReservationStatus.BLOCKED, result.status());
         assertNull(result.bookingCode());
@@ -105,7 +107,7 @@ class ReservationConstructionTest {
         assertEquals(reason, result.reason());
     }
 
-    /** Kiểm COMPLIANCE_HOLD có thể chặn vô hạn về phía trên theo BR-015. */
+    /** Kiểm COMPLIANCE_HOLD bắt buộc chặn vô hạn về phía trên theo BR-015. */
     @Test
     void createsUnboundedComplianceHold() {
         ReservationPeriod unbounded = ReservationPeriod.unboundedFrom(PERIOD.startInclusive());
@@ -115,6 +117,28 @@ class ReservationConstructionTest {
         assertEquals(unbounded, result.period());
         assertTrue(result.period().isUnbounded());
         assertEquals(ReservationStatus.BLOCKED, result.status());
+    }
+
+    /** Kiểm không thể tạo hoặc khôi phục khóa giấy tờ hữu hạn theo BR-015. */
+    @Test
+    void rejectsFiniteComplianceOnCreateAndRestore() {
+        assertInvalid(() -> Reservation.createBlocked(
+                CODE, VEHICLE_ID, PERIOD, ReservationKind.COMPLIANCE_HOLD, REASON, CREATED
+        ), "COMPLIANCE_HOLD must have an unbounded period.");
+        assertInvalid(() -> Reservation.restore(
+                CODE, VEHICLE_ID, PERIOD, ReservationKind.COMPLIANCE_HOLD, ReservationStatus.BLOCKED,
+                null, REASON, null, CREATED, CREATED
+        ), "COMPLIANCE_HOLD must have an unbounded period.");
+    }
+
+    /** Kiểm khôi phục không chấp nhận khóa giấy tờ ở bất kỳ trạng thái nào ngoài BLOCKED. */
+    @ParameterizedTest
+    @EnumSource(value = ReservationStatus.class, names = "BLOCKED", mode = EnumSource.Mode.EXCLUDE)
+    void rejectsNonBlockedComplianceOnRestore(ReservationStatus status) {
+        assertInvalid(() -> Reservation.restore(
+                CODE, VEHICLE_ID, ReservationPeriod.unboundedFrom(PERIOD.startInclusive()),
+                ReservationKind.COMPLIANCE_HOLD, status, null, REASON, null, CREATED, CREATED
+        ), "COMPLIANCE_HOLD must have BLOCKED status.");
     }
 
     /**

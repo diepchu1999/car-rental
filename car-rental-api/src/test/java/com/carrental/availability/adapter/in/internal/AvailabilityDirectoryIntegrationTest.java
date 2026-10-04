@@ -125,10 +125,10 @@ class AvailabilityDirectoryIntegrationTest {
         assertTrue(directory.findBusyVehicleIds(PERIOD, Duration.ZERO, List.of(VEHICLE_ID)).isEmpty());
     }
 
-    /** Kiểm năm loại vận hành được lưu đúng, giữ nguyên lý do và hoàn tất qua cùng API. */
+    /** Kiểm bốn loại vận hành hữu hạn được lưu đúng, giữ nguyên lý do và hoàn tất qua cùng API. */
     @ParameterizedTest
-    @EnumSource(BlockKind.class)
-    void storesAndCompletesEveryBlockKind(BlockKind kind) {
+    @EnumSource(value = BlockKind.class, names = "COMPLIANCE_HOLD", mode = EnumSource.Mode.EXCLUDE)
+    void storesAndCompletesFiniteBlockKinds(BlockKind kind) {
         var ref = directory.block(VEHICLE_ID, PERIOD, kind, " Scheduled work ");
         var stored = reads.loadAggregate(ref.code()).orElseThrow();
         assertEquals(ReservationKind.valueOf(kind.name()), stored.kind());
@@ -146,6 +146,40 @@ class AvailabilityDirectoryIntegrationTest {
     void supportsUnboundedComplianceThroughPublicApi() {
         var ref = directory.block(VEHICLE_ID, new Period(START, null), BlockKind.COMPLIANCE_HOLD, null);
         assertTrue(reads.loadAggregate(ref.code()).orElseThrow().period().isUnbounded());
+        assertEquals(Set.of(VEHICLE_ID), directory.findBusyVehicleIds(
+                new Period(START.plus(Duration.ofDays(3650)), END.plus(Duration.ofDays(3650))),
+                Duration.ZERO, List.of(VEHICLE_ID)));
+    }
+
+    /** Kiểm BR-015 qua API thật: hoàn tất hoặc giải phóng đều bị từ chối và không thay dữ liệu khóa. */
+    @ParameterizedTest
+    @ValueSource(strings = {"complete", "release"})
+    void rejectsComplianceCompletionAndReleaseThroughPublicApi(String operation) {
+        var ref = directory.block(VEHICLE_ID, new Period(START, null), BlockKind.COMPLIANCE_HOLD,
+                "Expired document");
+        var before = reads.loadAggregate(ref.code()).orElseThrow();
+        when(clock.instant()).thenReturn(NOW.plusSeconds(60));
+        var failure = assertThrows(DomainException.class, () -> {
+            if ("complete".equals(operation)) {
+                directory.complete(ref.code());
+            } else {
+                directory.release(ref.code());
+            }
+        });
+        assertEquals(ErrorCode.RESERVATION_INVALID_STATUS_TRANSITION, failure.errorCode());
+        assertEquals(DomainException.Category.RULE_VIOLATION, failure.category());
+        var after = reads.loadAggregate(ref.code()).orElseThrow();
+        assertEquals(ReservationStatus.BLOCKED, after.status());
+        assertEquals(before.period(), after.period());
+        assertTrue(after.period().isUnbounded());
+        assertEquals(before.statusChangedAt(), after.statusChangedAt());
+        assertEquals(before.createdAt(), after.createdAt());
+        assertEquals(before.code(), after.code());
+        assertEquals(before.vehicleId(), after.vehicleId());
+        assertEquals(before.kind(), after.kind());
+        assertEquals(before.reason(), after.reason());
+        assertEquals(before.bookingCode(), after.bookingCode());
+        assertEquals(before.holdExpiresAt(), after.holdExpiresAt());
         assertEquals(Set.of(VEHICLE_ID), directory.findBusyVehicleIds(
                 new Period(START.plus(Duration.ofDays(3650)), END.plus(Duration.ofDays(3650))),
                 Duration.ZERO, List.of(VEHICLE_ID)));

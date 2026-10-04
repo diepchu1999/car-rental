@@ -82,8 +82,10 @@ class ReservationBusyQueryIntegrationTest {
     @ParameterizedTest
     @EnumSource(value = ReservationKind.class, names = "RENTAL", mode = EnumSource.Mode.EXCLUDE)
     void includesEveryOperationalKind(ReservationKind kind) {
+        ReservationPeriod period = kind == ReservationKind.COMPLIANCE_HOLD
+                ? ReservationPeriod.unboundedFrom(START) : ReservationPeriod.finite(START, END);
         writes.insert(Reservation.createBlocked("KL-BUSY01", VEHICLE_ID,
-                ReservationPeriod.finite(START, END), kind, null, CREATED)).orElseThrow();
+                period, kind, null, CREATED)).orElseThrow();
         assertEquals(Set.of(VEHICLE_ID), busy(START, END, Duration.ZERO, VEHICLE_ID));
     }
 

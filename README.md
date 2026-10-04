@@ -135,7 +135,7 @@ không dùng mã đơn. Kết quả tra cứu rảnh không bảo đảm giữ �
 ### Job nhả giữ chỗ quá hạn
 
 Theo BR-103, backend tự chuyển `HELD` thành `RELEASED` khi `hold_expires_at` đã đến hạn.
-Job mặc định bật, dùng `applicationClock` chung và không tính lại TTL từ cấu hình hiện tại.
+Job luôn được đăng ký, không có công tắc tắt; dùng `applicationClock` chung và không tính lại TTL từ cấu hình hiện tại.
 Chỉ `status` và `status_changed_at` được cập nhật; không xóa bản ghi lịch.
 
 Nhịp chạy lấy từ `car-rental.availability.hold-sweep-interval`
@@ -148,11 +148,13 @@ Hai instance cùng chạy được bảo vệ bởi điều kiện `status = 'HE
 không bị job ghi đè. Nếu một lượt gặp lỗi, transaction rollback, scheduler ghi nhận
 lỗi và tiếp tục ở lượt định kỳ sau. Job chỉ nhả khóa lịch, không xử lý đơn thuê hay tiền.
 
-Test mặc định tắt job nền bằng `car-rental.availability.hold-sweep-enabled=false`
-trong `src/test/resources/application.properties` để các fixture thời gian cũ không tự thay đổi.
+Test đặt `car-rental.availability.hold-sweep-interval=PT24H`
+trong `src/test/resources/application.properties`. Job vẫn được đăng ký, nhưng độ trễ ban đầu
+cũng là 24 giờ nên không tự sửa fixture trong thời gian chạy suite thông thường.
 File này không được đóng gói vào ứng dụng local. Các test expiry gọi use case chủ động;
-`ReservationHoldExpirySchedulerTest` dùng context riêng để kiểm bật/tắt, nhịp chạy và
-khả năng tiếp tục sau lỗi. Không thêm biến bắt buộc vào `.env`.
+`ReservationHoldExpirySchedulerTest` dùng context riêng để kiểm đăng ký job, nhịp chạy,
+độ trễ ban đầu và khả năng tiếp tục sau lỗi. Cấu hình công tắc cũ không còn tác dụng.
+Không thêm biến bắt buộc vào `.env`.
 
 ## Bước tiếp theo
 
