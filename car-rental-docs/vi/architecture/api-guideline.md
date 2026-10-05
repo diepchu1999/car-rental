@@ -51,6 +51,10 @@ Trong cùng một `v1`:
 
 Thay đổi phá hợp đồng ⇒ `/api/v2/**`, `v1` sống song song tới khi số người dùng bản cũ đủ nhỏ.
 
+**Trước bản phát hành đầu tiên** — khi chưa có client nào được cài đặt — sửa thẳng `v1` và ghi rõ trong
+danh mục endpoint (§9). Mở `v2` khi chưa ai dùng `v1` chỉ là gánh thêm một bản cần giữ. Quy tắc `v2` áp
+dụng từ bản phát hành đầu tiên. Ví dụ: Task 6 thêm trường bắt buộc vào API admin tạo xe và tạo chi nhánh.
+
 Mọi request nên kèm:
 ```text
 X-Client-Platform: ios | android | web
@@ -99,6 +103,9 @@ phải tuỳ chọn giao diện.
 ## 8. Phân trang
 Cursor cho danh sách lớn (kết quả tìm xe, lịch sử đơn). Offset chấp nhận được cho danh sách admin nhỏ.
 **Mobile bắt buộc cursor** — cuộn vô hạn bằng offset sẽ trùng hoặc sót bản ghi khi dữ liệu thay đổi.
+
+Kích thước trang: mặc định **20**, tối đa **100** — chung cho mọi danh sách. Vượt tối đa thì báo lỗi đầu
+vào, không tự cắt về 100: client tưởng đã nhận đủ trong khi bị cắt im lặng.
 
 ## 9. Danh mục endpoint
 

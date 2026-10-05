@@ -75,8 +75,10 @@ codex chỉ chạy lệnh **đọc**: `git status`, `git diff`, `git log`, tìm 
 ### Chốt chặn
 
 - **Không chạy lệnh git nào có ghi** (`add`, `commit`, `push`, `reset`, `checkout`, `stash`...).
-- **Không sửa tài liệu** trong `car-rental-docs/`. Thấy tài liệu sai hoặc mâu thuẫn với code thì báo —
-  sửa tài liệu là việc của Chief Architect.
+- **Không sửa tài liệu chuẩn** — `car-rental-docs/vi/business/`, `architecture/`, `decisions/`. Thấy
+  tài liệu sai hoặc mâu thuẫn với code thì báo — sửa tài liệu chuẩn là việc của Chief Architect.
+  **Ngoại lệ:** danh mục endpoint `car-rental-docs/vi/api/` mô tả code đã viết, nên **bạn phải cập nhật
+  nó trong cùng thay đổi** với endpoint (api-guideline §9).
 - **Không làm quá phạm vi.** Thấy việc đáng làm ngoài phạm vi thì ghi chú ở cuối, đừng tự làm.
 - Chạm tài nguyên tranh chấp thì **test đồng thời thật** với PostgreSQL thật, và chỉ cách **chứng minh
   test đỏ được** khi tắt cơ chế bảo vệ (`backend-guideline.md` §6).
