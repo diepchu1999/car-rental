@@ -72,6 +72,17 @@ Hệ thống lưu CCCD, GPLX, ảnh tình trạng xe, vị trí, và dữ liệu
 - Vị trí xe và tài xế chỉ lộ khi đang có chuyến. Dữ liệu GPS lịch sử giữ đúng thời hạn cần cho
   tranh chấp và phạt nguội, không giữ lâu hơn.
 
+### Log — không để dữ liệu nhạy cảm lọt qua đường log
+
+- **Log SQL kèm giá trị tham số chỉ bật ở local**, qua profile `sql-log`. Mặc định tắt, test tắt.
+  Áp cho mọi cách làm việc này: P6Spy, hay log `TRACE` của `StatementCreatorUtils`.
+- **Không bao giờ bật ở môi trường có dữ liệu thật.** Giá trị tham số là số điện thoại, mã đơn, toạ độ,
+  số CCCD đã mã hoá — log là nơi dữ liệu bị đọc bởi người không có quyền đọc bảng gốc. Khi dựng môi
+  trường thật, kiểm rằng profile `sql-log` **không thể** được bật ở đó.
+- **Lỗi 500: chi tiết chỉ nằm ở log máy chủ.** Stack trace, tên class, số dòng, câu SQL không bao giờ
+  vào response gửi khách — response chỉ có mã lỗi chung. Đã khoá bằng test
+  `hidesInternalDetailsForUnexpectedFailure`.
+
 ### Xoá tài khoản — ngoại lệ có căn cứ
 Khách xoá tài khoản thì tài khoản ngừng hoạt động, nhưng **hồ sơ bằng chứng của đơn đã hoàn tất
 được giữ** (BR-123, ADR-0015). Đây là nghĩa vụ pháp lý theo Nghị định 336/2025.
