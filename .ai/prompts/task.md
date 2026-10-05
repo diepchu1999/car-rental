@@ -99,6 +99,7 @@ phình thành ba.
 ### §8 Báo cáo cuối task
 - Những lựa chọn kỹ thuật đã chọn và **vì sao**.
 - Chỗ nào thấy tài liệu chưa rõ hoặc mâu thuẫn — **ghi lại, đừng tự quyết**.
-- **Bộ request Postman của cả task**, gom một chỗ theo thứ tự chạy, để Tech Owner lưu thành collection.
+- **File collection Postman** của cả task trong `postman/` — import được, chạy được bằng Collection Runner
+  (`implement.md`, mục "Postman").
 - Danh sách file đã tạo hoặc sửa trong cả task.
 - Đề xuất commit message (Tech Owner tự chạy lệnh).
