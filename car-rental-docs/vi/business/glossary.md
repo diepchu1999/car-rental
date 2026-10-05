@@ -50,7 +50,12 @@
 | Loại sở hữu | `ownership_type` | `COMPANY` \| `PARTNER` — phân biệt theo **dòng tiền** |
 | Loại đối tác | `partner_type` | `INDIVIDUAL` \| `BUSINESS` — phân biệt theo **hợp đồng và kênh** |
 | Loại nhiên liệu | `fuel_type` | `PETROL` \| `DIESEL` \| `ELECTRIC` \| `HYBRID` |
+| Số chỗ | `seats` | `4` \| `5` \| `7` \| `16` (BR-018) |
+| Hộp số | `transmission` | `MANUAL` (số sàn) \| `AUTOMATIC` (số tự động) (BR-018) |
+| Hãng xe | `make` | Nhập tự do ở giai đoạn 1 (BR-018) |
+| Dòng xe | `model` | Nhập tự do ở giai đoạn 1 (BR-018) |
 | Chi nhánh | `Branch` | Điểm đỗ xe công ty, có địa điểm cụ thể và một quản lý |
+| Tên, địa chỉ chi nhánh | `name`, `address` | Hiển thị cho khách để biết tới đâu nhận xe (BR-808) |
 | Điều chuyển xe | `VehicleTransfer` | Chuyển xe từ chi nhánh này sang chi nhánh khác |
 | Thanh lý xe | `retire` | Ngừng khai thác vĩnh viễn một chiếc xe |
 
@@ -78,11 +83,17 @@
 |---|---|---|
 | Đơn thuê | `Booking` | Một lần thuê xe, từ lúc đặt tới lúc hoàn tất |
 | Báo giá | `Quote` | Kết quả tính giá, bất biến, có hạn dùng |
+| Gói thuê | `RentalType` | Trục phân loại thứ hai (ADR-0004); ba giá trị ở ba dòng dưới |
 | Gói giờ | `HOURLY` | Thuê tối thiểu 4 giờ |
 | Gói ngày | `DAILY` | Thuê theo ngày |
 | Gói dài hạn | `MONTHLY` | Thuê theo tháng, có hợp đồng riêng |
+| Hình thức lái | `DriveMode` | Hai giá trị ở hai dòng dưới |
 | Tự lái | `SELF_DRIVE` | Khách tự cầm lái |
 | Có tài xế | `WITH_DRIVER` | Nền tảng hoặc chủ xe bố trí người lái |
+| Cách nhận xe | `PickupMethod` | `BRANCH` (nhận tại chi nhánh) \| `DELIVERY` (giao tận nơi) |
+| Điều kiện thuê | `RentalTerms` | Khoảng đệm, tối thiểu 4 giờ, giờ chi nhánh, cửa sổ đặt — áp như nhau ở tìm kiếm và đặt xe (BR-125) |
+| Bán kính tìm kiếm | `radiusKm` | Khách chọn; mặc định 10, tối đa 30 (BR-125) |
+| Miễn thế chấp | `collateralFree` | Xe không yêu cầu thế chấp cho gói thuê đang xét (BR-110, BR-209). Tính trong `vehicle`; `search` chỉ nhận cờ, không biết loại sở hữu |
 | Người lái được khai báo | `declared_driver` | Người lái của chuyến, đã xác minh GPLX, khách nhìn thấy được |
 | Gia hạn | `extend` | Kéo dài chuyến đang diễn ra |
 | Đổi xe giữ cọc | `rebook` | Chuyển cọc từ đơn cũ sang đơn mới thay vì huỷ |

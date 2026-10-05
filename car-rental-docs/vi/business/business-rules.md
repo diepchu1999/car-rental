@@ -156,6 +156,20 @@ theo BR-303. Huỷ tự động không báo khách là không chấp nhận đư
 bị huỷ mà không ai gọi điện là loại trải nghiệm khách kể lại cho người khác nghe.
 *Nguồn: Tech Owner chốt 24/08/2026.*
 
+### BR-018 — Thuộc tính xe dùng để tìm kiếm ✅ GĐ1
+Mỗi xe phải có đủ bốn thuộc tính sau **ngay khi tạo** — thiếu thì bộ lọc của BR-126 không có gì để lọc:
+
+| Thuộc tính | Giá trị |
+|---|---|
+| Số chỗ | `4` · `5` · `7` · `16` |
+| Hộp số | Số sàn · Số tự động |
+| Hãng xe | Nhập tự do |
+| Dòng xe | Nhập tự do |
+
+Hãng và dòng xe nhập tự do ở giai đoạn 1 — chưa có đủ xe để một danh mục chuẩn đáng công duy trì.
+Chuẩn hoá thành danh mục khi số xe tăng.
+*Nguồn: Tech Owner duyệt 04/10/2026.*
+
 ---
 
 ## 1xx — Tìm xe và đặt xe
@@ -359,7 +373,20 @@ Bốn thứ sau **không phải bộ lọc tuỳ chọn** mà là đầu vào b�
 | Tự lái hay có tài xế | Quyết định xe nào đủ điều kiện hiển thị |
 
 Hiển thị một chiếc xe mà chưa biết nó có rảnh trong khoảng khách cần là hứa suông.
-*Nguồn: Tech Owner duyệt 24/08/2026.*
+
+**Bán kính:** khách chọn; mặc định **10 km**, tối đa **30 km** — khớp mốc "không nhận giao" của BR-412.
+Hai giá trị nằm ở cấu hình ứng dụng: không đóng cứng, nhưng không cần lịch sử hiệu lực (BR-225) vì
+không ảnh hưởng đơn đã tạo.
+
+**Hỗ trợ theo lát cắt (ADR-0012):** lát cắt 1 chỉ hỗ trợ **tự lái**, gói **giờ** và **ngày**, **nhận
+tại chi nhánh**. Có tài xế (lát cắt 4), gói tháng (lát cắt 5) và giao tận nơi (cần phân công nhân
+viên giao xe) bị **từ chối rõ ràng là chưa hỗ trợ** — không lặng lẽ bỏ qua. Lặng lẽ bỏ qua thì khách
+tưởng đang xem xe có tài xế trong khi thực ra là xe tự lái.
+
+**Phải nhất quán với lúc đặt:** tìm kiếm áp đúng những điều kiện mà bước đặt xe sẽ áp — khoảng đệm
+(BR-109, BR-116), tối thiểu 4 giờ (BR-113), giờ chi nhánh (BR-119), cửa sổ đặt (BR-121). Khoảng thuê
+vi phạm thì báo lỗi ngay ở tìm kiếm, không hiện xe rồi để khách bị từ chối ở bước cuối.
+*Nguồn: Tech Owner duyệt 24/08/2026. Làm rõ 04/10/2026.*
 
 ### BR-126 — Bộ lọc tìm kiếm ✅ GĐ1
 **Giai đoạn 1:** số chỗ (4/5/7/16) · hộp số (sàn/tự động) · **loại nhiên liệu** · khoảng giá ·
@@ -378,7 +405,11 @@ Hai bộ lọc cần đặt nổi bật:
 **Không được có bộ lọc theo loại sở hữu.** Nó vi phạm BR-112 và tạo cảm giác hai hạng xe. Cái khách
 thật sự quan tâm là *miễn thế chấp* và *đánh giá* — lọc theo tính chất khách quan tâm, không lọc
 theo nhãn sở hữu.
-*Nguồn: Tech Owner duyệt 24/08/2026.*
+
+**Thứ tự hiện thực:** lọc và xếp theo **giá** làm cùng `pricing` (và cần BR-218 chốt trước) · xếp theo
+**đánh giá** làm khi có đánh giá (BR-901) · lọc **giao tận nơi** làm cùng phân công nhân viên giao xe.
+Đây là thứ tự làm, không phải bỏ — cả ba vẫn thuộc giai đoạn 1.
+*Nguồn: Tech Owner duyệt 24/08/2026. Làm rõ 04/10/2026.*
 
 ### BR-127 — Xe hỏng trước giờ giao ✅ GĐ1
 Đơn đã `CONFIRMED` mà xe hỏng trước giờ bàn giao:
@@ -440,6 +471,7 @@ hồng **không** ảnh hưởng tới đơn đã tạo.
 ### BR-209 — Khi nào yêu cầu thế chấp ✅ GĐ1
 | Trường hợp | Thế chấp |
 |---|---|
+| Xe công ty, thuê giờ | **Không yêu cầu** — như thuê ngày (làm rõ 04/10/2026) |
 | Xe công ty, thuê ngày | **Không yêu cầu** |
 | Xe công ty, thuê dài hạn | **Bắt buộc** |
 | Xe đối tác | **Do đối tác tự quyết** |
@@ -1218,6 +1250,12 @@ Vai này là chủ thể của nhiều quyết định trong hệ thống: duy�
 tờ sắp hết hạn (BR-017). Không có người này thì các luồng đó không có ai đứng tên.
 *Nguồn: Tech Owner chốt 23/08/2026 (phân tích §3); tách thành quy tắc riêng 07/09/2026 —
 trước đó bị gán nhầm vào BR-003.*
+
+### BR-808 — Chi nhánh có tên và địa chỉ hiển thị cho khách ✅ GĐ1
+Mỗi chi nhánh có **tên** và **địa chỉ** — bắt buộc, hiển thị trong kết quả tìm kiếm và khi đặt xe.
+Toạ độ (BR-003) cho hệ thống biết khoảng cách; tên và địa chỉ cho khách biết phải tới đâu nhận xe.
+Kết quả tìm kiếm chỉ ghi "cách 3,2 km" thì khách không biết đó là ở đâu.
+*Nguồn: Tech Owner duyệt 04/10/2026.*
 
 ### BR-806 — Đóng chi nhánh ✅ GĐ1
 Chặn đóng chi nhánh khi còn xe hoặc còn đơn hiệu lực. Phải điều chuyển xe đi (BR-006) và xử lý đơn

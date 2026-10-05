@@ -137,6 +137,9 @@ Các cổng chính:
 | `booking` kiểm tra xe và lấy loại sở hữu | `vehicle` | `VehicleDirectory` → `VehicleRef` |
 | `booking` giữ chỗ | `availability` | `AvailabilityDirectory.hold(...)` |
 | `search` lọc xe đang bận | `availability` | `AvailabilityDirectory.findBusyVehicleIds(...)` |
+| `search` tìm chi nhánh trong bán kính | `branch` | `BranchDirectory` — PostGIS, trả cả khoảng cách |
+| `search` lấy xe hiển thị được | `vehicle` | `VehicleSearchDirectory` → `VehicleSearchView` |
+| `search` và `booking` kiểm điều kiện thuê | `booking` | `RentalTermsDirectory` — đệm, tối thiểu, giờ chi nhánh, cửa sổ đặt |
 | `fleet` khoá lịch bảo dưỡng | `availability` | `AvailabilityDirectory.block(...)` |
 | `fleet` tạo khoá giấy tờ **lúc duyệt xe**, không đợi tới ngày hết hạn | `availability` | `AvailabilityDirectory.block(..., COMPLIANCE_HOLD)` |
 | `fleet` dời khoá giấy tờ khi giấy tờ được gia hạn | `availability` | `AvailabilityDirectory.moveComplianceHoldStart(...)` |
@@ -147,4 +150,13 @@ Các cổng chính:
 > policy. Đổi lại, test kiến trúc R6 chặn việc dùng nó để rẽ nhánh trực tiếp.
 >
 > `search` **không** nhận `VehicleRef` đầy đủ; nó dùng một `VehicleSearchView` riêng không có
-> `ownershipType`. Đây là cách ép BR-112 bằng kiểu dữ liệu chứ không bằng kỷ luật.
+> `ownershipType`, qua một interface riêng `VehicleSearchDirectory` không có phương thức nào trả về
+> `VehicleRef`. Đây là cách ép BR-112 bằng kiểu dữ liệu chứ không bằng kỷ luật. Cờ `collateralFree`
+> (BR-209) được `vehicle` tính sẵn — vì nó phụ thuộc loại sở hữu mà `search` không được biết.
+>
+> `RentalType`, `DriveMode`, `PickupMethod` nằm trong `shared` như từ vựng dùng chung: `vehicle` cần
+> `RentalType` để tính thế chấp, mà `vehicle` không được phụ thuộc `booking`. **Chỉ enum** — quy tắc
+> theo gói thuê vẫn nằm ở `*PolicyResolver` của module sở hữu nó (ADR-0004).
+> Điều kiện thuê thuộc `booking` vì đó là điều kiện của một lượt đặt; `search` áp lại đúng chúng để
+> không hiện xe mà bước đặt sẽ từ chối (BR-125). `booking` có `api` và policy từ Task 6, vòng đời đơn
+> từ Task 9.

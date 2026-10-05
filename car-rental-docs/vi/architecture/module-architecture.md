@@ -209,7 +209,7 @@ ranh giới sai, dừng lại và hỏi Chief Architect.
 | R7 | Chỉ module `availability` chứa SQL ghi vào `availability.reservation` | ADR-0005 |
 | R8 | Không có `DELETE`, `TRUNCATE`, hay `DROP TABLE` trong SQL của `handover` và `compliance` | ADR-0015 |
 | R9 | `booking`, `handover`, `payment`, `settlement` không import `ConfigurationPort` — đọc bản sao trong đơn | ADR-0014 |
-| R10 | Module `search` không import `VehicleRef` (chỉ dùng `VehicleSearchView` không có loại sở hữu) | BR-112 |
+| R10 | Module `search` không import `VehicleRef`, và **không kiểu nào** `search` dùng từ `vehicle.api` có trường, thành phần record hay kiểu trả về là `OwnershipType` (mở rộng ở Task 6 — tên `VehicleRef` thôi thì chưa đủ) | BR-112 |
 | R11 | `application` không import web/HTTP/servlet · JDBC/SQL · Jackson · `@Configuration`/`@Bean` | ADR-0004 |
 
 R11 cho phép `application` dùng Spring **chỉ để tiêm phụ thuộc và đánh dấu transaction** — chi tiết
