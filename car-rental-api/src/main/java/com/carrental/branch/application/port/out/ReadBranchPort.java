@@ -1,8 +1,11 @@
 package com.carrental.branch.application.port.out;
 
 import com.carrental.branch.application.view.BranchDetail;
+import com.carrental.branch.application.view.BranchDistanceSummary;
+import com.carrental.branch.application.query.ListNearbyBranchesQuery;
 
 import java.util.Optional;
+import java.util.List;
 
 /**
  * Cổng đầu ra cho việc đọc dữ liệu chi nhánh.
@@ -25,4 +28,7 @@ public interface ReadBranchPort {
      *         không bao giờ trả null
      */
     Optional<BranchDetail> findByCode(String code);
+
+    /** Truy vấn địa lý một lần, trả các chi nhánh và khoảng cách mét; không truy vấn chéo schema. */
+    List<BranchDistanceSummary> findWithinRadius(ListNearbyBranchesQuery query);
 }

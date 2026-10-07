@@ -22,6 +22,7 @@ import java.time.LocalDate;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -209,7 +210,7 @@ class VehicleStatusPersistenceIntegrationTest {
                 new VehicleDocuments(
                         APPROVAL_DATE.plusDays(30),
                         APPROVAL_DATE.plusDays(60)
-                )
+                ), SPECIFICATIONS
         );
     }
 
@@ -255,7 +256,9 @@ class VehicleStatusPersistenceIntegrationTest {
                 before.branchId(),
                 expectedStatus,
                 before.inspectionExpiresOn(),
-                before.liabilityInsuranceExpiresOn()
+                before.liabilityInsuranceExpiresOn(),
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                SPECIFICATIONS.make(), SPECIFICATIONS.model()
         );
 
         assertEquals(expected, after);

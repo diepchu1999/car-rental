@@ -17,11 +17,15 @@ package com.carrental.branch.application.view;
  * @param code mã nghiệp vụ của chi nhánh
  * @param latitude vĩ độ của chi nhánh, tính bằng độ
  * @param longitude kinh độ của chi nhánh, tính bằng độ
+ * @param name tên chi nhánh theo BR-808
+ * @param address địa chỉ chi nhánh theo BR-808
  */
 public record BranchDetail(
         long id,
         String code,
         double latitude,
-        double longitude
+        double longitude,
+        String name,
+        String address
 ) {
 }

@@ -8,6 +8,9 @@ package com.carrental.branch.adapter.out.persistence;
  */
 final class BranchSqlPaths {
 
+    /** Truy vấn production tìm chi nhánh trong bán kính bằng ST_DWithin. */
+    static final String FIND_WITHIN_RADIUS = "sql/branch/find_branches_within_radius.sql";
+
     /**
      * Đường dẫn câu lệnh chèn chi nhánh mới.
      */

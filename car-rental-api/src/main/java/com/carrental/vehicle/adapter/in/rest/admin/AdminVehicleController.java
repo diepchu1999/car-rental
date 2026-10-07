@@ -69,7 +69,8 @@ class AdminVehicleController {
     public ResponseEntity<ApiResponse<VehicleResponse>> create(@RequestBody CreateVehicleRequest request) {
         CreateVehicleCommand command = CreateVehicleCommand.from(
                 request.plateNumber(), OwnershipType.COMPANY, request.fuelType(),
-                request.branchCode(), request.inspectionExpiresOn(), request.liabilityInsuranceExpiresOn()
+                request.branchCode(), request.inspectionExpiresOn(), request.liabilityInsuranceExpiresOn(),
+                request.seats(), request.transmission(), request.make(), request.model()
         );
         VehicleResponse response = VehicleResponse.fromDomain(createVehicleUseCase.create(command));
         return ResponseEntity.created(URI.create(BASE_PATH + "/" + response.code()))

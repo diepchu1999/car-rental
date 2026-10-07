@@ -2,6 +2,7 @@ package com.carrental.branch.application.service;
 
 import com.carrental.branch.application.command.CreateBranchCommand;
 import com.carrental.branch.application.port.out.ReadBranchPort;
+import com.carrental.branch.BranchReadPortStub;
 import com.carrental.branch.application.port.out.WriteBranchPort;
 import com.carrental.branch.application.view.BranchDetail;
 import com.carrental.branch.domain.Branch;
@@ -39,7 +40,7 @@ class BranchCommandServiceTest {
             new BranchLocation(10.762622, 106.660172);
 
     private static final CreateBranchCommand COMMAND =
-            new CreateBranchCommand(LOCATION);
+            new CreateBranchCommand(LOCATION, "Test Branch", "123 Test Street");
 
     private static final List<String> GENERATED_CODES = List.of(
             "CN-AAAAAA",
@@ -80,10 +81,10 @@ class BranchCommandServiceTest {
             return insertedBranches.size() == attemptCount;
         };
 
-        ReadBranchPort readBranchPort = code -> {
+        ReadBranchPort readBranchPort = BranchReadPortStub.byCode(code -> {
             operations.add("read:" + code);
             return Optional.of(expected);
-        };
+        });
 
         BranchCommandService service = new BranchCommandService(
                 writeBranchPort,
@@ -102,7 +103,7 @@ class BranchCommandServiceTest {
             String expectedCode = GENERATED_CODES.get(index);
 
             assertEquals(
-                    new Branch(expectedCode, LOCATION),
+                    new Branch(expectedCode, LOCATION, "Test Branch", "123 Test Street"),
                     insertedBranches.get(index)
             );
 
@@ -131,11 +132,11 @@ class BranchCommandServiceTest {
             return false;
         };
 
-        ReadBranchPort readBranchPort = code -> {
+        ReadBranchPort readBranchPort = BranchReadPortStub.byCode(code -> {
             throw new AssertionError(
                     "Read port must not be called when every insert collides."
             );
-        };
+        });
 
         BranchCommandService service = new BranchCommandService(
                 writeBranchPort,
@@ -176,11 +177,11 @@ class BranchCommandServiceTest {
             throw storageFailure;
         };
 
-        ReadBranchPort readBranchPort = code -> {
+        ReadBranchPort readBranchPort = BranchReadPortStub.byCode(code -> {
             throw new AssertionError(
                     "Read port must not be called after a write failure."
             );
-        };
+        });
 
         BranchCommandService service = new BranchCommandService(
                 writeBranchPort,
@@ -214,10 +215,10 @@ class BranchCommandServiceTest {
             return true;
         };
 
-        ReadBranchPort readBranchPort = code -> {
+        ReadBranchPort readBranchPort = BranchReadPortStub.byCode(code -> {
             operations.add("read:" + code);
             return Optional.empty();
-        };
+        });
 
         BranchCommandService service = new BranchCommandService(
                 writeBranchPort,
@@ -262,10 +263,10 @@ class BranchCommandServiceTest {
             return true;
         };
 
-        ReadBranchPort readBranchPort = code -> {
+        ReadBranchPort readBranchPort = BranchReadPortStub.byCode(code -> {
             operations.add("read:" + code);
             throw storageFailure;
-        };
+        });
 
         BranchCommandService service = new BranchCommandService(
                 writeBranchPort,
@@ -299,7 +300,7 @@ class BranchCommandServiceTest {
                 42L,
                 code,
                 LOCATION.latitude(),
-                LOCATION.longitude()
+                LOCATION.longitude(), "Test Branch", "123 Test Street"
         );
     }
 

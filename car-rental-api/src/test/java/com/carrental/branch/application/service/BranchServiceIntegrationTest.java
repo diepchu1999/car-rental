@@ -7,6 +7,8 @@ import com.carrental.branch.application.command.CreateBranchCommand;
 import com.carrental.branch.application.port.in.CreateBranchUseCase;
 import com.carrental.branch.application.port.in.GetBranchUseCase;
 import com.carrental.branch.application.port.out.ReadBranchPort;
+import com.carrental.branch.application.query.ListNearbyBranchesQuery;
+import com.carrental.branch.application.view.BranchDistanceSummary;
 import com.carrental.branch.application.query.GetBranchQuery;
 import com.carrental.branch.application.view.BranchDetail;
 import com.carrental.shared.error.DomainException;
@@ -102,7 +104,7 @@ class BranchServiceIntegrationTest {
     void commitsCreatedBranchAndQueriesItInReadOnlyTransaction() {
         CreateBranchCommand command = CreateBranchCommand.from(
                 10.762622,
-                106.660172
+                106.660172, "Test Branch", "123 Test Street"
         );
 
         BranchDetail created = createBranchUseCase.create(command);
@@ -204,7 +206,7 @@ class BranchServiceIntegrationTest {
 
         CreateBranchCommand command = CreateBranchCommand.from(
                 21.028511,
-                105.804817
+                105.804817, "Test Branch", "123 Test Street"
         );
 
         IllegalStateException actualFailure = assertThrowsExactly(
@@ -247,7 +249,7 @@ class BranchServiceIntegrationTest {
         BranchDetail created = createBranchUseCase.create(
                 CreateBranchCommand.from(
                         10.762622,
-                        106.660172
+                        106.660172, "Test Branch", "123 Test Street"
                 )
         );
 
@@ -306,6 +308,19 @@ class BranchServiceIntegrationTest {
         );
     }
 
+    /** Truy vấn bán kính qua Directory mở transaction chỉ đọc, không tự mở ở adapter. */
+    @Test
+    void readsNearbyBranchesThroughDirectoryInReadOnlyTransaction() {
+        BranchDetail created = createBranchUseCase.create(
+                CreateBranchCommand.from(10.762622, 106.660172, "Nearby Branch", "123 Street"));
+        readBranchProbe.reset();
+        var found = branchDirectory.findWithinRadius(10.762622, 106.660172, 1.0);
+        assertTrue(found.stream().anyMatch(branch -> branch.code().equals(created.code())));
+        assertTrue(readBranchProbe.transactionActive);
+        assertTrue(readBranchProbe.transactionReadOnly);
+        assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+    }
+
     /**
      * Đăng ký lớp quan sát cổng đọc dành riêng cho integration test này.
      *
@@ -340,6 +355,14 @@ class BranchServiceIntegrationTest {
      * Không tự tạo dữ liệu giả hoặc tự mở transaction.
      */
     static final class ReadBranchProbe implements ReadBranchPort {
+
+        /** Chuyển truy vấn địa lý qua adapter thật và ghi nhận transaction do service mở. */
+        @Override
+        public java.util.List<BranchDistanceSummary> findWithinRadius(ListNearbyBranchesQuery query) {
+            transactionActive = TransactionSynchronizationManager.isActualTransactionActive();
+            transactionReadOnly = TransactionSynchronizationManager.isCurrentTransactionReadOnly();
+            return delegate.findWithinRadius(query);
+        }
 
         private final ReadBranchPort delegate;
 

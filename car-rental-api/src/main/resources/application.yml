@@ -27,6 +27,10 @@ management:
 
 car-rental:
   time-zone: ${CAR_RENTAL_TIME_ZONE:Asia/Ho_Chi_Minh}
+  search:
+    # BR-125: bán kính tính bằng km, thay đổi qua cấu hình ứng dụng.
+    default-radius-km: 10
+    max-radius-km: 30
   availability:
     # BR-103, BR-225: thời hạn giữ chỗ; nguồn cấu hình local trước khi có module config.
     hold-duration: ${CAR_RENTAL_HOLD_DURATION:PT1H}

@@ -10,6 +10,10 @@ SELECT
     v.branch_id,
     v.status,
     v.inspection_expires_on,
-    v.liability_insurance_expires_on
+    v.liability_insurance_expires_on,
+    v.seats,
+    v.transmission,
+    v.make,
+    v.model
 FROM vehicle.vehicle AS v
 WHERE v.code = :code;

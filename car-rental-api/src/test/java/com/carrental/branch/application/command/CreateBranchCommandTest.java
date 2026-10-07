@@ -23,7 +23,7 @@ class CreateBranchCommandTest {
     void createsCommandWithValidatedLocation() {
         CreateBranchCommand command = CreateBranchCommand.from(
                 10.762622,
-                106.660172
+                106.660172, "Test Branch", "123 Test Street"
         );
 
         assertEquals(10.762622, command.location().latitude());
@@ -37,7 +37,7 @@ class CreateBranchCommandTest {
     void rejectsMissingLocation() {
         DomainException exception = assertThrows(
                 DomainException.class,
-                () -> new CreateBranchCommand(null)
+                () -> new CreateBranchCommand(null, "Test Branch", "123 Test Street")
         );
 
         assertEquals(ErrorCode.INVALID_REQUEST, exception.errorCode());

@@ -2,6 +2,7 @@ package com.carrental.vehicle.adapter.in.rest.admin.request;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.carrental.vehicle.domain.FuelType;
+import com.carrental.vehicle.domain.Transmission;
 
 import java.time.LocalDate;
 
@@ -18,6 +19,10 @@ import java.time.LocalDate;
  * @param branchCode mã chi nhánh đã tồn tại
  * @param inspectionExpiresOn ngày đăng kiểm hết hiệu lực, có thể null
  * @param liabilityInsuranceExpiresOn ngày TNDS hết hiệu lực, có thể null
+ * @param seats số chỗ theo BR-018
+ * @param transmission hộp số theo BR-018
+ * @param make hãng xe có nội dung
+ * @param model dòng xe có nội dung
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record CreateVehicleRequest(
@@ -25,6 +30,10 @@ public record CreateVehicleRequest(
         FuelType fuelType,
         String branchCode,
         LocalDate inspectionExpiresOn,
-        LocalDate liabilityInsuranceExpiresOn
+        LocalDate liabilityInsuranceExpiresOn,
+        Integer seats,
+        Transmission transmission,
+        String make,
+        String model
 ) {
 }

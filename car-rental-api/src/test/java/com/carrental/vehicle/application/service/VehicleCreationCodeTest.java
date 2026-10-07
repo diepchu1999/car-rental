@@ -2,6 +2,7 @@ package com.carrental.vehicle.application.service;
 
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchRef;
+import com.carrental.branch.api.BranchSearchView;
 import com.carrental.shared.code.BusinessCodeGeneratorTestFactory;
 import com.carrental.vehicle.application.command.CreateVehicleCommand;
 import com.carrental.vehicle.application.port.out.ReadVehiclePort;
@@ -22,6 +23,7 @@ import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.random.RandomGenerator;
 
+import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
@@ -49,7 +51,9 @@ class VehicleCreationCodeTest {
                     FuelType.PETROL,
                     BRANCH.code(),
                     null,
-                    null
+                    null,
+                    SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                    SPECIFICATIONS.make(), SPECIFICATIONS.model()
             );
 
     private static final List<String> GENERATED_CODES = List.of(
@@ -86,9 +90,20 @@ class VehicleCreationCodeTest {
         List<String> operations = new ArrayList<>();
         List<Vehicle> insertedVehicles = new ArrayList<>();
 
-        BranchDirectory branchDirectory = code -> {
-            operations.add("branch:" + code);
-            return Optional.of(BRANCH);
+        BranchDirectory branchDirectory = new BranchDirectory() {
+            /** Giữ nguyên hành vi tra mã của fixture tạo xe. */
+            @Override
+            public Optional<BranchRef> findByCode(String code) {
+                operations.add("branch:" + code);
+                return Optional.of(BRANCH);
+            }
+
+            /** Luồng tạo xe không được gọi truy vấn bán kính. */
+            @Override
+            public List<BranchSearchView> findWithinRadius(
+                    Double latitude, Double longitude, Double radiusMeters) {
+                throw new AssertionError("Radius lookup must not be called during vehicle creation.");
+            }
         };
 
         WriteVehiclePort writeVehiclePort = new InsertOnlyWritePort(
@@ -154,9 +169,20 @@ class VehicleCreationCodeTest {
         SequentialRandom random = new SequentialRandom(5);
         List<String> operations = new ArrayList<>();
 
-        BranchDirectory branchDirectory = code -> {
-            operations.add("branch:" + code);
-            return Optional.of(BRANCH);
+        BranchDirectory branchDirectory = new BranchDirectory() {
+            /** Giữ nguyên hành vi tra mã của fixture tạo xe. */
+            @Override
+            public Optional<BranchRef> findByCode(String code) {
+                operations.add("branch:" + code);
+                return Optional.of(BRANCH);
+            }
+
+            /** Luồng tạo xe không được gọi truy vấn bán kính. */
+            @Override
+            public List<BranchSearchView> findWithinRadius(
+                    Double latitude, Double longitude, Double radiusMeters) {
+                throw new AssertionError("Radius lookup must not be called during vehicle creation.");
+            }
         };
 
         WriteVehiclePort writeVehiclePort = new InsertOnlyWritePort(
@@ -219,7 +245,9 @@ class VehicleCreationCodeTest {
                 BRANCH.id(),
                 VehicleStatus.DRAFT,
                 COMMAND.documents().inspectionExpiresOn(),
-                COMMAND.documents().liabilityInsuranceExpiresOn()
+                COMMAND.documents().liabilityInsuranceExpiresOn(),
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                SPECIFICATIONS.make(), SPECIFICATIONS.model()
         );
     }
 

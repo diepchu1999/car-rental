@@ -43,6 +43,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -277,7 +278,9 @@ class VehicleStatusConcurrencyIntegrationTest {
                     before.branchId(),
                     transitioned.status(),
                     before.inspectionExpiresOn(),
-                    before.liabilityInsuranceExpiresOn()
+                    before.liabilityInsuranceExpiresOn(),
+                    SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                    SPECIFICATIONS.make(), SPECIFICATIONS.model()
             );
 
             assertEquals(
@@ -529,7 +532,7 @@ class VehicleStatusConcurrencyIntegrationTest {
                 new VehicleDocuments(
                         APPROVAL_DATE.plusDays(30),
                         APPROVAL_DATE.plusDays(60)
-                )
+                ), SPECIFICATIONS
         );
     }
 

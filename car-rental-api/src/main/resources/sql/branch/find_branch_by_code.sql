@@ -3,6 +3,8 @@
 SELECT
     b.id,
     b.code,
+    b.name,
+    b.address,
     public.ST_Y(CAST(b.location AS public.geometry)) AS latitude,
     public.ST_X(CAST(b.location AS public.geometry)) AS longitude
 FROM branch.branch AS b

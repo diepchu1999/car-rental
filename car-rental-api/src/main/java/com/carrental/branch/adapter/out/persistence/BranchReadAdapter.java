@@ -2,6 +2,8 @@ package com.carrental.branch.adapter.out.persistence;
 
 import com.carrental.branch.application.port.out.ReadBranchPort;
 import com.carrental.branch.application.view.BranchDetail;
+import com.carrental.branch.application.view.BranchDistanceSummary;
+import com.carrental.branch.application.query.ListNearbyBranchesQuery;
 import com.carrental.shared.sql.SqlLoader;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.support.DataAccessUtils;
@@ -25,6 +27,7 @@ class BranchReadAdapter implements ReadBranchPort {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final String findByCodeSql;
+    private final String findWithinRadiusSql;
 
     /**
      * Khởi tạo adapter và tải câu truy vấn một lần.
@@ -42,6 +45,7 @@ class BranchReadAdapter implements ReadBranchPort {
             SqlLoader sqlLoader
     ) {
         this.jdbcTemplate = jdbcTemplate;
+        this.findWithinRadiusSql = sqlLoader.load(BranchSqlPaths.FIND_WITHIN_RADIUS);
         this.findByCodeSql = sqlLoader.load(
                 BranchSqlPaths.FIND_BY_CODE
         );
@@ -73,5 +77,15 @@ class BranchReadAdapter implements ReadBranchPort {
         );
 
         return DataAccessUtils.optionalResult(branches);
+    }
+
+    /** Thực thi một SELECT có tham số; không tính khoảng cách hoặc lọc bán kính trong Java. */
+    @Override
+    public List<BranchDistanceSummary> findWithinRadius(ListNearbyBranchesQuery query) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("latitude", query.origin().latitude())
+                .addValue("longitude", query.origin().longitude())
+                .addValue("radius_meters", query.radiusMeters());
+        return jdbcTemplate.query(findWithinRadiusSql, parameters, BranchRowMappers.DISTANCE);
     }
 }

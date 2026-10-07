@@ -127,7 +127,8 @@ class VehicleCommandService implements CreateVehicleUseCase,
                     command.ownershipType(),
                     command.fuelType(),
                     branch.id(),
-                    command.documents()
+                    command.documents(),
+                    command.specifications()
             );
 
             boolean inserted;

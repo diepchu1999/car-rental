@@ -13,6 +13,8 @@ import com.tngtech.archunit.lang.ArchRule;
 import com.tngtech.archunit.lang.ConditionEvents;
 import com.tngtech.archunit.lang.SimpleConditionEvent;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -25,6 +27,7 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 
+/** Khóa các ranh giới kiến trúc bằng code thật và fixture âm/dương độc lập. */
 class ArchitectureRulesTest {
 
     private static final String R1 = "R1";
@@ -42,10 +45,10 @@ class ArchitectureRulesTest {
     private static final String PRODUCTION_ROOT_PACKAGE = "com.carrental";
     private static final String R3_FIXTURE_ROOT_PACKAGE =
             "com.carrental.architecture.fixtures.r3";
-    private static final String PRODUCTION_VEHICLE_REF =
-            "com.carrental.vehicle.api.VehicleRef";
-    private static final String R10_FIXTURE_VEHICLE_REF =
-            "com.carrental.architecture.fixtures.r10.vehicle.api.VehicleRef";
+    private static final String R10_FIXTURE_ROOT =
+            "com.carrental.architecture.fixtures.r10";
+    private static final String R10_CONTRACT_FIXTURE_ROOT =
+            "com.carrental.architecture.fixtures.r10contracts";
 
     private static final Path BACKEND_ROOT = locateBackendRoot();
 
@@ -208,13 +211,6 @@ class ArchitectureRulesTest {
                     + "module-architecture.md §3 và §8.";
 
 
-    private static final String R10_DESCRIPTION =
-            "Module search tham chiếu VehicleRef.";
-
-    private static final String R10_REMEDY =
-            "Dùng VehicleSearchView không chứa ownershipType; xem "
-                    + "module-architecture.md §5, §8 và BR-112.";
-
     private static final JavaClasses PRODUCTION_CLASSES =
             new ClassFileImporter()
                     .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
@@ -254,6 +250,11 @@ class ArchitectureRulesTest {
                     .importPackages(
                             "com.carrental.architecture.fixtures.r10"
                     );
+
+    private static final JavaClasses R10_CONTRACT_FIXTURE_CLASSES =
+            new ClassFileImporter()
+                    .withImportOption(ImportOption.Predefined.ONLY_INCLUDE_TESTS)
+                    .importPackages(R10_CONTRACT_FIXTURE_ROOT);
 
 
     private static final ArchRule R1_RULE =
@@ -542,24 +543,26 @@ class ArchitectureRulesTest {
         );
     }
 
+    /** Code thật không được nhận VehicleRef hoặc hợp đồng lộ OwnershipType. */
     @Test
-    void r10RealSourceSearchDoesNotReferenceVehicleRef() {
+    void r10RealSourceSearchDoesNotReceiveOwnership() {
         assertNoViolations(
                 R10,
                 evaluateR10(
                         PRODUCTION_CLASSES,
-                        PRODUCTION_VEHICLE_REF
+                        PRODUCTION_ROOT_PACKAGE
                 )
         );
     }
 
+    /** Giữ test âm cũ: tên VehicleRef vẫn bị cấm dù fixture chưa có OwnershipType. */
     @Test
     void r10NegativeFixtureDetectsSearchReferencingVehicleRef() {
         assertFixtureViolations(
                 R10,
                 evaluateR10(
                         R10_FIXTURE_CLASSES,
-                        R10_FIXTURE_VEHICLE_REF
+                        R10_FIXTURE_ROOT
                 ),
                 1,
                 "R10SearchVehicleRefViolation",
@@ -568,6 +571,72 @@ class ArchitectureRulesTest {
                 "VehicleSearchView",
                 "BR-112"
         );
+    }
+
+    /** Mỗi dạng rò có đúng một vi phạm, report phải chỉ rõ đường tới kiểu cấm. */
+    @ParameterizedTest
+    @CsvSource({
+            "FieldLeak,FieldView.classification,OwnershipType",
+            "RecordLeak,RecordView.classification,OwnershipType",
+            "MethodLeak,MethodView.classification(),OwnershipType",
+            "GenericLeak,GenericView.classifications(),OwnershipType",
+            "ArrayLeak,ArrayView.classifications(),OwnershipType",
+            "NestedLeak,NestedDirectory.list(),OwnershipType",
+            "InheritedLeak,MethodView.classification(),OwnershipType",
+            "RefLeak,RefDirectory.find(),VehicleRef"
+    })
+    void r10NegativeFixturesDetectOwnershipInContracts(String consumer, String member, String forbidden) {
+        assertFixtureViolations(R10, evaluateR10Consumer(consumer), 1,
+                consumer, member, forbidden, "VehicleSearchView", "BR-112");
+    }
+
+    /** Hợp đồng có collateralFree và generic sạch được phép; dùng test này cho phép thử đảo. */
+    @Test
+    void r10AllowedFixturePermitsOwnershipFreeContracts() {
+        assertNoViolations(R10, evaluateR10Consumer("Allowed"));
+    }
+
+    /** Đồ thị kiểu có chu trình nhưng không có sở hữu không bị chặn hoặc duyệt vô hạn. */
+    @Test
+    void r10AllowedFixtureHandlesContractCycles() {
+        assertNoViolations(R10, evaluateR10Consumer("CycleAllowed"));
+    }
+
+    /** R10 không cấm booking nhận loại sở hữu qua API để phân giải policy. */
+    @Test
+    void r10AllowedFixtureDoesNotRestrictBooking() {
+        JavaClass consumer = requireImportedClass(R10_CONTRACT_FIXTURE_CLASSES,
+                R10_CONTRACT_FIXTURE_ROOT + ".booking.application.BookingConsumer");
+        assertNoViolations(R10, VehicleSearchContractRule.evaluate(List.of(consumer), R10_CONTRACT_FIXTURE_ROOT));
+    }
+
+    /** Kiểm hợp đồng thật ngay cả khi search chưa được hiện thực, tránh chỉ có test production rỗng. */
+    @Test
+    void r10ProductionVehicleSearchContractDoesNotExposeOwnership() {
+        for (String type : List.of("VehicleSearchDirectory", "VehicleSearchView")) {
+            JavaClass contract = requireImportedClass(PRODUCTION_CLASSES,
+                    PRODUCTION_ROOT_PACKAGE + ".vehicle.api." + type);
+            Optional<String> leak = VehicleSearchContractRule.findLeak(contract, PRODUCTION_ROOT_PACKAGE);
+            org.junit.jupiter.api.Assertions.assertTrue(leak.isEmpty(),
+                    () -> "R10: production search contract leaks ownership: " + leak.orElse(""));
+        }
+    }
+
+    /** Chọn đúng consumer đã import đầy đủ dependency; thiếu fixture phải lỗi thay vì test xanh rỗng. */
+    private static List<ArchitectureViolation> evaluateR10Consumer(String name) {
+        JavaClass consumer = requireImportedClass(R10_CONTRACT_FIXTURE_CLASSES,
+                R10_CONTRACT_FIXTURE_ROOT + ".search.application.Consumers$" + name);
+        return VehicleSearchContractRule.evaluate(List.of(consumer), R10_CONTRACT_FIXTURE_ROOT);
+    }
+
+    /** Không cho selector im lặng bỏ qua lớp bị đổi tên hoặc thiếu khỏi tập import. */
+    private static JavaClass requireImportedClass(JavaClasses classes, String name) {
+        for (JavaClass candidate : classes) {
+            if (candidate.getName().equals(name)) {
+                return candidate;
+            }
+        }
+        throw new AssertionError("Required architecture class was not imported: " + name);
     }
 
     private static List<ArchitectureViolation> evaluateR1(
@@ -778,37 +847,9 @@ class ArchitectureRulesTest {
     }
 
 
-    private static List<ArchitectureViolation> evaluateR10(
-            JavaClasses classes,
-            String vehicleRefClassName
-    ) {
-        return r10Rule(vehicleRefClassName)
-                .evaluate(classes)
-                .getFailureReport()
-                .getDetails()
-                .stream()
-                .map(detail -> new ArchitectureViolation(
-                        R10,
-                        detail,
-                        R10_DESCRIPTION,
-                        R10_REMEDY
-                ))
-                .toList();
-    }
-
-    private static ArchRule r10Rule(
-            String vehicleRefClassName
-    ) {
-        return noClasses()
-                .that()
-                .resideInAPackage("..search..")
-                .should()
-                .dependOnClassesThat()
-                .haveFullyQualifiedName(vehicleRefClassName)
-                .because(
-                        "BR-112 yêu cầu search không biết loại sở hữu của xe"
-                )
-                .allowEmptyShould(true);
+    /** Dùng cùng detector cho production và fixture, chỉ khác namespace gốc. */
+    private static List<ArchitectureViolation> evaluateR10(JavaClasses classes, String rootPackage) {
+        return VehicleSearchContractRule.evaluate(classes, rootPackage);
     }
 
     private static ArchRule r3Rule(String rootPackage) {

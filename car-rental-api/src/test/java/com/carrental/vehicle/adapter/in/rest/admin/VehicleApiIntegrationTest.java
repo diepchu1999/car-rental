@@ -63,6 +63,10 @@ class VehicleApiIntegrationTest {
         JsonNode created = vehicleSuccess(response, 201, "DRAFT");
         assertEquals(body.get("plateNumber"), created.path("plateNumber").asString());
         assertEquals(fuel, created.path("fuelType").asString());
+        assertEquals(5, created.path("seats").intValue());
+        assertEquals("AUTOMATIC", created.path("transmission").asString());
+        assertEquals("Toyota", created.path("make").asString());
+        assertEquals("Vios", created.path("model").asString());
         assertEquals("COMPANY", created.path("ownershipType").asString());
         assertTrue(created.path("branchId").longValue() > 0);
         assertTrue(created.path("inspectionExpiresOn").isNull());
@@ -219,6 +223,62 @@ class VehicleApiIntegrationTest {
         error(post(PATH, body), 400, "INVALID_REQUEST");
     }
 
+    /** BR-018: thiếu hoặc null bất kỳ thuộc tính mới nào đều bị từ chối trước khi tra cứu chi nhánh. */
+    @ParameterizedTest
+    @ValueSource(strings = {"seats", "transmission", "make", "model"})
+    void rejectsMissingOrNullSpecifications(String field) throws Exception {
+        Map<String, Object> body = payload("CN-INPUT1", "PETROL", null, null);
+        body.remove(field);
+        error(post(PATH, body), 400, "INVALID_REQUEST");
+        body.put(field, null);
+        error(post(PATH, body), 400, "INVALID_REQUEST");
+    }
+
+    /** BR-018: chuỗi trắng và hộp số ngoài enum không được lưu vào CSDL. */
+    @ParameterizedTest
+    @ValueSource(strings = {"make", "model", "transmission"})
+    void rejectsInvalidSpecificationText(String field) throws Exception {
+        Map<String, Object> body = payload("CN-INPUT1", "PETROL", null, null);
+        body.put(field, " \t\n");
+        error(post(PATH, body), 400, "INVALID_REQUEST");
+        body.put(field, "");
+        error(post(PATH, body), 400, "INVALID_REQUEST");
+        if (field.equals("transmission")) {
+            body.put(field, "CVT");
+            error(post(PATH, body), 400, "INVALID_REQUEST");
+        }
+    }
+
+    /** BR-018: số chỗ 6 đúng kiểu số nhưng sai tập nghiệp vụ, trả 422 trước khi tra cứu chi nhánh. */
+    @Test
+    void rejectsUnsupportedSeats() throws Exception {
+        Map<String, Object> body = payload("CN-INPUT1", "PETROL", null, null);
+        body.put("seats", 6);
+        error(post(PATH, body), 422, "VEHICLE_INVALID_SEATS");
+    }
+
+    /** BR-018: mọi số chỗ hợp lệ cùng cả hai hộp số đều được lưu và đọc lại nguyên trạng. */
+    @ParameterizedTest
+    @ValueSource(ints = {4, 5, 7, 16})
+    void roundTripsSpecifications(int seats) throws Exception {
+        String branchCode = branch();
+        for (String transmission : new String[]{"MANUAL", "AUTOMATIC"}) {
+            Map<String, Object> body = payload(branchCode, "PETROL", null, null);
+            body.put("seats", seats);
+            body.put("transmission", transmission);
+            body.put("make", " Toyota ");
+            body.put("model", "Model " + "x".repeat(1000));
+            HttpResponse<String> response = post(PATH, body);
+            JsonNode created = vehicleSuccess(response, 201, "DRAFT");
+            assertEquals(seats, created.path("seats").intValue());
+            assertEquals(transmission, created.path("transmission").asString());
+            assertEquals(body.get("make"), created.path("make").asString());
+            assertEquals(body.get("model"), created.path("model").asString());
+            assertEquals(created, vehicleSuccess(
+                    get(response.headers().firstValue("Location").orElseThrow()), 200, "DRAFT"));
+        }
+    }
+
     /**
      * JSON hỏng, null và thiếu body phải trả lỗi chuẩn thay vì 500.
      * @param body nội dung không hợp lệ
@@ -260,7 +320,8 @@ class VehicleApiIntegrationTest {
      */
     private String branch() throws Exception {
         HttpResponse<String> response = post("/api/v1/admin/branches",
-                Map.of("latitude", 10.762622, "longitude", 106.660172));
+                Map.of("latitude", 10.762622, "longitude", 106.660172,
+                        "name", "Vehicle Test Branch", "address", "123 Test Street"));
         JsonNode root = envelope(response, 201);
         assertTrue(root.path("success").booleanValue());
         return root.path("data").path("code").asString();
@@ -279,6 +340,10 @@ class VehicleApiIntegrationTest {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("plateNumber", "TEST-" + UUID.randomUUID());
         body.put("fuelType", fuel);
+        body.put("seats", 5);
+        body.put("transmission", "AUTOMATIC");
+        body.put("make", "Toyota");
+        body.put("model", "Vios");
         body.put("branchCode", branchCode);
         body.put("inspectionExpiresOn", inspection == null ? null : inspection.toString());
         body.put("liabilityInsuranceExpiresOn", insurance == null ? null : insurance.toString());
@@ -367,7 +432,7 @@ class VehicleApiIntegrationTest {
         assertTrue(root.path("error").isNull());
         JsonNode data = root.path("data");
         assertEquals(Set.of("code", "plateNumber", "ownershipType", "fuelType", "branchId", "status",
-                "inspectionExpiresOn", "liabilityInsuranceExpiresOn"), Set.copyOf(data.propertyNames()));
+                "inspectionExpiresOn", "liabilityInsuranceExpiresOn", "seats", "transmission", "make", "model"), Set.copyOf(data.propertyNames()));
         assertTrue(data.path("code").asString().matches("XE-[A-Z0-9]{6}"));
         assertEquals(vehicleStatus, data.path("status").asString());
         assertTrue(data.path("plateNumber").isString());
@@ -399,7 +464,7 @@ class VehicleApiIntegrationTest {
      */
     private static void assertSameVehicleFields(JsonNode before, JsonNode after) {
         for (String field : Set.of("code", "plateNumber", "ownershipType", "fuelType", "branchId",
-                "inspectionExpiresOn", "liabilityInsuranceExpiresOn")) {
+                "inspectionExpiresOn", "liabilityInsuranceExpiresOn", "seats", "transmission", "make", "model")) {
             assertEquals(before.path(field), after.path(field), field);
         }
     }

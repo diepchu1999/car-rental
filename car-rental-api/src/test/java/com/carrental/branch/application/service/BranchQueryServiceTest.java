@@ -1,6 +1,7 @@
 package com.carrental.branch.application.service;
 
 import com.carrental.branch.application.port.out.ReadBranchPort;
+import com.carrental.branch.BranchReadPortStub;
 import com.carrental.branch.application.query.GetBranchQuery;
 import com.carrental.branch.application.view.BranchDetail;
 import com.carrental.shared.error.DomainException;
@@ -23,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
  * <p>Thông tin vị trí phục vụ BR-003. Trường hợp không tìm thấy
  * sử dụng BRANCH_NOT_FOUND theo backend-guideline mục 5.
  *
- * <p>Cổng đọc được thay bằng lambda có kết quả kiểm soát được.
+ * <p>Cổng đọc được thay bằng stub bọc lambda có kết quả kiểm soát được.
  * Test không khởi động Spring, không kết nối cơ sở dữ liệu
  * và không kiểm chứng cơ chế transaction.
  */
@@ -41,15 +42,15 @@ class BranchQueryServiceTest {
                 42L,
                 code,
                 10.762622,
-                106.660172
+                106.660172, "Test Branch", "123 Test Street"
         );
 
         List<String> requestedCodes = new ArrayList<>();
 
-        ReadBranchPort readBranchPort = requestedCode -> {
+        ReadBranchPort readBranchPort = BranchReadPortStub.byCode(requestedCode -> {
             requestedCodes.add(requestedCode);
             return Optional.of(expected);
-        };
+        });
 
         BranchQueryService service = new BranchQueryService(
                 readBranchPort
@@ -81,10 +82,10 @@ class BranchQueryServiceTest {
     void reportsNotFoundWithoutChangingRequestedCode(String code) {
         List<String> requestedCodes = new ArrayList<>();
 
-        ReadBranchPort readBranchPort = requestedCode -> {
+        ReadBranchPort readBranchPort = BranchReadPortStub.byCode(requestedCode -> {
             requestedCodes.add(requestedCode);
             return Optional.empty();
-        };
+        });
 
         BranchQueryService service = new BranchQueryService(
                 readBranchPort
@@ -132,10 +133,10 @@ class BranchQueryServiceTest {
 
         List<String> requestedCodes = new ArrayList<>();
 
-        ReadBranchPort readBranchPort = requestedCode -> {
+        ReadBranchPort readBranchPort = BranchReadPortStub.byCode(requestedCode -> {
             requestedCodes.add(requestedCode);
             throw storageFailure;
-        };
+        });
 
         BranchQueryService service = new BranchQueryService(
                 readBranchPort

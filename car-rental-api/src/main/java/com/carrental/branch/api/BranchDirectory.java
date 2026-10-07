@@ -1,6 +1,7 @@
 package com.carrental.branch.api;
 
 import java.util.Optional;
+import java.util.List;
 
 /**
  * Cung cấp cổng tra cứu chi nhánh cho các module khác.
@@ -32,4 +33,13 @@ public interface BranchDirectory {
      *         không bao giờ trả null
      */
     Optional<BranchRef> findByCode(String code);
+
+    /**
+     * Tìm chi nhánh trong bán kính địa lý theo BR-003, BR-808 và ADR-0007.
+     * @param latitude vĩ độ tâm tìm kiếm, bắt buộc và thuộc [-90, 90]
+     * @param longitude kinh độ tâm tìm kiếm, bắt buộc và thuộc [-180, 180]
+     * @param radiusMeters bán kính hữu hạn, dương theo mét; search áp mặc định/trần BR-125
+     * @return danh sách bất biến theo khoảng cách rồi ID, có thể rỗng; lỗi không bị nuốt
+     */
+    List<BranchSearchView> findWithinRadius(Double latitude, Double longitude, Double radiusMeters);
 }

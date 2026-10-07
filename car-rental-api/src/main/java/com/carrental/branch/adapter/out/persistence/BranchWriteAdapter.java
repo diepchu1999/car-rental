@@ -58,6 +58,8 @@ class BranchWriteAdapter implements WriteBranchPort {
     public boolean insert(Branch branch) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("code", branch.code())
+                .addValue("name", branch.name())
+                .addValue("address", branch.address())
                 .addValue("latitude", branch.location().latitude())
                 .addValue("longitude", branch.location().longitude());
 

@@ -1,8 +1,11 @@
 package com.carrental.vehicle.application.port.out;
 
 import com.carrental.vehicle.application.view.VehicleDetail;
+import com.carrental.vehicle.application.view.VehicleSearchCandidate;
+import com.carrental.vehicle.application.query.ListSearchVehiclesQuery;
 import com.carrental.vehicle.domain.Vehicle;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -14,6 +17,13 @@ import java.util.Optional;
  * <p>Application không phụ thuộc JDBC hoặc cách tổ chức câu SQL.
  */
 public interface ReadVehiclePort {
+
+    /**
+     * Đọc xe ACTIVE theo tập chi nhánh và bộ lọc thuộc tính (BR-010/126).
+     * Không lọc thế chấp tại persistence: application phân giải BR-209 trước khi lọc cờ.
+     * Tập chi nhánh rỗng phải trả rỗng, không đọc toàn bộ bảng.
+     */
+    List<VehicleSearchCandidate> findSearchCandidates(ListSearchVehiclesQuery query);
 
     /**
      * Tìm chi tiết xe phục vụ hiển thị hoặc đọc lại sau khi ghi.

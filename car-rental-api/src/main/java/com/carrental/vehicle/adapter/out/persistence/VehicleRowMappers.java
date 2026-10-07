@@ -1,9 +1,12 @@
 package com.carrental.vehicle.adapter.out.persistence;
 
 import com.carrental.vehicle.application.view.VehicleDetail;
+import com.carrental.vehicle.application.view.VehicleSearchCandidate;
 import com.carrental.vehicle.domain.FuelType;
 import com.carrental.vehicle.domain.OwnershipType;
 import com.carrental.vehicle.domain.Vehicle;
+import com.carrental.vehicle.domain.VehicleSpecifications;
+import com.carrental.vehicle.domain.Transmission;
 import com.carrental.vehicle.domain.VehicleDocuments;
 import com.carrental.vehicle.domain.VehicleStatus;
 import org.springframework.jdbc.core.RowMapper;
@@ -11,7 +14,7 @@ import org.springframework.jdbc.core.RowMapper;
 import java.time.LocalDate;
 
 /**
- * Cung cấp hai bộ ánh xạ độc lập cho view và aggregate của xe.
+ * Cung cấp các bộ ánh xạ độc lập cho view, ứng viên tìm kiếm và aggregate của xe.
  *
  * <p>Mỗi mapper đọc trực tiếp các cột JDBC cần cho mục đích của nó.
  * Mapper aggregate không gọi mapper view hoặc phụ thuộc VehicleDetail.
@@ -20,6 +23,13 @@ import java.time.LocalDate;
  * Các giá trị null của chi nhánh và ngày giấy tờ được giữ nguyên.
  */
 final class VehicleRowMappers {
+
+    /** Giữ sở hữu trong read model nội bộ để application phân giải thế chấp BR-209. */
+    static final RowMapper<VehicleSearchCandidate> SEARCH_CANDIDATE = (rs, row) ->
+            new VehicleSearchCandidate(rs.getLong("id"), rs.getString("code"),
+                    rs.getLong("branch_id"), OwnershipType.valueOf(rs.getString("ownership_type")),
+                    rs.getInt("seats"), Transmission.valueOf(rs.getString("transmission")),
+                    FuelType.valueOf(rs.getString("fuel_type")), rs.getString("make"), rs.getString("model"));
 
     /**
      * Ánh xạ dòng hiện tại sang thông tin chi tiết xe.
@@ -53,7 +63,11 @@ final class VehicleRowMappers {
                     resultSet.getObject(
                             "liability_insurance_expires_on",
                             LocalDate.class
-                    )
+                    ),
+                    resultSet.getInt("seats"),
+                    Transmission.valueOf(resultSet.getString("transmission")),
+                    resultSet.getString("make"),
+                    resultSet.getString("model")
             );
 
     /**
@@ -91,6 +105,12 @@ final class VehicleRowMappers {
                                     "liability_insurance_expires_on",
                                     LocalDate.class
                             )
+                    ),
+                    new VehicleSpecifications(
+                            resultSet.getInt("seats"),
+                            Transmission.valueOf(resultSet.getString("transmission")),
+                            resultSet.getString("make"),
+                            resultSet.getString("model")
                     )
             );
 

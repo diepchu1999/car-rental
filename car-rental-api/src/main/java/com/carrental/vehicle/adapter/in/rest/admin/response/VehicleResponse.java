@@ -2,6 +2,7 @@ package com.carrental.vehicle.adapter.in.rest.admin.response;
 
 import com.carrental.vehicle.application.view.VehicleDetail;
 import com.carrental.vehicle.domain.FuelType;
+import com.carrental.vehicle.domain.Transmission;
 import com.carrental.vehicle.domain.OwnershipType;
 import com.carrental.vehicle.domain.VehicleStatus;
 
@@ -23,6 +24,10 @@ import java.util.Objects;
  * @param status trạng thái hiện tại
  * @param inspectionExpiresOn ngày đăng kiểm hết hiệu lực
  * @param liabilityInsuranceExpiresOn ngày TNDS hết hiệu lực
+ * @param seats số chỗ theo BR-018
+ * @param transmission hộp số theo BR-018
+ * @param make hãng xe có nội dung
+ * @param model dòng xe có nội dung
  */
 public record VehicleResponse(
         String code,
@@ -32,7 +37,11 @@ public record VehicleResponse(
         Long branchId,
         VehicleStatus status,
         LocalDate inspectionExpiresOn,
-        LocalDate liabilityInsuranceExpiresOn
+        LocalDate liabilityInsuranceExpiresOn,
+        Integer seats,
+        Transmission transmission,
+        String make,
+        String model
 ) {
 
     /**
@@ -46,7 +55,8 @@ public record VehicleResponse(
         return new VehicleResponse(
                 view.code(), view.plateNumber(), view.ownershipType(), view.fuelType(),
                 view.branchId(), view.status(), view.inspectionExpiresOn(),
-                view.liabilityInsuranceExpiresOn()
+                view.liabilityInsuranceExpiresOn(),
+                view.seats(), view.transmission(), view.make(), view.model()
         );
     }
 }

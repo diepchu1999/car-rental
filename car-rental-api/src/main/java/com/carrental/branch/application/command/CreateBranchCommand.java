@@ -14,39 +14,51 @@ import com.carrental.shared.validation.Validations;
  * <p>Factory chỉ nhận giá trị thô, không phụ thuộc DTO của REST adapter.
  *
  * @param location tọa độ hợp lệ của chi nhánh cần tạo
+ * @param name tên bắt buộc theo BR-808
+ * @param address địa chỉ bắt buộc theo BR-808
  */
 public record CreateBranchCommand(
-        BranchLocation location
+        BranchLocation location,
+        String name,
+        String address
 ) {
 
     /**
-     * Bảo đảm command luôn có vị trí, kể cả khi được tạo trực tiếp.
+     * Bảo đảm command có vị trí, tên và địa chỉ hợp lệ, kể cả khi được tạo trực tiếp.
      *
      * <p>Giới hạn tọa độ đã được BranchLocation bảo vệ.
      *
-     * @throws DomainException nếu vị trí là null
+     * @throws DomainException nếu thiếu vị trí hoặc tên/địa chỉ thiếu, rỗng hay trắng
      */
     public CreateBranchCommand {
         location = Validations.required(location, "location");
+        name = Validations.requiredText(name, "name");
+        address = Validations.requiredText(address, "address");
     }
 
     /**
-     * Chuyển các tọa độ đầu vào thành command đã được kiểm tra.
+     * Chuyển tọa độ, tên và địa chỉ đầu vào thành command đã được kiểm tra.
      *
      * <p>Ủy quyền cho BranchLocation kiểm dữ liệu thiếu,
      * giá trị không hữu hạn và giới hạn địa lý.
      *
      * @param latitude vĩ độ đầu vào, có thể null nếu bị thiếu
      * @param longitude kinh độ đầu vào, có thể null nếu bị thiếu
-     * @return command chứa vị trí hợp lệ
-     * @throws DomainException nếu thiếu tọa độ hoặc tọa độ không hợp lệ
+     * @param name tên chi nhánh, không được trắng
+     * @param address địa chỉ chi nhánh, không được trắng
+     * @return command chứa vị trí và thông tin hiển thị hợp lệ
+     * @throws DomainException nếu tọa độ sai hoặc tên/địa chỉ thiếu, rỗng hay trắng
      */
     public static CreateBranchCommand from(
             Double latitude,
-            Double longitude
+            Double longitude,
+            String name,
+            String address
     ) {
         return new CreateBranchCommand(
-                BranchLocation.from(latitude, longitude)
+                BranchLocation.from(latitude, longitude),
+                name,
+                address
         );
     }
 }

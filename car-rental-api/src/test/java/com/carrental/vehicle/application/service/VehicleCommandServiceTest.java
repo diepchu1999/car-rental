@@ -31,6 +31,7 @@ import java.time.ZoneId;
 import java.util.Optional;
 import java.util.Random;
 
+import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -565,7 +566,9 @@ class VehicleCommandServiceTest {
                 FuelType.PETROL,
                 "CN-TEST01",
                 null,
-                null
+                null,
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                SPECIFICATIONS.make(), SPECIFICATIONS.model()
         );
     }
 
@@ -589,7 +592,7 @@ class VehicleCommandServiceTest {
                 FuelType.PETROL,
                 42L,
                 status,
-                new VehicleDocuments(inspection, insurance)
+                new VehicleDocuments(inspection, insurance), SPECIFICATIONS
         );
     }
 
@@ -615,7 +618,9 @@ class VehicleCommandServiceTest {
                 42L,
                 status,
                 inspection,
-                insurance
+                insurance,
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                SPECIFICATIONS.make(), SPECIFICATIONS.model()
         );
     }
 

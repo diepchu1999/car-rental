@@ -23,6 +23,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -67,6 +68,49 @@ class BranchApiIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    /** BR-808: kiểm từng trường thiếu, null, rỗng và trắng với đúng thông báo lỗi. */
+    @ParameterizedTest
+    @CsvSource({
+            "name, missing", "name, null", "name, empty", "name, blank",
+            "address, missing", "address, null", "address, empty", "address, blank"
+    })
+    void rejectsInvalidDisplayFields(String field, String variant)
+            throws IOException, InterruptedException {
+        Map<String, Object> body = new LinkedHashMap<>(Map.of(
+                "latitude", 10.762622, "longitude", 106.660172,
+                "name", "Central Branch", "address", "123 Main Street"));
+        switch (variant) {
+            case "missing" -> body.remove(field);
+            case "null" -> body.put(field, null);
+            case "empty" -> body.put(field, "");
+            case "blank" -> body.put(field, " \t\n");
+            default -> throw new AssertionError("Unknown test variant: " + variant);
+        }
+        JsonNode error = assertErrorResponse(
+                post(objectMapper.writeValueAsString(body), MediaType.APPLICATION_JSON_VALUE),
+                400, "INVALID_REQUEST");
+        String suffix = variant.equals("missing") || variant.equals("null")
+                ? " is required." : " must not be blank.";
+        assertEquals(field + suffix, error.path("message").asString());
+    }
+
+    /** BR-808: HTTP, adapter và CSDL giữ nguyên nội dung dài, khoảng trắng và dấu nháy. */
+    @Test
+    void preservesDisplayFieldsThroughDatabaseRoundTrip()
+            throws IOException, InterruptedException {
+        String name = " Owner's " + "N".repeat(1000) + " ";
+        String address = " 123 'Main' Street " + "A".repeat(1000) + " ";
+        String body = objectMapper.writeValueAsString(Map.of(
+                "latitude", 10.762622, "longitude", 106.660172,
+                "name", name, "address", address));
+        JsonNode created = assertSuccessfulResponse(post(body, MediaType.APPLICATION_JSON_VALUE), 201);
+        assertEquals(name, created.path("name").asString());
+        assertEquals(address, created.path("address").asString());
+        JsonNode loaded = assertSuccessfulResponse(
+                get(uri(BRANCHES_PATH + "/" + created.path("code").asString())), 200);
+        assertEquals(created, loaded);
+    }
+
     /**
      * Chứng minh POST tạo được chi nhánh và Location đọc lại đúng tài nguyên.
      *
@@ -90,7 +134,8 @@ class BranchApiIntegrationTest {
         String requestBody = objectMapper.writeValueAsString(
                 Map.of(
                         "latitude", latitude,
-                        "longitude", longitude
+                        "longitude", longitude,
+                        "name", "Test Branch", "address", "123 Test Street"
                 )
         );
 
@@ -115,6 +160,8 @@ class BranchApiIntegrationTest {
                 0.000000001
         );
 
+        assertEquals("Test Branch", createdBranch.path("name").asString());
+        assertEquals("123 Test Street", createdBranch.path("address").asString());
         String code = createdBranch.path("code").asString();
 
         String location = createResponse.headers()
@@ -150,15 +197,15 @@ class BranchApiIntegrationTest {
      */
     @ParameterizedTest
     @ValueSource(strings = {
-            "{\"longitude\":106.660172}",
-            "{\"latitude\":10.762622}",
-            "{\"latitude\":null,\"longitude\":106.660172}",
-            "{\"latitude\":10.762622,\"longitude\":null}",
-            "{\"latitude\":91,\"longitude\":106.660172}",
-            "{\"latitude\":-91,\"longitude\":106.660172}",
-            "{\"latitude\":10.762622,\"longitude\":181}",
-            "{\"latitude\":10.762622,\"longitude\":-181}",
-            "{\"latitude\":\"not-a-number\",\"longitude\":106.660172}",
+            "{\"longitude\":106.660172,\"name\":\"Test Branch\",\"address\":\"123 Test Street\"}",
+            "{\"latitude\":10.762622,\"name\":\"Test Branch\",\"address\":\"123 Test Street\"}",
+            "{\"latitude\":null,\"longitude\":106.660172,\"name\":\"Test Branch\",\"address\":\"123 Test Street\"}",
+            "{\"latitude\":10.762622,\"longitude\":null,\"name\":\"Test Branch\",\"address\":\"123 Test Street\"}",
+            "{\"latitude\":91,\"longitude\":106.660172,\"name\":\"Test Branch\",\"address\":\"123 Test Street\"}",
+            "{\"latitude\":-91,\"longitude\":106.660172,\"name\":\"Test Branch\",\"address\":\"123 Test Street\"}",
+            "{\"latitude\":10.762622,\"longitude\":181,\"name\":\"Test Branch\",\"address\":\"123 Test Street\"}",
+            "{\"latitude\":10.762622,\"longitude\":-181,\"name\":\"Test Branch\",\"address\":\"123 Test Street\"}",
+            "{\"latitude\":\"not-a-number\",\"longitude\":106.660172,\"name\":\"Test Branch\",\"address\":\"123 Test Street\"}",
             "{",
             "null",
             ""
@@ -217,7 +264,8 @@ class BranchApiIntegrationTest {
         String requestBody = objectMapper.writeValueAsString(
                 Map.of(
                         "latitude", 10.762622,
-                        "longitude", 106.660172
+                        "longitude", 106.660172,
+                        "name", "Test Branch", "address", "123 Test Street"
                 )
         );
 
@@ -363,7 +411,7 @@ class BranchApiIntegrationTest {
 
         assertTrue(data.isObject());
         assertEquals(
-                Set.of("code", "latitude", "longitude"),
+                Set.of("code", "latitude", "longitude", "name", "address"),
                 Set.copyOf(data.propertyNames())
         );
 
@@ -373,6 +421,8 @@ class BranchApiIntegrationTest {
         );
         assertTrue(data.path("latitude").isNumber());
         assertTrue(data.path("longitude").isNumber());
+        assertTrue(data.path("name").isString());
+        assertTrue(data.path("address").isString());
 
         return data;
     }

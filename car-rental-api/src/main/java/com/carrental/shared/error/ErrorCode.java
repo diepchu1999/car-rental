@@ -15,6 +15,30 @@ package com.carrental.shared.error;
  */
 public enum ErrorCode {
 
+    /** BR-125: lát cắt 1 chưa hỗ trợ tìm xe theo gói tháng. */
+    SEARCH_RENTAL_TYPE_NOT_SUPPORTED("Monthly rental search is not supported yet."),
+
+    /** BR-125: lát cắt 1 chưa hỗ trợ tìm xe có tài xế. */
+    SEARCH_DRIVE_MODE_NOT_SUPPORTED("Search with a driver is not supported yet."),
+
+    /** BR-125: lát cắt 1 chưa hỗ trợ tìm xe giao tận nơi. */
+    SEARCH_PICKUP_METHOD_NOT_SUPPORTED("Search with vehicle delivery is not supported yet."),
+
+    /** BR-126: chỉ hỗ trợ sắp xếp gần nhất khi chưa có pricing và đánh giá. */
+    SEARCH_SORT_NOT_SUPPORTED("Only nearest-first search is currently supported."),
+
+    /** Gói giờ ngắn hơn tối thiểu 4 giờ theo BR-113. */
+    RENTAL_DURATION_TOO_SHORT("The rental duration is shorter than the required minimum."),
+
+    /** Giờ nhận hoặc trả xe thực tế nằm ngoài giờ chi nhánh theo BR-119. */
+    OUTSIDE_BRANCH_HOURS("Pickup and return must be within branch opening hours."),
+
+    /** Thời điểm nhận xe vi phạm cửa sổ đặt trước theo BR-121. */
+    BOOKING_WINDOW_VIOLATION("Pickup is outside the allowed advance booking window."),
+
+    /** Số chỗ không thuộc tập 4, 5, 7, 16 theo BR-018. */
+    VEHICLE_INVALID_SEATS("Vehicle seats must be one of 4, 5, 7 or 16."),
+
     /**
      * Request sai định dạng hoặc thiếu dữ liệu đầu vào bắt buộc.
      * Đây là lỗi hợp đồng API, chưa phải lỗi quy tắc nghiệp vụ.

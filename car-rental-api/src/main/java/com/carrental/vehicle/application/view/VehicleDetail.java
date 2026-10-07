@@ -1,6 +1,7 @@
 package com.carrental.vehicle.application.view;
 
 import com.carrental.vehicle.domain.FuelType;
+import com.carrental.vehicle.domain.Transmission;
 import com.carrental.vehicle.domain.OwnershipType;
 import com.carrental.vehicle.domain.VehicleStatus;
 
@@ -39,6 +40,10 @@ import java.time.LocalDate;
  *                            có thể null nếu chưa được cung cấp
  * @param liabilityInsuranceExpiresOn ngày bảo hiểm TNDS hết hiệu lực,
  *                                    có thể null nếu chưa được cung cấp
+ * @param seats số chỗ theo BR-018
+ * @param transmission hộp số theo BR-018
+ * @param make hãng xe có nội dung
+ * @param model dòng xe có nội dung
  */
 public record VehicleDetail(
         long id,
@@ -49,6 +54,10 @@ public record VehicleDetail(
         Long branchId,
         VehicleStatus status,
         LocalDate inspectionExpiresOn,
-        LocalDate liabilityInsuranceExpiresOn
+        LocalDate liabilityInsuranceExpiresOn,
+        Integer seats,
+        Transmission transmission,
+        String make,
+        String model
 ) {
 }

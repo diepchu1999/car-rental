@@ -2,9 +2,12 @@ package com.carrental.vehicle.application.service;
 
 import com.carrental.vehicle.application.port.out.ReadVehiclePort;
 import com.carrental.vehicle.application.view.VehicleDetail;
+import com.carrental.vehicle.application.view.VehicleSearchCandidate;
+import com.carrental.vehicle.application.query.ListSearchVehiclesQuery;
 import com.carrental.vehicle.domain.Vehicle;
 
 import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -17,6 +20,12 @@ import java.util.function.Function;
  * <p>Lớp chỉ nằm trong source test, không được đóng gói vào ứng dụng.
  */
 final class ViewOnlyVehicleReadPort implements ReadVehiclePort {
+
+    /** Test chỉ đọc chi tiết phải thất bại nếu service gọi nhầm truy vấn tìm kiếm. */
+    @Override
+    public List<VehicleSearchCandidate> findSearchCandidates(ListSearchVehiclesQuery query) {
+        throw new AssertionError("Search must not be called in a detail-only scenario.");
+    }
 
     private final Function<String, Optional<VehicleDetail>> findBehavior;
 

@@ -15,9 +15,13 @@ package com.carrental.branch.adapter.in.rest.admin.request;
  *
  * @param latitude vĩ độ tính bằng độ, có thể null nếu đầu vào thiếu
  * @param longitude kinh độ tính bằng độ, có thể null nếu đầu vào thiếu
+ * @param name tên chi nhánh theo BR-808
+ * @param address địa chỉ chi nhánh theo BR-808
  */
 public record CreateBranchRequest(
         Double latitude,
-        Double longitude
+        Double longitude,
+        String name,
+        String address
 ) {
 }

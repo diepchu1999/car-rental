@@ -19,17 +19,21 @@ import java.util.regex.Pattern;
  *
  * @param code mã chi nhánh gồm CN- và sáu chữ cái ASCII viết hoa hoặc chữ số
  * @param location tọa độ chi nhánh đã được kiểm tra hợp lệ
+ * @param name tên chi nhánh bắt buộc theo BR-808, giữ nguyên cách viết
+ * @param address địa chỉ bắt buộc theo BR-808, giữ nguyên cách viết
  */
 public record Branch(
         String code,
-        BranchLocation location
+        BranchLocation location,
+        String name,
+        String address
 ) {
 
     private static final Pattern CODE_PATTERN =
             Pattern.compile("CN-[A-Z0-9]{6}");
 
     /**
-     * Bảo đảm chi nhánh có mã đúng định dạng và có vị trí.
+     * Bảo đảm chi nhánh có mã, vị trí hợp lệ và tên/địa chỉ bắt buộc theo BR-808.
      *
      * <p>Giữ nguyên dữ liệu được cung cấp, không tự cắt khoảng trắng
      * hoặc sửa chữ thường thành chữ hoa.
@@ -38,7 +42,7 @@ public record Branch(
      * lặp lại việc kiểm từng thành phần tại đây.
      *
      * @throws DomainException nếu mã bị thiếu, trống, sai định dạng
-     *                         hoặc vị trí là null
+     *                         hoặc vị trí null, tên/địa chỉ thiếu hay trắng
      */
     public Branch {
         code = Validations.requiredText(code, "code");
@@ -50,5 +54,7 @@ public record Branch(
         }
 
         location = Validations.required(location, "location");
+        name = Validations.requiredText(name, "name");
+        address = Validations.requiredText(address, "address");
     }
 }

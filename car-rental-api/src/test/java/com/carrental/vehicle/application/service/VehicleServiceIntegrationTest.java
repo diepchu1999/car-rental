@@ -5,6 +5,10 @@ import com.carrental.branch.application.command.CreateBranchCommand;
 import com.carrental.branch.application.port.in.CreateBranchUseCase;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
+import com.carrental.shared.rental.RentalType;
+import com.carrental.vehicle.api.VehicleSearchDirectory;
+import com.carrental.vehicle.application.query.ListSearchVehiclesQuery;
+import com.carrental.vehicle.application.view.VehicleSearchCandidate;
 import com.carrental.vehicle.application.command.ApproveVehicleCommand;
 import com.carrental.vehicle.application.command.CreateVehicleCommand;
 import com.carrental.vehicle.application.command.SubmitVehicleForApprovalCommand;
@@ -39,8 +43,10 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
+import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -67,6 +73,7 @@ class VehicleServiceIntegrationTest {
     @Autowired private ReadProbe probe;
     @Autowired @Qualifier("vehicleReadAdapter") private ReadVehiclePort actualRead;
     @Autowired private Clock clock;
+    @Autowired private VehicleSearchDirectory searchDirectory;
 
 
 
@@ -97,6 +104,21 @@ class VehicleServiceIntegrationTest {
         assertEquals(created, get.get(GetVehicleQuery.from(created.code())));
         assertTrue(probe.transactionActive);
         assertTrue(probe.transactionReadOnly);
+    }
+
+    /** Directory tìm kiếm mở transaction chỉ đọc từ chính use case, không nhờ transaction của test. */
+    @Test
+    void searchUsesReadOnlyTransactionThroughDirectory() {
+        VehicleDetail draft = create.create(command());
+        submit.submitForApproval(SubmitVehicleForApprovalCommand.from(draft.code()));
+        approve.approve(ApproveVehicleCommand.from(draft.code()));
+        probe.reset();
+        var result = searchDirectory.list(List.of(draft.branchId()), RentalType.DAILY,
+                null, null, null, null, null, null);
+        assertEquals(List.of(draft.code()), result.stream().map(view -> view.code()).toList());
+        assertTrue(probe.transactionActive);
+        assertTrue(probe.transactionReadOnly);
+        assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
     }
 
     /** Lỗi đọc lại sau INSERT phải rollback bản ghi đã nhìn thấy trong giao dịch. */
@@ -184,10 +206,12 @@ class VehicleServiceIntegrationTest {
      * @return command có biển số riêng cho mỗi test
      */
     private CreateVehicleCommand command() {
-        String branchCode = createBranch.create(CreateBranchCommand.from(10.762622, 106.660172)).code();
+        String branchCode = createBranch.create(CreateBranchCommand.from(10.762622, 106.660172, "Test Branch", "123 Test Street")).code();
         LocalDate expiry = LocalDate.now(clock).plusDays(30);
         return CreateVehicleCommand.from("TEST-" + UUID.randomUUID(), OwnershipType.COMPANY,
-                FuelType.HYBRID, branchCode, expiry, expiry.plusDays(1));
+                FuelType.HYBRID, branchCode, expiry, expiry.plusDays(1),
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                SPECIFICATIONS.make(), SPECIFICATIONS.model());
     }
 
     /**
@@ -199,7 +223,9 @@ class VehicleServiceIntegrationTest {
     private static void assertOnlyStatusChanged(VehicleDetail before, VehicleDetail after, VehicleStatus status) {
         assertEquals(new VehicleDetail(before.id(), before.code(), before.plateNumber(), before.ownershipType(),
                 before.fuelType(), before.branchId(), status, before.inspectionExpiresOn(),
-                before.liabilityInsuranceExpiresOn()), after);
+                before.liabilityInsuranceExpiresOn(),
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                SPECIFICATIONS.make(), SPECIFICATIONS.model()), after);
     }
 
     /** Đăng ký probe chỉ trong context kiểm transaction của xe. */
@@ -220,6 +246,14 @@ class VehicleServiceIntegrationTest {
 
     /** Quan sát kết quả thật và có thể gây lỗi sau lần đọc được chỉ định. */
     static final class ReadProbe implements ReadVehiclePort {
+        /** Giữ đường tìm kiếm hoạt động khi context kiểm transaction bọc cổng đọc bằng probe. */
+        @Override
+        public List<VehicleSearchCandidate> findSearchCandidates(ListSearchVehiclesQuery query) {
+            transactionActive = TransactionSynchronizationManager.isActualTransactionActive();
+            transactionReadOnly = TransactionSynchronizationManager.isCurrentTransactionReadOnly();
+            return delegate.findSearchCandidates(query);
+        }
+
         private final ReadVehiclePort delegate;
         private int failAtRead;
         private int readCount;
