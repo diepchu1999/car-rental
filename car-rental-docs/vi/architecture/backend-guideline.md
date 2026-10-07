@@ -83,12 +83,16 @@ Mã lỗi là **hợp đồng ổn định** — mobile bản cũ hiển thị t
 | `VEHICLE_INVALID_STATUS_TRANSITION` | 409 | Trạng thái xe đã thay đổi giữa lúc đọc và cập nhật có điều kiện; client cần đọc lại, không tự thử lại |
 | `VEHICLE_DOCUMENT_MISSING` | 422 | Thiếu ngày hết hạn đăng kiểm hoặc TNDS tại thời điểm duyệt — BR-005 |
 | `VEHICLE_DOCUMENT_EXPIRED` | 422 | Đăng kiểm hoặc TNDS đã hết hạn tại thời điểm duyệt — BR-005 |
+| `VEHICLE_INVALID_SEATS` | 422 | Số chỗ ngoài `4/5/7/16` — khi tạo xe và khi lọc tìm kiếm (BR-018) |
 | `INTERNAL_ERROR` | 500 | Lỗi hệ thống ngoài dự kiến; không tiết lộ chi tiết nội bộ |
 | `VEHICLE_NOT_AVAILABLE` | 409 | Xe vừa bị đặt cho khoảng thời gian này |
 | `DRIVER_NOT_AVAILABLE` | 409 | Tài xế đã có chuyến chồng giờ |
 | `DELIVERY_STAFF_NOT_AVAILABLE` | 409 | Nhân viên giao xe đã bận |
 | `QUOTE_EXPIRED` | 422 | Báo giá hết hạn |
 | `HOLD_EXPIRED` | 422 | Quá 1 tiếng chưa trả cọc |
+| `RESERVATION_NOT_FOUND` | 404 | Không tìm thấy khoá lịch theo mã `KL-<6>` |
+| `RESERVATION_INVALID_STATUS_TRANSITION` | 422 | Trạng thái khoá lịch không cho phép thao tác — status-flow §2, BR-015 |
+| `RESERVATION_INVALID_STATUS_TRANSITION` | 409 | Khoá lịch đã đổi giữa lúc đọc và lúc ghi có điều kiện (đổi trạng thái, dời mốc khoá giấy tờ); đọc lại, không tự thử lại |
 | `BOOKING_INVALID_STATUS_TRANSITION` | 422 | Nhảy cóc trạng thái |
 | `CANCELLATION_WINDOW_PASSED` | 422 | Ngoài cửa sổ huỷ |
 | `DRIVER_LICENSE_NOT_VERIFIED` | 403 | Chưa xác minh GPLX (BR-106) |
@@ -102,8 +106,17 @@ Mã lỗi là **hợp đồng ổn định** — mobile bản cũ hiển thị t
 | `PROMOTION_CODE_EXHAUSTED` | 422 | Hết lượt dùng |
 | `OUTSIDE_BRANCH_HOURS` | 422 | Giờ nhận/trả ngoài 06:00–23:00 (BR-119) |
 | `BOOKING_WINDOW_VIOLATION` | 422 | Ngoài giới hạn đặt trước (BR-121) |
+| `RENTAL_DURATION_TOO_SHORT` | 422 | Gói giờ ngắn hơn 4 giờ (BR-113) |
+| `SEARCH_RENTAL_TYPE_NOT_SUPPORTED` | 422 | Gói tháng chưa hỗ trợ trong tìm kiếm ở lát cắt hiện tại (BR-125) |
+| `SEARCH_DRIVE_MODE_NOT_SUPPORTED` | 422 | Có tài xế chưa hỗ trợ ở lát cắt hiện tại (BR-125) |
+| `SEARCH_PICKUP_METHOD_NOT_SUPPORTED` | 422 | Giao tận nơi chưa hỗ trợ ở lát cắt hiện tại (BR-125) |
+| `SEARCH_SORT_NOT_SUPPORTED` | 422 | Chỉ hỗ trợ sắp xếp gần nhất ở lát cắt hiện tại (BR-126) |
 | `VEHICLE_HAS_ACTIVE_BOOKINGS` | 409 | Thanh lý xe còn đơn hiệu lực (BR-014) |
 | `CONTRACT_OVERDUE` | 403 | Hợp đồng có kỳ quá hạn, chặn nghiệp vụ khác (BR-224) |
+
+**Bảng này được test giữ đồng bộ với enum `ErrorCode`** (từ Task 6b): thêm mã vào code mà không ghi
+vào đây thì build đỏ. Chiều ngược lại được phép — bảng có sẵn những mã thiết kế trước cho module chưa
+làm. Task 5 và Task 6 từng để lọt 8 mã vì việc này giao cho người nhớ.
 
 ## 6. Testing
 

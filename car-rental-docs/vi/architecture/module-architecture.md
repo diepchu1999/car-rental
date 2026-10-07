@@ -194,7 +194,7 @@ ranh giới sai, dừng lại và hỏi Chief Architect.
 
 ---
 
-## 8. Mười một rule khoá bằng test kiến trúc
+## 8. Mười hai rule khoá bằng test kiến trúc
 
 `src/test/java/com/carrental/architecture/ArchitectureRulesTest` — quét source, **fail build** nếu vi phạm.
 
@@ -211,6 +211,7 @@ ranh giới sai, dừng lại và hỏi Chief Architect.
 | R9 | `booking`, `handover`, `payment`, `settlement` không import `ConfigurationPort` — đọc bản sao trong đơn | ADR-0014 |
 | R10 | Module `search` không import `VehicleRef`, và **không kiểu nào** `search` dùng từ `vehicle.api` có trường, thành phần record hay kiểu trả về là `OwnershipType` (mở rộng ở Task 6 — tên `VehicleRef` thôi thì chưa đủ) | BR-112 |
 | R11 | `application` không import web/HTTP/servlet · JDBC/SQL · Jackson · `@Configuration`/`@Bean` | ADR-0004 |
+| R12 | Record response trong `adapter/in/rest/**` không có thành phần kiểu số tên `id` hoặc kết thúc bằng `Id` — tham chiếu ra ngoài bằng **mã nghiệp vụ** (thêm ở Task 6b) | database-guideline §2 |
 
 R11 cho phép `application` dùng Spring **chỉ để tiêm phụ thuộc và đánh dấu transaction** — chi tiết
 và lý do ở ADR-0004, mục làm rõ 21/09/2026.

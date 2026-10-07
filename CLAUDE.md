@@ -13,8 +13,8 @@ tài liệu · Principal Engineer (codex) hiện thực theo tài liệu đã ch
 | Hạng mục | Trạng thái |
 |---|---|
 | Nghiệp vụ giai đoạn 1 | ✅ **157 quy tắc BR đã chốt** |
-| Kiến trúc | ✅ 15 ADR ACCEPTED, 10 guideline, 11 rule khoá bằng test |
-| Code | 🟡 Đang làm — `shared`, `branch`, `vehicle`, `availability` xong; 1.139 test xanh |
+| Kiến trúc | ✅ 15 ADR ACCEPTED, 10 guideline, 12 rule khoá bằng test |
+| Code | 🟡 Đang làm — `shared`, `branch`, `vehicle`, `availability` xong; `search` chờ Task 6b; 1.576 test xanh |
 | Môi trường | Local, chưa build production |
 
 ## Quy tắc số một
@@ -100,10 +100,11 @@ Cách xây: **lát cắt dọc từng luồng** (ADR-0012), không xây hết ba
 | Xoá cứng dữ liệu trong `handover` và `compliance` | Bằng chứng pháp lý |
 | JPA repository cho truy vấn nghiệp vụ | ADR-0003 |
 | Quy tắc nghiệp vụ trong controller · trả row CSDL làm response | — |
+| Trả khoá chính số trong response hay cursor — tham chiếu ra ngoài bằng mã nghiệp vụ | Số tuần tự mời người ta dò — database-guideline §2 |
 | Sửa migration đã chạy | — |
 | Dùng H2 trong test | Không có exclusion constraint, PostGIS, `tstzrange` |
 
-Những điều trên được khoá bằng `ArchitectureRulesTest` (R1 → R11) và phải xanh trước khi commit.
+Những điều trên được khoá bằng `ArchitectureRulesTest` (R1 → R12) và phải xanh trước khi commit.
 
 ## Chống tranh chấp — bắt buộc
 
