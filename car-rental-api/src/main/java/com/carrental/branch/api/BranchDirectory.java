@@ -34,6 +34,9 @@ public interface BranchDirectory {
      */
     Optional<BranchRef> findByCode(String code);
 
+    /** Tra định danh bất biến đã lưu ở module khác; ID phải dương, không tìm thấy trả rỗng (ADR-0008). */
+    Optional<BranchRef> findById(long id);
+
     /**
      * Tìm chi nhánh trong bán kính địa lý theo BR-003, BR-808 và ADR-0007.
      * @param latitude vĩ độ tâm tìm kiếm, bắt buộc và thuộc [-90, 90]

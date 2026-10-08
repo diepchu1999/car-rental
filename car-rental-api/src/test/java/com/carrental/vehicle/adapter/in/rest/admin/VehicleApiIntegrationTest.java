@@ -68,7 +68,7 @@ class VehicleApiIntegrationTest {
         assertEquals("Toyota", created.path("make").asString());
         assertEquals("Vios", created.path("model").asString());
         assertEquals("COMPANY", created.path("ownershipType").asString());
-        assertTrue(created.path("branchId").longValue() > 0);
+        assertEquals(body.get("branchCode"), created.path("branchCode").asString());
         assertTrue(created.path("inspectionExpiresOn").isNull());
         assertTrue(created.path("liabilityInsuranceExpiresOn").isNull());
         String location = response.headers().firstValue("Location").orElseThrow();
@@ -83,8 +83,10 @@ class VehicleApiIntegrationTest {
     @Test
     void createsSubmitsAndApprovesVehicle() throws Exception {
         LocalDate expiry = LocalDate.now(clock).plusDays(30);
-        JsonNode created = vehicleSuccess(post(PATH, payload(branch(), "HYBRID", expiry, expiry.plusDays(1))),
+        String branchCode = branch();
+        JsonNode created = vehicleSuccess(post(PATH, payload(branchCode, "HYBRID", expiry, expiry.plusDays(1))),
                 201, "DRAFT");
+        assertEquals(branchCode, created.path("branchCode").asString());
         String resource = PATH + "/" + created.path("code").asString();
 
         JsonNode pending = vehicleSuccess(postEmpty(resource + "/submit-for-approval"), 200, "PENDING_APPROVAL");
@@ -114,7 +116,7 @@ class VehicleApiIntegrationTest {
         JsonNode created = vehicleSuccess(post(PATH, body), 201, "DRAFT");
         assertEquals("COMPANY", created.path("ownershipType").asString());
         assertNotEquals("client-selected-code", created.path("code").asString());
-        assertTrue(created.path("branchId").longValue() > 0);
+        assertEquals(body.get("branchCode"), created.path("branchCode").asString());
     }
 
     /**
@@ -431,12 +433,14 @@ class VehicleApiIntegrationTest {
         assertTrue(root.path("success").booleanValue());
         assertTrue(root.path("error").isNull());
         JsonNode data = root.path("data");
-        assertEquals(Set.of("code", "plateNumber", "ownershipType", "fuelType", "branchId", "status",
+        assertEquals(Set.of("code", "plateNumber", "ownershipType", "fuelType", "branchCode", "status",
                 "inspectionExpiresOn", "liabilityInsuranceExpiresOn", "seats", "transmission", "make", "model"), Set.copyOf(data.propertyNames()));
         assertTrue(data.path("code").asString().matches("XE-[A-Z0-9]{6}"));
         assertEquals(vehicleStatus, data.path("status").asString());
         assertTrue(data.path("plateNumber").isString());
-        assertTrue(data.path("branchId").isIntegralNumber());
+        assertTrue(data.path("branchCode").asString().matches("CN-[A-Z0-9]{6}"));
+        assertFalse(data.has("branchId"));
+        assertFalse(data.has("id"));
         return data;
     }
 
@@ -463,7 +467,7 @@ class VehicleApiIntegrationTest {
      * @param after dữ liệu sau thao tác
      */
     private static void assertSameVehicleFields(JsonNode before, JsonNode after) {
-        for (String field : Set.of("code", "plateNumber", "ownershipType", "fuelType", "branchId",
+        for (String field : Set.of("code", "plateNumber", "ownershipType", "fuelType", "branchCode",
                 "inspectionExpiresOn", "liabilityInsuranceExpiresOn", "seats", "transmission", "make", "model")) {
             assertEquals(before.path(field), after.path(field), field);
         }

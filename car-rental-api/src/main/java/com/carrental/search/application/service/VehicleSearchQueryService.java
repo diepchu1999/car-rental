@@ -102,6 +102,6 @@ class VehicleSearchQueryService implements SearchVehiclesUseCase {
 
     /** Dùng chung khóa so sánh và khóa ghi cursor để không lệch thứ tự giữa hai trang. */
     private static SearchPosition position(SearchVehicleListItem item) {
-        return new SearchPosition(item.distanceMeters(), item.vehicleId());
+        return new SearchPosition(item.distanceMeters(), item.code());
     }
 }

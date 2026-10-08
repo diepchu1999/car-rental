@@ -189,11 +189,11 @@
                   "pm.test(\"Vehicle created with all submitted attributes\", function () {",
                   "    pm.expect(body.success).to.eql(true);",
                   "    pm.expect(body.error).to.eql(null);",
-                  "    pm.expect(body.data).to.have.all.keys(\"code\", \"plateNumber\", \"ownershipType\", \"fuelType\", \"branchId\", \"status\", \"inspectionExpiresOn\", \"liabilityInsuranceExpiresOn\", \"seats\", \"transmission\", \"make\", \"model\");",
+                  "    pm.expect(body.data).to.have.all.keys(\"code\", \"plateNumber\", \"ownershipType\", \"fuelType\", \"branchCode\", \"status\", \"inspectionExpiresOn\", \"liabilityInsuranceExpiresOn\", \"seats\", \"transmission\", \"make\", \"model\");",
                   "    pm.expect(body.data.code).to.match(/^XE-[A-Z0-9]{6}$/);",
                   "    pm.expect(body.data.status).to.eql(\"DRAFT\");",
                   "    pm.expect(body.data.ownershipType).to.eql(\"COMPANY\");",
-                  "    pm.expect(body.data.branchId).to.be.a(\"number\").and.above(0);",
+                  "    pm.expect(body.data.branchCode).to.eql(sent.branchCode);",
                   "    [\"plateNumber\", \"fuelType\", \"inspectionExpiresOn\", \"liabilityInsuranceExpiresOn\", \"seats\", \"transmission\", \"make\", \"model\"].forEach(function (field) {",
                   "        pm.expect(body.data[field], field).to.eql(sent[field]);",
                   "    });",
@@ -2729,7 +2729,7 @@
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
                   "});",
-                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\",\"p6NearVehicle\"].map(key => pm.collectionVariables.get(key))));",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort().concat(pm.collectionVariables.get(\"p6NearVehicle\"))));",
                   "pm.test(\"Branch display and meters\", () => { const a = body.data.items[0]; const b = body.data.items[2]; pm.expect(a.branch.code).to.eql(pm.collectionVariables.get(\"p6OriginBranch\")); pm.expect(a.branch.name).to.include(pm.collectionVariables.get(\"p6Model\")); pm.expect(a.branch.address).to.eql(\"123 Search Street\"); pm.expect(a.distanceMeters).to.eql(0); pm.expect(b.distanceMeters).to.be.within(100,120); pm.expect(body.data.nextCursor).to.eql(null); });"
                 ]
               }
@@ -2776,7 +2776,7 @@
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
                   "});",
-                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\",\"p6NearVehicle\"].map(key => pm.collectionVariables.get(key))));"
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort().concat(pm.collectionVariables.get(\"p6NearVehicle\"))));"
                 ]
               }
             }
@@ -2822,7 +2822,7 @@
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
                   "});",
-                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key))));"
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort()));"
                 ]
               }
             }
@@ -2960,7 +2960,7 @@
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
                   "});",
-                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\",\"p6NearVehicle\"].map(key => pm.collectionVariables.get(key))));"
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort().concat(pm.collectionVariables.get(\"p6NearVehicle\"))));"
                 ]
               }
             }
@@ -3015,7 +3015,7 @@
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
                   "});",
-                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\"].map(key => pm.collectionVariables.get(key))));",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort().slice(0, 1)));",
                   "pm.test(\"Next cursor exists\", () => pm.expect(body.data.nextCursor).to.be.a(\"string\").and.not.empty);",
                   "if (pm.response.code === 200 && body.success) pm.collectionVariables.set(\"p6Cursor\", body.data.nextCursor);"
                 ]
@@ -3072,7 +3072,7 @@
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
                   "});",
-                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginB\",\"p6NearVehicle\"].map(key => pm.collectionVariables.get(key))));",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort().slice(1).concat(pm.collectionVariables.get(\"p6NearVehicle\"))));",
                   "pm.test(\"Last page\", () => pm.expect(body.data.nextCursor).to.eql(null));"
                 ]
               }
@@ -4228,7 +4228,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(body.data.nextCursor).to.eql(null);",
                   "});",
-                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-B76A44\",\"XE-09Z3NS\",\"XE-TTJ8LW\"]));",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-09Z3NS\",\"XE-B76A44\",\"XE-TTJ8LW\"]));",
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",

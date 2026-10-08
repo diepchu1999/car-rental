@@ -189,6 +189,8 @@ class BranchDirectoryTest {
     private static BranchDirectory directoryWithLookup(FindBranchUseCase lookup) {
         return new BranchDirectoryAdapter(lookup, query -> {
             throw new AssertionError("Nearby lookup must not be called during code lookup.");
+        }, query -> {
+            throw new AssertionError("ID lookup must not be called during code lookup.");
         });
     }
 }

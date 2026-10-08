@@ -67,7 +67,7 @@ final class VehicleRowMappers {
                     resultSet.getInt("seats"),
                     Transmission.valueOf(resultSet.getString("transmission")),
                     resultSet.getString("make"),
-                    resultSet.getString("model")
+                    resultSet.getString("model"), null
             );
 
     /**

@@ -4,6 +4,8 @@ import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchRef;
 import com.carrental.branch.api.BranchSearchView;
 import com.carrental.branch.application.port.in.FindBranchUseCase;
+import com.carrental.branch.application.port.in.FindBranchByIdUseCase;
+import com.carrental.branch.application.query.FindBranchByIdQuery;
 import com.carrental.branch.application.port.in.ListNearbyBranchesUseCase;
 import com.carrental.branch.application.query.GetBranchQuery;
 import com.carrental.branch.application.query.ListNearbyBranchesQuery;
@@ -16,11 +18,21 @@ import java.util.Optional;
 class BranchDirectoryAdapter implements BranchDirectory {
     private final FindBranchUseCase lookup;
     private final ListNearbyBranchesUseCase nearby;
+    private final FindBranchByIdUseCase lookupById;
 
     /** Nhận các use case được Spring bọc transaction; không truy cập persistence trực tiếp. */
-    BranchDirectoryAdapter(FindBranchUseCase lookup, ListNearbyBranchesUseCase nearby) {
+    BranchDirectoryAdapter(FindBranchUseCase lookup, ListNearbyBranchesUseCase nearby,
+            FindBranchByIdUseCase lookupById) {
         this.lookup = lookup;
         this.nearby = nearby;
+        this.lookupById = lookupById;
+    }
+
+    /** Chuyển tham chiếu ID sang mã qua use case của branch, không đọc chéo schema (ADR-0008). */
+    @Override
+    public Optional<BranchRef> findById(long id) {
+        return lookupById.findById(new FindBranchByIdQuery(id))
+                .map(detail -> new BranchRef(detail.id(), detail.code()));
     }
 
     /** Giữ nguyên mã đầu vào, kết quả rỗng và lỗi của hợp đồng tra chi nhánh cũ (BR-003). */

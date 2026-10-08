@@ -29,6 +29,9 @@ public interface ReadBranchPort {
      */
     Optional<BranchDetail> findByCode(String code);
 
+    /** Đọc chi nhánh theo ID dương nội bộ; không tìm thấy trả rỗng, không nuốt lỗi lưu trữ. */
+    Optional<BranchDetail> findById(long id);
+
     /** Truy vấn địa lý một lần, trả các chi nhánh và khoảng cách mét; không truy vấn chéo schema. */
     List<BranchDistanceSummary> findWithinRadius(ListNearbyBranchesQuery query);
 }

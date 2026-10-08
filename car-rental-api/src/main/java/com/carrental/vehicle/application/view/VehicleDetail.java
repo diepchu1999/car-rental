@@ -21,9 +21,9 @@ import java.time.LocalDate;
  * REST adapter sẽ chuyển dữ liệu thành response riêng.
  * URL sử dụng mã nghiệp vụ của xe, không dùng khóa chính số.
  *
- * <p>Chỉ chứa tham chiếu chi nhánh được lưu cùng xe.
- * Khi cần thêm thông tin của chi nhánh, application phải lấy qua
- * cổng api của module branch, không JOIN trực tiếp qua schema.
+ * <p>Persistence chỉ điền dữ liệu trong schema vehicle, để branchCode null.
+ * Application bổ sung branchCode qua branch.api trước khi trả use case cho REST;
+ * không JOIN hoặc sao chép mã chi nhánh vào bảng xe (ADR-0008).
  *
  * <p>Không kiểm lại điều kiện duyệt khi đọc dữ liệu.
  * Hồ sơ xe thiếu ngày giấy tờ hoặc có giấy tờ đã hết hạn
@@ -44,6 +44,7 @@ import java.time.LocalDate;
  * @param transmission hộp số theo BR-018
  * @param make hãng xe có nội dung
  * @param model dòng xe có nội dung
+ * @param branchCode mã chi nhánh do application bổ sung; null trước tra cứu hoặc khi không có liên kết
  */
 public record VehicleDetail(
         long id,
@@ -58,6 +59,12 @@ public record VehicleDetail(
         Integer seats,
         Transmission transmission,
         String make,
-        String model
+        String model,
+        String branchCode
 ) {
+    /** Tạo view đã bổ sung mã cho response, không đổi dữ liệu xe hoặc ghi mã vào CSDL. */
+    public VehicleDetail withBranchCode(String code) {
+        return new VehicleDetail(id, this.code, plateNumber, ownershipType, fuelType, branchId,
+                status, inspectionExpiresOn, liabilityInsuranceExpiresOn, seats, transmission, make, model, code);
+    }
 }

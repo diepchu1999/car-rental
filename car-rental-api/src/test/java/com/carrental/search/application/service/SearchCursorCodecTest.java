@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.List;
 import java.util.function.Consumer;
@@ -17,18 +18,46 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Kiểm cursor theo api-guideline §8: không làm tròn, không dùng lẫn bộ lọc và lỗi đầu vào rõ ràng. */
 class SearchCursorCodecTest {
-    /** Round-trip giữ nguyên từng bit khoảng cách và ID lớn, không qua số JSON có thể mất chính xác. */
+    /** Round-trip giữ nguyên từng bit khoảng cách và mã xe, không đưa ID nội bộ vào khóa cursor. */
     @Test
-    void roundTripsExactDistanceAndLargeId() {
+    void roundTripsExactDistanceAndVehicleCode() {
         var hash = SearchCursorCodec.fingerprint(input().build(), 10);
-        var position = new SearchPosition(Math.nextUp(123.456789), Long.MAX_VALUE);
+        var position = new SearchPosition(Math.nextUp(123.456789), "XE-Z9AB01");
         String token = SearchCursorCodec.encode(position, hash);
-        assertEquals(66, token.length());
+        assertEquals(67, token.length());
         assertTrue(token.matches("[A-Za-z0-9_-]+"));
         var decoded = SearchCursorCodec.decode(token, hash).orElseThrow();
         assertEquals(position, decoded);
         assertEquals(Double.doubleToLongBits(position.distanceMeters()),
                 Double.doubleToLongBits(decoded.distanceMeters()));
+    }
+
+    /** Giải mã độc lập toàn bộ payload: chỉ có version/hash/khoảng cách/mã, không còn chỗ cho ID số. */
+    @Test
+    void decodedPayloadContainsVehicleCodeAndNoNumericVehicleId() {
+        var hash = SearchCursorCodec.fingerprint(input().build(), 10);
+        var position = new SearchPosition(123.5, "XE-ABC123");
+        byte[] bytes = Base64.getUrlDecoder().decode(SearchCursorCodec.encode(position, hash));
+        assertEquals(50, bytes.length);
+        var payload = ByteBuffer.wrap(bytes);
+        assertEquals(2, payload.get());
+        byte[] storedHash = new byte[32];
+        payload.get(storedHash);
+        assertArrayEquals(hash, storedHash);
+        assertEquals(position.distanceMeters(), payload.getDouble());
+        byte[] code = new byte[9];
+        payload.get(code);
+        assertEquals(position.vehicleCode(), new String(code, StandardCharsets.US_ASCII));
+        assertFalse(payload.hasRemaining(), "Cursor must not contain an additional numeric vehicle ID.");
+    }
+
+    /** Cursor v1 đúng cấu trúc cũ vẫn bị từ chối, không được tiếp tục với thứ tự khác. */
+    @Test
+    void rejectsLegacyVersionOneWithNumericId() {
+        var hash = SearchCursorCodec.fingerprint(input().build(), 10);
+        byte[] legacy = ByteBuffer.allocate(49).put((byte) 1).put(hash)
+                .putDouble(0).putLong(123456789L).array();
+        assertInvalid(() -> SearchCursorCodec.decode(encode(legacy), hash));
     }
 
     /** Null biểu diễn trang đầu, không cần phát một token giả. */
@@ -49,25 +78,27 @@ class SearchCursorCodecTest {
     @Test
     void rejectsUnknownVersionAndPadding() {
         var hash = SearchCursorCodec.fingerprint(input().build(), 10);
-        String token = SearchCursorCodec.encode(new SearchPosition(0, 1), hash);
+        String token = SearchCursorCodec.encode(new SearchPosition(0, "XE-000001"), hash);
         byte[] bytes = Base64.getUrlDecoder().decode(token);
-        bytes[0] = 2;
+        bytes[0] = 3;
+        assertInvalid(() -> SearchCursorCodec.decode(encode(bytes), hash));
+        bytes[0] = 1;
         assertInvalid(() -> SearchCursorCodec.decode(encode(bytes), hash));
         assertInvalid(() -> SearchCursorCodec.decode(token + "=", hash));
     }
 
-    /** Không nhận NaN/vô cực/khoảng cách âm hoặc ID không dương từ payload đã giải mã. */
+    /** Không nhận NaN/vô cực/khoảng cách âm hoặc mã sai prefix/alphabet từ payload đã giải mã. */
     @Test
     void rejectsInvalidPositions() {
         var hash = SearchCursorCodec.fingerprint(input().build(), 10);
         for (double distance : new double[]{Double.NaN, Double.POSITIVE_INFINITY, -1}) {
-            byte[] bytes = Base64.getUrlDecoder().decode(SearchCursorCodec.encode(new SearchPosition(0, 1), hash));
+            byte[] bytes = Base64.getUrlDecoder().decode(SearchCursorCodec.encode(new SearchPosition(0, "XE-000001"), hash));
             ByteBuffer.wrap(bytes).putDouble(33, distance);
             assertInvalid(() -> SearchCursorCodec.decode(encode(bytes), hash));
         }
-        for (long id : new long[]{0, -1}) {
-            byte[] bytes = Base64.getUrlDecoder().decode(SearchCursorCodec.encode(new SearchPosition(0, 1), hash));
-            ByteBuffer.wrap(bytes).putLong(41, id);
+        for (String code : new String[]{"CN-000001", "XE-abc123", "XE-ABC12!", "XE-ABC12 "}) {
+            byte[] bytes = Base64.getUrlDecoder().decode(SearchCursorCodec.encode(new SearchPosition(0, "XE-000001"), hash));
+            ByteBuffer.wrap(bytes).position(41).put(code.getBytes(StandardCharsets.US_ASCII));
             assertInvalid(() -> SearchCursorCodec.decode(encode(bytes), hash));
         }
     }
@@ -76,7 +107,7 @@ class SearchCursorCodecTest {
     @Test
     void bindsEverySearchCriterion() {
         var originalHash = SearchCursorCodec.fingerprint(input().build(), 10);
-        String token = SearchCursorCodec.encode(new SearchPosition(0, 1), originalHash);
+        String token = SearchCursorCodec.encode(new SearchPosition(0, "XE-000001"), originalHash);
         List<Consumer<Input>> changes = List.of(
                 v -> v.latitude = 11.0,
                 v -> v.longitude = 107.0,

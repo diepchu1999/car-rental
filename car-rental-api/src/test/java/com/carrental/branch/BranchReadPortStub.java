@@ -26,6 +26,12 @@ public final class BranchReadPortStub implements ReadBranchPort {
     @Override
     public Optional<BranchDetail> findByCode(String code) { return lookup.apply(code); }
 
+    /** Stub luồng tra mã phải báo lỗi nếu vô tình bị dùng cho luồng tra ID. */
+    @Override
+    public Optional<BranchDetail> findById(long id) {
+        throw new AssertionError("ID lookup is not expected in this scenario.");
+    }
+
     /** Không cho test luồng tra theo mã vô tình xanh khi service gọi thêm truy vấn địa lý. */
     @Override
     public List<BranchDistanceSummary> findWithinRadius(ListNearbyBranchesQuery query) {

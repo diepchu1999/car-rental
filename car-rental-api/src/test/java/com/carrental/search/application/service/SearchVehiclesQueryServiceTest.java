@@ -204,6 +204,46 @@ class SearchVehiclesQueryServiceTest {
         assertNull(third.nextCursor());
     }
 
+    /** Mã và ID cố ý ngược thứ tự: hai trang phải theo mã, kể cả khi danh mục đổi thứ tự trả về. */
+    @Test
+    void breaksDistanceTiesByCodeInsteadOfNumericId() {
+        when(availability.findBusyVehicleIds(any(), any(), anyCollection())).thenReturn(Set.of());
+        var smallestCode = vehicle(900, "XE-000001", 1);
+        var middleCode = vehicle(1, "XE-AAAAAA", 1);
+        var largestCode = vehicle(2, "XE-ZZZZZZ", 1);
+        when(vehicles.list(anyList(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(largestCode, middleCode, smallestCode));
+        var values = input();
+        values.limit = 1;
+        var first = service.search(values.build());
+        assertEquals(List.of("XE-000001"), first.items().stream().map(SearchVehicleListItem::code).toList());
+        assertIds(first.items(), 900L);
+        assertNotNull(first.nextCursor());
+        when(vehicles.list(anyList(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(smallestCode, largestCode, middleCode));
+        values.cursor = first.nextCursor();
+        values.limit = 2;
+        var second = service.search(values.build());
+        assertEquals(List.of("XE-AAAAAA", "XE-ZZZZZZ"),
+                second.items().stream().map(SearchVehicleListItem::code).toList());
+        assertNull(second.nextCursor());
+    }
+
+    /** Cùng mã/khoảng cách phải phát cùng cursor dù ID nội bộ đổi; ID không được ảnh hưởng token. */
+    @Test
+    void cursorDoesNotDependOnInternalVehicleIds() {
+        when(availability.findBusyVehicleIds(any(), any(), anyCollection())).thenReturn(Set.of());
+        var values = input();
+        values.limit = 1;
+        when(vehicles.list(anyList(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(vehicle(1, "XE-ABC123", 1), vehicle(2, "XE-ZZZZZZ", 1)));
+        String original = service.search(values.build()).nextCursor();
+        assertNotNull(original);
+        when(vehicles.list(anyList(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(vehicle(Long.MAX_VALUE, "XE-ABC123", 1), vehicle(3, "XE-ZZZZZZ", 1)));
+        assertEquals(original, service.search(values.build()).nextCursor());
+    }
+
     /** Không cần tìm lại bản ghi neo; xe neo biến mất không khiến trang sau lùi hoặc bị lỗi. */
     @Test
     void cursorSurvivesAnchorDisappearingAndPageSizeChange() {
@@ -260,7 +300,12 @@ class SearchVehiclesQueryServiceTest {
 
     /** Tạo hợp đồng xe không có loại sở hữu, đúng ranh giới R10. */
     private VehicleSearchView vehicle(long id, long branchId) {
-        return new VehicleSearchView(id, "XE-%06d".formatted(id), branchId,
+        return vehicle(id, "XE-%06d".formatted(id), branchId);
+    }
+
+    /** Cho phép mã độc lập ID để test không vô tình chứng minh cả thứ tự cũ lẫn mới đều đúng. */
+    private VehicleSearchView vehicle(long id, String code, long branchId) {
+        return new VehicleSearchView(id, code, branchId,
                 5, "AUTOMATIC", "PETROL", "Toyota", "Vios", true);
     }
 

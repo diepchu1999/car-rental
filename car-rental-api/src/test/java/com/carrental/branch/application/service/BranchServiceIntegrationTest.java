@@ -356,6 +356,12 @@ class BranchServiceIntegrationTest {
      */
     static final class ReadBranchProbe implements ReadBranchPort {
 
+        /** Chuyển nguyên truy vấn ID cho adapter thật; không giả dữ liệu cross-module. */
+        @Override
+        public Optional<BranchDetail> findById(long id) {
+            return delegate.findById(id);
+        }
+
         /** Chuyển truy vấn địa lý qua adapter thật và ghi nhận transaction do service mở. */
         @Override
         public java.util.List<BranchDistanceSummary> findWithinRadius(ListNearbyBranchesQuery query) {

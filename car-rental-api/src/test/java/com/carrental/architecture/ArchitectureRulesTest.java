@@ -41,6 +41,9 @@ class ArchitectureRulesTest {
     private static final String R9 = "R9";
     private static final String R10 = "R10";
     private static final String R11 = "R11";
+    private static final String R12 = "R12";
+    private static final String R12_FORBIDDEN_ROOT = "com.carrental.architecture.fixtures.r12forbidden";
+    private static final String R12_ALLOWED_ROOT = "com.carrental.architecture.fixtures.r12allowed";
 
     private static final String PRODUCTION_ROOT_PACKAGE = "com.carrental";
     private static final String R3_FIXTURE_ROOT_PACKAGE =
@@ -710,6 +713,28 @@ class ArchitectureRulesTest {
                 R11,
                 R11_ALLOWED_FIXTURE_VIOLATIONS
         );
+    }
+
+    /** R12: response record trong REST production không trả khóa chính số. */
+    @Test
+    void r12RealResponsesDoNotExposeNumericIdentifiers() {
+        assertNoViolations(R12, RestResponseIdentifierRule.evaluate(PRODUCTION_CLASSES, PRODUCTION_ROOT_PACKAGE));
+    }
+
+    /** Mỗi thành phần số bị cấm phải được phát hiện, gồm record lồng và các kiểu Number. */
+    @Test
+    void r12NegativeFixtureDetectsNumericIdentifiers() {
+        var classes = new ClassFileImporter().importPackages(R12_FORBIDDEN_ROOT);
+        assertFixtureViolations(R12, RestResponseIdentifierRule.evaluate(classes, R12_FORBIDDEN_ROOT), 16,
+                "ForbiddenResponse.id", "ForbiddenResponse.branchId", "ForbiddenResponse$Detail.nestedId",
+                "java.math.BigInteger", "java.math.BigDecimal", "java.lang.Number", "ADR-0008");
+    }
+
+    /** Mã chuỗi, số không phải ID, hằng static, request và view nội bộ không bị bắt nhầm. */
+    @Test
+    void r12AllowedFixturePermitsBusinessCodes() {
+        var classes = new ClassFileImporter().importPackages(R12_ALLOWED_ROOT);
+        assertNoViolations(R12, RestResponseIdentifierRule.evaluate(classes, R12_ALLOWED_ROOT));
     }
 
     private static List<ArchitectureViolation> evaluateR2(

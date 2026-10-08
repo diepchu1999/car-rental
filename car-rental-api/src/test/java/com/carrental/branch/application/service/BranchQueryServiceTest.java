@@ -3,6 +3,7 @@ package com.carrental.branch.application.service;
 import com.carrental.branch.application.port.out.ReadBranchPort;
 import com.carrental.branch.BranchReadPortStub;
 import com.carrental.branch.application.query.GetBranchQuery;
+import com.carrental.branch.application.query.FindBranchByIdQuery;
 import com.carrental.branch.application.view.BranchDetail;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
@@ -17,6 +18,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
+import static org.mockito.Mockito.*;
 
 /**
  * Kiểm tra hành vi điều phối của service đọc chi nhánh.
@@ -29,6 +31,33 @@ import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
  * và không kiểm chứng cơ chế transaction.
  */
 class BranchQueryServiceTest {
+
+    /** Tra ID chuyển nguyên query sang read port, không suy mã hoặc dùng đường tra theo mã. */
+    @Test
+    void returnsDetailByInternalId() {
+        ReadBranchPort read = mock(ReadBranchPort.class);
+        var expected = Optional.of(new BranchDetail(42, "CN-ZYX987", 10, 106, "Branch", "Address"));
+        when(read.findById(42)).thenReturn(expected);
+        assertSame(expected, new BranchQueryService(read).findById(new FindBranchByIdQuery(42)));
+        verify(read).findById(42);
+        verifyNoMoreInteractions(read);
+    }
+
+    /** Không tìm thấy ID trả rỗng; lỗi nguồn dữ liệu được truyền nguyên và không tự thử lại. */
+    @Test
+    void preservesMissingIdAndStorageFailure() {
+        ReadBranchPort read = mock(ReadBranchPort.class);
+        when(read.findById(42)).thenReturn(Optional.empty());
+        var service = new BranchQueryService(read);
+        assertEquals(Optional.empty(), service.findById(new FindBranchByIdQuery(42)));
+        var failure = new IllegalStateException("Branch lookup failed.");
+        when(read.findById(43)).thenThrow(failure);
+        assertSame(failure, assertThrowsExactly(IllegalStateException.class,
+                () -> service.findById(new FindBranchByIdQuery(43))));
+        verify(read).findById(42);
+        verify(read).findById(43);
+        verifyNoMoreInteractions(read);
+    }
 
     /**
      * Chứng minh service gọi cổng đọc đúng một lần với đúng mã,

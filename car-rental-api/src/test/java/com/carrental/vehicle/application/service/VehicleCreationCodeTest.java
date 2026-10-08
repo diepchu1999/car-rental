@@ -98,6 +98,12 @@ class VehicleCreationCodeTest {
                 return Optional.of(BRANCH);
             }
 
+            /** Tạo xe tái sử dụng mã đã tra trước khi chèn, không tra ID lần nữa. */
+            @Override
+            public Optional<BranchRef> findById(long id) {
+                throw new AssertionError("ID lookup must not be called during vehicle creation.");
+            }
+
             /** Luồng tạo xe không được gọi truy vấn bán kính. */
             @Override
             public List<BranchSearchView> findWithinRadius(
@@ -131,7 +137,7 @@ class VehicleCreationCodeTest {
 
         VehicleDetail actual = service.create(COMMAND);
 
-        assertSame(expected, actual);
+        assertEquals(expected.withBranchCode(BRANCH.code()), actual);
         assertEquals(attemptCount, insertedVehicles.size());
 
         List<String> expectedOperations = new ArrayList<>();
@@ -175,6 +181,12 @@ class VehicleCreationCodeTest {
             public Optional<BranchRef> findByCode(String code) {
                 operations.add("branch:" + code);
                 return Optional.of(BRANCH);
+            }
+
+            /** Tạo xe tái sử dụng mã đã tra trước khi chèn, không tra ID lần nữa. */
+            @Override
+            public Optional<BranchRef> findById(long id) {
+                throw new AssertionError("ID lookup must not be called during vehicle creation.");
             }
 
             /** Luồng tạo xe không được gọi truy vấn bán kính. */
@@ -247,7 +259,7 @@ class VehicleCreationCodeTest {
                 COMMAND.documents().inspectionExpiresOn(),
                 COMMAND.documents().liabilityInsuranceExpiresOn(),
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model()
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
         );
     }
 

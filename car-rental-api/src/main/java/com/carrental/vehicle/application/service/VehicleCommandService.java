@@ -146,6 +146,7 @@ class VehicleCommandService implements CreateVehicleUseCase,
             }
 
             return readVehiclePort.findByCode(code)
+                    .map(detail -> detail.withBranchCode(branch.code()))
                     .orElseThrow(() -> new IllegalStateException(
                             "Created vehicle could not be reloaded: " + code
                     ));
@@ -224,6 +225,7 @@ class VehicleCommandService implements CreateVehicleUseCase,
             throw DomainException.conflict(ErrorCode.VEHICLE_INVALID_STATUS_TRANSITION);
         }
         return readVehiclePort.findByCode(original.code())
+                .map(detail -> VehicleDetailEnricher.enrich(detail, branchDirectory))
                 .orElseThrow(() -> new IllegalStateException(
                         "Updated vehicle could not be reloaded: " + original.code()
                 ));

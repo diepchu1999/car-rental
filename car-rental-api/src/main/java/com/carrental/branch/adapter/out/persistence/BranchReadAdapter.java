@@ -27,6 +27,7 @@ class BranchReadAdapter implements ReadBranchPort {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final String findByCodeSql;
+    private final String findByIdSql;
     private final String findWithinRadiusSql;
 
     /**
@@ -45,6 +46,7 @@ class BranchReadAdapter implements ReadBranchPort {
             SqlLoader sqlLoader
     ) {
         this.jdbcTemplate = jdbcTemplate;
+        this.findByIdSql = sqlLoader.load(BranchSqlPaths.FIND_BY_ID);
         this.findWithinRadiusSql = sqlLoader.load(BranchSqlPaths.FIND_WITHIN_RADIUS);
         this.findByCodeSql = sqlLoader.load(
                 BranchSqlPaths.FIND_BY_CODE
@@ -77,6 +79,13 @@ class BranchReadAdapter implements ReadBranchPort {
         );
 
         return DataAccessUtils.optionalResult(branches);
+    }
+
+    /** Đọc bằng khóa chính có tham số, chỉ truy cập schema branch theo ADR-0008. */
+    @Override
+    public Optional<BranchDetail> findById(long id) {
+        return DataAccessUtils.optionalResult(jdbcTemplate.query(findByIdSql,
+                new MapSqlParameterSource("id", id), BranchRowMappers.DETAIL));
     }
 
     /** Thực thi một SELECT có tham số; không tính khoảng cách hoặc lọc bán kính trong Java. */

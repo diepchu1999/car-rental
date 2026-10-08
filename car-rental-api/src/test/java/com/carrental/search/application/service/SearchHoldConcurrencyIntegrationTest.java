@@ -68,8 +68,9 @@ class SearchHoldConcurrencyIntegrationTest {
     @Test
     void twoCustomersSeeSameVehicleButOnlyOneHoldCommits() throws Exception {
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
-        // Phép thử đảo: chỉ bỏ chú thích dòng dưới trong container test, rồi khôi phục sau khi test đỏ.
-        // jdbc.getJdbcTemplate().execute(sqlLoader.load("sql/availability/drop_overlap_constraint_for_search_inverse_test.sql"));
+        // Phép thử đảo BR-104/ADR-0005: chỉ bỏ chú thích dòng dưới trong container test, không chạy trên CSDL local.
+        // Hai hold cùng commit phải làm test đỏ; khôi phục chú thích sau đó. @DirtiesContext đóng container sau lớp test.
+        // jdbc.getJdbcTemplate().execute("ALTER TABLE availability.reservation DROP CONSTRAINT reservation_no_overlap");
         for (int round = 0; round < 10; round++) {
             var input = SearchTestQueries.input();
             String model = "RaceModel-" + UUID.randomUUID();

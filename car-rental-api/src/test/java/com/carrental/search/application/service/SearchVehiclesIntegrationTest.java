@@ -241,7 +241,10 @@ class SearchVehiclesIntegrationTest {
             }
             input.cursor = page.nextCursor();
         } while (input.cursor != null);
-        assertEquals(List.of(first.code(), second.code(), third.code(), last.code()), seen);
+        var expected = new ArrayList<>(List.of(first.code(), second.code(), third.code()));
+        expected.sort(String::compareTo);
+        expected.add(last.code());
+        assertEquals(expected, seen);
     }
 
     /** So sánh đúng thứ tự và tập xe; kết quả rỗng cũng là một khẳng định tường minh. */

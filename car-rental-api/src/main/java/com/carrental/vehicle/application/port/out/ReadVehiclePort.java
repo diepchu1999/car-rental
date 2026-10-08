@@ -31,6 +31,8 @@ public interface ReadVehiclePort {
      * <p>Không kiểm lại điều kiện duyệt khi đọc hồ sơ.
      * View được phép thay đổi theo nhu cầu hiển thị mà không
      * quyết định dữ liệu đầu vào cho việc khôi phục aggregate.
+     * Persistence để branchCode null; application bổ sung qua branch.api,
+     * không yêu cầu adapter đọc schema của module khác (ADR-0008).
      *
      * <p>Kết quả rỗng chỉ biểu thị không tìm thấy.
      * Lỗi truy xuất phải được truyền ra ngoài.

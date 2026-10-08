@@ -1,6 +1,6 @@
 # API xe — admin
 
-## Phạm vi Task 4 và Task 6 — Phần 1
+## Phạm vi Task 4, Task 6 và Task 6b
 
 - BR-001: lưu loại sở hữu, bất biến sau khi tạo; API GĐ1 chỉ tạo `COMPANY`.
 - BR-003: tra cứu chi nhánh đã tồn tại qua `branch.api.BranchDirectory` trước khi tạo xe.
@@ -75,7 +75,7 @@ Response 201, ví dụ `Location: /api/v1/admin/vehicles/XE-8KQ4M2`:
     "transmission": "AUTOMATIC",
     "make": "Toyota",
     "model": "Vios",
-    "branchId": 42,
+    "branchCode": "CN-3TR7WK",
     "status": "DRAFT",
     "inspectionExpiresOn": "2030-12-31",
     "liabilityInsuranceExpiresOn": "2030-12-31"
@@ -84,10 +84,14 @@ Response 201, ví dụ `Location: /api/v1/admin/vehicles/XE-8KQ4M2`:
 }
 ```
 
-`branchId` là tham chiếu chi nhánh chỉ đọc trong API admin hiện tại, không phải input hoặc URL.
-Không trả `id` của xe, không JOIN schema branch để bổ sung dữ liệu ngoài hợp đồng hiện có.
-Nếu cần trả `branchCode`/thông tin chi nhánh trong tương lai, bổ sung tra cứu qua `branch.api`,
-không suy mã từ ID và không đọc thẳng bảng của module khác.
+Từ Task 6b, cả bốn endpoint trả **`branchCode`**, không còn `branchId` và không trả `id` của xe (R12).
+Đây là thay đổi trước phát hành, sửa thẳng `v1` theo api-guideline, không tạo `v2`.
+Mã chi nhánh được application lấy qua `branch.api`; CSDL vẫn chỉ lưu `branch_id`,
+không thêm cột `branch_code`, không suy mã từ ID và không JOIN chéo schema (ADR-0008).
+Luồng tạo xe tái sử dụng mã chi nhánh đã tra trước khi chèn; luồng đọc/gửi duyệt/duyệt tra bằng ID đã lưu.
+`branchCode` có thể null nếu hồ sơ không có liên kết chi nhánh; luồng tạo COMPANY ở GĐ1 luôn có mã.
+Có ID tham chiếu nhưng chi nhánh không tồn tại là lỗi toàn vẹn nội bộ (500 `INTERNAL_ERROR`),
+không trả mã giả/null hoặc biến thành lỗi 404 của mã xe. Lỗi sau ghi làm rollback giao dịch.
 
 Service thử tối đa năm mã `XE-<6>` nếu trùng mã. Trùng biển số dừng ngay, không thử lại.
 Endpoint chưa hỗ trợ Idempotency-Key; gửi lại cùng biển số sẽ nhận 409.
@@ -145,6 +149,19 @@ Ví dụ lỗi:
 
 Thông báo code là tiếng Anh; giao diện Việt hóa sau dựa trên `error.code`.
 Không trả SQL, stack trace hoặc chi tiết kết nối ra HTTP.
+
+## Collection Postman — Task 6b, Phần 3
+
+Import `postman/task-06b-review.postman_collection.json`, chọn **Car Rental - Local**,
+khởi động lại backend rồi chạy riêng thư mục **Part 3 - Vehicle branch code** theo thứ tự 01–07.
+Không cần chạy Phần 1 trước, không cần SQL hoặc chép biến giữa các request.
+
+- 01 tạo chi nhánh; 02 tạo xe; 03 đọc DRAFT; 04 gửi duyệt; 05 duyệt; 06 đọc ACTIVE.
+- Mọi response xe thành công phải có `branchCode` đúng mã chi nhánh ở request 01,
+  không có `id` hoặc `branchId`, và giữ nguyên dữ liệu qua các lần chuyển trạng thái.
+- 07 duyệt lại xe ACTIVE: **422 `VEHICLE_INVALID_STATUS_TRANSITION`**, test vẫn phải xanh.
+- Mỗi lượt tạo một bộ dữ liệu mới với biển số/tên ngẫu nhiên và giấy tờ còn hạn;
+  không xóa dữ liệu của lượt trước. Collection Task 6 cũng đã cập nhật sang hợp đồng `branchCode`.
 
 ## Collection Postman — Task 6, Phần 1
 

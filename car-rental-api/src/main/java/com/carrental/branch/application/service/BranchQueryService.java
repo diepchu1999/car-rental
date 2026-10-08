@@ -1,6 +1,8 @@
 package com.carrental.branch.application.service;
 
 import com.carrental.branch.application.port.in.FindBranchUseCase;
+import com.carrental.branch.application.port.in.FindBranchByIdUseCase;
+import com.carrental.branch.application.query.FindBranchByIdQuery;
 import com.carrental.branch.application.port.in.GetBranchUseCase;
 import com.carrental.branch.application.port.in.ListNearbyBranchesUseCase;
 import com.carrental.branch.application.port.out.ReadBranchPort;
@@ -22,7 +24,7 @@ import java.util.Optional;
  * Không ghi dữ liệu, không tính khoảng cách hoặc đọc dữ liệu module vehicle.
  */
 @Service
-class BranchQueryService implements GetBranchUseCase, FindBranchUseCase, ListNearbyBranchesUseCase {
+class BranchQueryService implements GetBranchUseCase, FindBranchUseCase, FindBranchByIdUseCase, ListNearbyBranchesUseCase {
     private final ReadBranchPort readBranchPort;
 
     /** Nhận một cổng đọc gộp cho resource chi nhánh theo module-architecture §3. */
@@ -45,6 +47,14 @@ class BranchQueryService implements GetBranchUseCase, FindBranchUseCase, ListNea
     public Optional<BranchDetail> find(GetBranchQuery query) {
         Validations.required(query, "query");
         return readBranchPort.findByCode(query.code());
+    }
+
+    /** Tra tham chiếu nội bộ trong transaction chỉ đọc theo ADR-0008; không tự đổi thành lỗi 404. */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<BranchDetail> findById(FindBranchByIdQuery query) {
+        Validations.required(query, "query");
+        return readBranchPort.findById(query.id());
     }
 
     /** Trả toàn bộ chi nhánh trong bán kính bằng một lượt đọc, chưa phân trang tìm xe. */

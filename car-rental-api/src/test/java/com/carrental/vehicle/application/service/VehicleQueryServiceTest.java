@@ -1,5 +1,7 @@
 package com.carrental.vehicle.application.service;
 
+import com.carrental.branch.api.BranchDirectory;
+import com.carrental.branch.api.BranchRef;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
 import com.carrental.vehicle.application.port.out.ReadVehiclePort;
@@ -18,6 +20,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
+import static org.mockito.Mockito.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
@@ -34,7 +37,7 @@ class VehicleQueryServiceTest {
 
     /**
      * Chứng minh service gọi cổng đọc đúng một lần với đúng mã
-     * và trả nguyên view nhận được, không kiểm lại điều kiện duyệt.
+     * và bổ sung mã chi nhánh qua directory, không kiểm lại điều kiện duyệt.
      *
      * <p>Hồ sơ DRAFT được phép chưa có đủ giấy tờ; điều kiện
      * giấy tờ của BR-005 chỉ áp dụng khi duyệt xe.
@@ -54,7 +57,7 @@ class VehicleQueryServiceTest {
                 LocalDate.of(2030, 5, 10),
                 null,
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model()
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
         );
 
         List<String> requestedCodes = new ArrayList<>();
@@ -66,15 +69,17 @@ class VehicleQueryServiceTest {
                 }
         );
 
-        VehicleQueryService service = new VehicleQueryService(
-                readVehiclePort
-        );
+        BranchDirectory branches = mock(BranchDirectory.class);
+        VehicleQueryService service = new VehicleQueryService(readVehiclePort, branches);
 
+        when(branches.findById(42L)).thenReturn(Optional.of(new BranchRef(42L, "CN-READ01")));
         VehicleDetail actual = service.get(
                 GetVehicleQuery.from(code)
         );
 
-        assertSame(expected, actual);
+        assertEquals(expected.withBranchCode("CN-READ01"), actual);
+        verify(branches).findById(42L);
+        verifyNoMoreInteractions(branches);
         assertEquals(List.of(code), requestedCodes);
     }
 
@@ -102,9 +107,8 @@ class VehicleQueryServiceTest {
                 }
         );
 
-        VehicleQueryService service = new VehicleQueryService(
-                readVehiclePort
-        );
+        BranchDirectory branches = mock(BranchDirectory.class);
+        VehicleQueryService service = new VehicleQueryService(readVehiclePort, branches);
 
         GetVehicleQuery query = GetVehicleQuery.from(code);
 
@@ -155,9 +159,8 @@ class VehicleQueryServiceTest {
                 }
         );
 
-        VehicleQueryService service = new VehicleQueryService(
-                readVehiclePort
-        );
+        BranchDirectory branches = mock(BranchDirectory.class);
+        VehicleQueryService service = new VehicleQueryService(readVehiclePort, branches);
 
         GetVehicleQuery query = GetVehicleQuery.from(code);
 

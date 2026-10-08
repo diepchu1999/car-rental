@@ -22,7 +22,7 @@ class BranchNearbyDirectoryTest {
             calls.add(query);
             return List.of(new BranchDistanceSummary(8, "CN-NEAR01", " Near ", " 123 Street ", 12.3456789),
                     new BranchDistanceSummary(9, "CN-NEAR02", "Far", "456 Street", 102.75));
-        });
+        }, query -> { throw new AssertionError("ID lookup is not expected."); });
         List<BranchSearchView> result = adapter.findWithinRadius(10.5, 106.5, 1500.0);
         assertEquals(List.of(
                 new BranchSearchView(8, "CN-NEAR01", " Near ", " 123 Street ", 12.3456789),
@@ -36,7 +36,7 @@ class BranchNearbyDirectoryTest {
     void returnsEmptyWhenNoBranchMatches() {
         BranchDirectoryAdapter adapter = new BranchDirectoryAdapter(query -> {
             throw new AssertionError("Code lookup is not expected.");
-        }, query -> List.of());
+        }, query -> List.of(), query -> { throw new AssertionError("ID lookup is not expected."); });
         assertEquals(List.of(), adapter.findWithinRadius(0.0, 0.0, 1.0));
     }
 
@@ -47,7 +47,7 @@ class BranchNearbyDirectoryTest {
         int[] calls = {0};
         BranchDirectoryAdapter adapter = new BranchDirectoryAdapter(query -> {
             throw new AssertionError("Code lookup is not expected.");
-        }, query -> { calls[0]++; throw expected; });
+        }, query -> { calls[0]++; throw expected; }, query -> { throw new AssertionError("ID lookup is not expected."); });
         assertSame(expected, assertThrowsExactly(IllegalStateException.class,
                 () -> adapter.findWithinRadius(10.0, 106.0, 1000.0)));
         assertEquals(1, calls[0]);
@@ -58,7 +58,8 @@ class BranchNearbyDirectoryTest {
     void rejectsInvalidInputBeforeCallingUseCase() {
         BranchDirectoryAdapter adapter = new BranchDirectoryAdapter(query -> {
             throw new AssertionError("Code lookup is not expected.");
-        }, query -> { throw new AssertionError("Invalid query must not reach the use case."); });
+        }, query -> { throw new AssertionError("Invalid query must not reach the use case."); },
+                query -> { throw new AssertionError("ID lookup is not expected."); });
         DomainException failure = assertThrowsExactly(DomainException.class,
                 () -> adapter.findWithinRadius(10.0, 106.0, -1.0));
         assertEquals(ErrorCode.INVALID_REQUEST, failure.errorCode());

@@ -102,12 +102,15 @@ Không có xe phù hợp vẫn trả 200 với `items: []`, `nextCursor: null`, 
 
 ### Cursor
 
-- Thứ tự: khoảng cách tăng dần, bằng nhau thì ID xe nội bộ tăng dần để ổn định thứ tự.
+- Thứ tự: khoảng cách tăng dần, bằng nhau thì **mã xe tăng dần theo thứ tự từ điển ASCII**.
+  Không dùng ID nội bộ hoặc thứ tự tạo xe làm khóa phụ.
 - Khi `nextCursor` khác null, truyền token đó vào `cursor` ở lần gọi sau và giữ nguyên điều kiện tìm.
 - Có thể đổi `limit` giữa các trang; không đổi vị trí, khoảng thuê, gói, hình thức lái/nhận,
   bán kính, sort hoặc bộ lọc. Giữ nguyên cả cách viết hãng/dòng khi tiếp tục cursor.
-- Token chứa phiên bản, dấu SHA-256 của điều kiện và khóa tiếp nối; client phải coi là opaque.
-  Đây không phải chữ ký xác thực hay quyền truy cập dữ liệu.
+- Từ Task 6b, token dùng **version 2**, chứa dấu SHA-256 của điều kiện và khóa tiếp nối
+  `(khoảng cách, mã xe)`, không chứa ID số của xe; client phải coi là opaque.
+  Đây không phải chữ ký xác thực hay quyền truy cập dữ liệu. Cursor version 1 bị từ chối bằng
+  **400 `INVALID_REQUEST`** như cursor sai; khách bỏ cursor để tìm lại từ trang đầu.
 - Không phải snapshot: lịch/trạng thái/vị trí thay đổi giữa hai lần gọi có thể làm thay đổi tập kết quả.
   Kết quả search **không giữ chỗ**. BR-104 vẫn do ràng buộc PostgreSQL quyết định khi hold.
 
@@ -115,7 +118,7 @@ Không có xe phù hợp vẫn trả 200 với `items: []`, `nextCursor: null`, 
 
 | HTTP | `error.code` | Trường hợp |
 |---|---|---|
-| 400 | `INVALID_REQUEST` | Thiếu bắt buộc; sai kiểu/enum; tọa độ, bán kính hoặc limit sai; khoảng không tăng; chuỗi trắng; cursor hỏng/sai điều kiện; tham số lạ/lặp |
+| 400 | `INVALID_REQUEST` | Thiếu bắt buộc; sai kiểu/enum; tọa độ, bán kính hoặc limit sai; khoảng không tăng; chuỗi trắng; cursor hỏng/sai phiên bản/sai điều kiện; tham số lạ/lặp |
 | 422 | `VEHICLE_INVALID_SEATS` | Số nguyên chỗ ngồi không thuộc 4/5/7/16 |
 | 422 | `RENTAL_DURATION_TOO_SHORT` | Gói giờ ngắn hơn bốn giờ |
 | 422 | `OUTSIDE_BRANCH_HOURS` | Nhận/trả ngoài giờ chi nhánh |
@@ -157,6 +160,22 @@ Mỗi lượt dùng model và biển số riêng, không cần xóa dữ liệu 
   cuộc đua hai khách tìm rồi giữ trong `SearchHoldConcurrencyIntegrationTest`.
   Kiểm thủ công khóa lịch dùng IntelliJ SQL Console theo hướng dẫn nghiệm thu, không có REST giả cho availability.
 
+### Kiểm cursor version 2 — Task 6b
+
+Import `postman/task-06b-review.postman_collection.json`, dùng environment **Car Rental - Local**.
+Khởi động lại backend sau khi cập nhật code, rồi chạy cả thư mục **Part 1 - Business-code cursor**
+bằng Collection Runner, theo thứ tự 16 request. Không cần chạy collection Task 6 trước.
+
+- Request 01–11 tự tạo hai chi nhánh và ba xe ACTIVE; model/biển số riêng mỗi lượt,
+  thời gian thuê và hạn giấy tờ tự sinh. Fixture được giữ lại, không có thao tác xóa dữ liệu.
+- Request 12–13 kiểm hai xe cùng vị trí theo thứ tự mã, sau đó xe xa hơn; không lặp/mất xe.
+  Request 12 giải mã payload v2 và kiểm mã xe nằm ở cuối, không còn trường ID số.
+- Request 14 dựng cursor v1 với đúng hash/khoảng cách của cursor vừa nhận và ID số mẫu;
+  request 15 gửi cursor hỏng; request 16 dùng cursor đúng nhưng đổi bán kính.
+  Cả ba phải nhận **400 `INVALID_REQUEST`**, mọi `pm.test` phải xanh.
+- Kiểm độc lập trong Java còn đổi riêng ID nội bộ và giữ nguyên mã/khoảng cách:
+  token phải không đổi. Không dò chuỗi chữ số trong hash để kết luận có hay không có ID.
+
 ### Kiểm thủ công khóa thuê và đệm gói ngày
 
 Fixture của lượt nghiệm thu đã xác nhận: xe `XE-B76A44`, model
@@ -169,7 +188,8 @@ Fixture của lượt nghiệm thu đã xác nhận: xe `XE-B76A44`, model
 2. Import lại collection, chạy riêng **Part 6 - Manual rental and daily buffer**.
    Các request dùng bộ fixture đã xác nhận trực tiếp, không phụ thuộc biến `p6*` có thể mất khi import.
 3. Ba request lần lượt kiểm tìm từ 10:00, 11:00, 12:00 tới 16:00 (giờ Việt Nam).
-   Hai request đầu trả `XE-09Z3NS`, `XE-TTJ8LW`; request cuối trả thêm `XE-B76A44` ở đầu danh sách.
+   Hai request đầu trả `XE-09Z3NS`, `XE-TTJ8LW`; request cuối trả
+   `XE-09Z3NS`, `XE-B76A44`, `XE-TTJ8LW` theo khoảng cách rồi mã xe.
    Tất cả HTTP 200, mọi `pm.test` phải xanh.
 
 Khóa `KL-T6M001` là RENTAL/CONFIRMED, lưu `[06:00,12:00)` cho chuyến trả 10:00 cộng hai giờ đệm.

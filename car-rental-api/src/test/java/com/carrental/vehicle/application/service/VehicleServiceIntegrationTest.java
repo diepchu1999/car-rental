@@ -94,11 +94,12 @@ class VehicleServiceIntegrationTest {
         assertEquals(OwnershipType.COMPANY, created.ownershipType());
         assertEquals(command.plateNumber(), created.plateNumber());
         assertNotNull(created.branchId());
+        assertEquals(command.branchCode(), created.branchCode());
         assertTrue(created.id() > 0);
         assertTrue(probe.transactionActive);
         assertFalse(probe.transactionReadOnly);
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
-        assertEquals(Optional.of(created), actualRead.findByCode(created.code()));
+        assertEquals(Optional.of(created.withBranchCode(null)), actualRead.findByCode(created.code()));
 
         probe.reset();
         assertEquals(created, get.get(GetVehicleQuery.from(created.code())));
@@ -146,14 +147,14 @@ class VehicleServiceIntegrationTest {
         assertOnlyStatusChanged(draft, pending, VehicleStatus.PENDING_APPROVAL);
         assertTrue(probe.transactionActive);
         assertFalse(probe.transactionReadOnly);
-        assertEquals(Optional.of(pending), actualRead.findByCode(draft.code()));
+        assertEquals(Optional.of(pending.withBranchCode(null)), actualRead.findByCode(draft.code()));
 
         probe.reset();
         VehicleDetail active = approve.approve(ApproveVehicleCommand.from(draft.code()));
         assertOnlyStatusChanged(pending, active, VehicleStatus.ACTIVE);
         assertTrue(probe.transactionActive);
         assertFalse(probe.transactionReadOnly);
-        assertEquals(Optional.of(active), actualRead.findByCode(draft.code()));
+        assertEquals(Optional.of(active.withBranchCode(null)), actualRead.findByCode(draft.code()));
     }
 
     /**
@@ -184,7 +185,7 @@ class VehicleServiceIntegrationTest {
         assertTrue(probe.transactionActive);
         assertFalse(probe.transactionReadOnly);
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
-        assertEquals(Optional.of(initial), actualRead.findByCode(code));
+        assertEquals(Optional.of(initial.withBranchCode(null)), actualRead.findByCode(code));
     }
 
     /** Trùng biển số qua PostgreSQL thật trả lỗi xung đột và không ảnh hưởng xe đã có. */
@@ -197,7 +198,7 @@ class VehicleServiceIntegrationTest {
         assertEquals(ErrorCode.VEHICLE_PLATE_ALREADY_EXISTS, failure.errorCode());
         assertEquals(DomainException.Category.CONFLICT, failure.category());
         assertEquals(0, probe.readCount);
-        assertEquals(Optional.of(original), actualRead.findByCode(original.code()));
+        assertEquals(Optional.of(original.withBranchCode(null)), actualRead.findByCode(original.code()));
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
     }
 
@@ -225,7 +226,7 @@ class VehicleServiceIntegrationTest {
                 before.fuelType(), before.branchId(), status, before.inspectionExpiresOn(),
                 before.liabilityInsuranceExpiresOn(),
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model()), after);
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), before.branchCode()), after);
     }
 
     /** Đăng ký probe chỉ trong context kiểm transaction của xe. */

@@ -25,10 +25,13 @@ import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -146,19 +149,40 @@ class SearchApiIntegrationTest {
         var branch = fixtures.branch(10.76, 106.66);
         var first = fixtures.active(branch.code(), model);
         var second = fixtures.active(branch.code(), model);
+        var sortedCodes = List.of(first.code(), second.code()).stream().sorted().toList();
         parameters.put("limit", "1");
         var page1 = success(get());
         assertEquals(1, page1.path("items").size());
-        assertEquals(first.code(), page1.path("items").get(0).path("code").asString());
+        assertEquals(sortedCodes.getFirst(), page1.path("items").get(0).path("code").asString());
         assertTrue(page1.path("nextCursor").isString());
         String cursor = page1.path("nextCursor").asString();
         assertFalse(cursor.isBlank());
+        byte[] payload = Base64.getUrlDecoder().decode(cursor);
+        assertEquals(50, payload.length);
+        assertEquals(2, payload[0]);
+        assertEquals(sortedCodes.getFirst(), new String(payload, 41, 9, StandardCharsets.US_ASCII));
         parameters.put("cursor", cursor);
         var page2 = success(get());
         assertEquals(1, page2.path("items").size());
-        assertEquals(second.code(), page2.path("items").get(0).path("code").asString());
+        assertEquals(sortedCodes.getLast(), page2.path("items").get(0).path("code").asString());
         assertTrue(page2.path("nextCursor").isNull());
         parameters.put("radiusKm", "5");
+        error(get(), 400, "INVALID_REQUEST");
+    }
+
+    /** Cursor v1 mang đúng dấu điều kiện từ request hiện tại vẫn bị HTTP 400, không tiếp tục theo ID. */
+    @Test
+    void rejectsLegacyNumericIdCursorOverHttp() throws Exception {
+        var branch = fixtures.branch(10.76, 106.66);
+        var first = fixtures.active(branch.code(), model);
+        var second = fixtures.active(branch.code(), model);
+        parameters.put("limit", "1");
+        var page = success(get());
+        byte[] current = Base64.getUrlDecoder().decode(page.path("nextCursor").asString());
+        long anchorId = first.code().equals(page.path("items").get(0).path("code").asString())
+                ? first.id() : second.id();
+        byte[] legacy = ByteBuffer.allocate(49).put((byte) 1).put(current, 1, 40).putLong(anchorId).array();
+        parameters.put("cursor", Base64.getUrlEncoder().withoutPadding().encodeToString(legacy));
         error(get(), 400, "INVALID_REQUEST");
     }
 

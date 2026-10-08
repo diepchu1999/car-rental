@@ -151,7 +151,7 @@ class VehicleReadAdapterIntegrationTest {
                 inspectionExpiresOn,
                 liabilityInsuranceExpiresOn,
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model()
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
         );
 
         assertEquals(expected, result.orElseThrow());

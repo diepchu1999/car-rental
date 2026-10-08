@@ -327,7 +327,7 @@ class VehicleWriteAdapterIntegrationTest {
                 expected.documents().inspectionExpiresOn(),
                 expected.documents().liabilityInsuranceExpiresOn(),
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model()
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
         );
 
         assertEquals(expectedDetail, actual);
