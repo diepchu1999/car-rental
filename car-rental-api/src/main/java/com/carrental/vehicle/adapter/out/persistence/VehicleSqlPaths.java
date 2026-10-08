@@ -8,6 +8,9 @@ package com.carrental.vehicle.adapter.out.persistence;
  */
 final class VehicleSqlPaths {
 
+    /** Truy vấn ứng viên tìm kiếm BR-010/126, chỉ đọc schema vehicle. */
+    static final String FIND_SEARCH_CANDIDATES = "sql/vehicle/find_search_vehicles.sql";
+
     /**
      * Đường dẫn câu lệnh chèn xe mới.
      */

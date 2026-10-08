@@ -171,9 +171,50 @@ class BranchConstraintIntegrationTest {
     private int insertRawBranch(String code, String location) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("code", code, Types.VARCHAR)
+                .addValue("name", "Test Branch", Types.VARCHAR)
+                .addValue("address", "123 Test Street", Types.VARCHAR)
                 .addValue("location", location, Types.VARCHAR);
 
         return jdbcTemplate.update(insertSql, parameters);
+    }
+
+    /** BR-808: từng cột hiển thị bắt buộc được bảo vệ bởi NOT NULL tại CSDL. */
+    @ParameterizedTest
+    @ValueSource(strings = {"name", "address"})
+    void rejectsNullDisplayField(String field) {
+        MapSqlParameterSource parameters = validDisplayParameters().addValue(field, null, Types.VARCHAR);
+        ServerErrorMessage details = assertDatabaseViolation(
+                () -> jdbcTemplate.update(insertSql, parameters), "23502");
+        assertEquals(field, details.getColumn());
+    }
+
+    /** BR-808: tên trắng bị đúng CHECK của tên chặn, không phải ràng buộc khác. */
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "\t\n"})
+    void rejectsBlankName(String name) {
+        MapSqlParameterSource parameters = validDisplayParameters().addValue("name", name);
+        ServerErrorMessage details = assertDatabaseViolation(
+                () -> jdbcTemplate.update(insertSql, parameters), "23514");
+        assertEquals("chk_branch_name_not_blank", details.getConstraint());
+    }
+
+    /** BR-808: địa chỉ trắng bị đúng CHECK của địa chỉ chặn. */
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "\t\n"})
+    void rejectsBlankAddress(String address) {
+        MapSqlParameterSource parameters = validDisplayParameters().addValue("address", address);
+        ServerErrorMessage details = assertDatabaseViolation(
+                () -> jdbcTemplate.update(insertSql, parameters), "23514");
+        assertEquals("chk_branch_address_not_blank", details.getConstraint());
+    }
+
+    /** Tạo dữ liệu hợp lệ để mỗi test chỉ thay đúng một trường cần thử phá hoại. */
+    private MapSqlParameterSource validDisplayParameters() {
+        return new MapSqlParameterSource()
+                .addValue("code", "CN-NAME01", Types.VARCHAR)
+                .addValue("name", "Central Branch", Types.VARCHAR)
+                .addValue("address", "123 Main Street", Types.VARCHAR)
+                .addValue("location", VALID_LOCATION, Types.VARCHAR);
     }
 
     /**

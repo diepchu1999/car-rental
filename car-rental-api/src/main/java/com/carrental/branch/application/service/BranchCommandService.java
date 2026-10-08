@@ -87,7 +87,9 @@ class BranchCommandService implements CreateBranchUseCase {
 
             Branch branch = new Branch(
                     code,
-                    command.location()
+                    command.location(),
+                    command.name(),
+                    command.address()
             );
 
             if (!writeBranchPort.insert(branch)) {

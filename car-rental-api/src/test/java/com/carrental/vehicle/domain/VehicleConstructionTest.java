@@ -14,6 +14,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.time.LocalDate;
 import java.util.stream.Stream;
 
+import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
@@ -212,7 +213,7 @@ class VehicleConstructionTest {
                         FuelType.PETROL,
                         BRANCH_ID,
                         null,
-                        DOCUMENTS
+                        DOCUMENTS, SPECIFICATIONS
                 ),
                 "status is required."
         );
@@ -234,7 +235,7 @@ class VehicleConstructionTest {
                 OwnershipType.COMPANY,
                 FuelType.PETROL,
                 BRANCH_ID,
-                DOCUMENTS
+                DOCUMENTS, SPECIFICATIONS
         );
 
         Vehicle restored = Vehicle.restore(
@@ -244,7 +245,7 @@ class VehicleConstructionTest {
                 FuelType.PETROL,
                 BRANCH_ID,
                 VehicleStatus.ACTIVE,
-                DOCUMENTS
+                DOCUMENTS, SPECIFICATIONS
         );
 
         assertEquals(plateNumber, draft.plateNumber());
@@ -276,7 +277,7 @@ class VehicleConstructionTest {
                 FuelType.HYBRID,
                 BRANCH_ID,
                 status,
-                DOCUMENTS
+                DOCUMENTS, SPECIFICATIONS
         );
 
         assertEquals(CODE, restored.code());
@@ -318,7 +319,7 @@ class VehicleConstructionTest {
                         ownershipType,
                         fuelType,
                         branchId,
-                        documents
+                        documents, SPECIFICATIONS
                 ),
                 expectedMessage
         );
@@ -331,7 +332,7 @@ class VehicleConstructionTest {
                         fuelType,
                         branchId,
                         VehicleStatus.DRAFT,
-                        documents
+                        documents, SPECIFICATIONS
                 ),
                 expectedMessage
         );

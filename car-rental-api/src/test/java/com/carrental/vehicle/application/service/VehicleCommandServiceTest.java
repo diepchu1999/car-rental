@@ -31,6 +31,7 @@ import java.time.ZoneId;
 import java.util.Optional;
 import java.util.Random;
 
+import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -195,6 +196,7 @@ class VehicleCommandServiceTest {
     /** Gửi duyệt tải aggregate trước, ghi trạng thái rồi mới đọc view trả về. */
     @Test
     void submitsDraftWithoutRequiringDocuments() {
+        when(branches.findById(42L)).thenReturn(Optional.of(new BranchRef(42L, "CN-TEST01")));
         Vehicle draft = aggregate(VehicleStatus.DRAFT, null, null);
         VehicleDetail pending = detail(VehicleStatus.PENDING_APPROVAL, null, null);
 
@@ -204,8 +206,8 @@ class VehicleCommandServiceTest {
                 CODE, VehicleStatus.DRAFT, VehicleStatus.PENDING_APPROVAL
         )).thenReturn(true);
 
-        assertSame(
-                pending,
+        assertEquals(
+                pending.withBranchCode("CN-TEST01"),
                 service.submitForApproval(SubmitVehicleForApprovalCommand.from(CODE))
         );
 
@@ -217,12 +219,14 @@ class VehicleCommandServiceTest {
         order.verify(read).findByCode(CODE);
 
         verifyNoMoreInteractions(read, write);
-        verifyNoInteractions(branches);
+        verify(branches).findById(42L);
+        verifyNoMoreInteractions(branches);
     }
 
     /** Duyệt aggregate có giấy tờ còn hạn, ghi ACTIVE rồi đọc lại view. */
     @Test
     void approvesPendingVehicleAndReloads() {
+        when(branches.findById(42L)).thenReturn(Optional.of(new BranchRef(42L, "CN-TEST01")));
         Vehicle pending = aggregate(
                 VehicleStatus.PENDING_APPROVAL,
                 TODAY.plusDays(1),
@@ -240,7 +244,7 @@ class VehicleCommandServiceTest {
                 CODE, VehicleStatus.PENDING_APPROVAL, VehicleStatus.ACTIVE
         )).thenReturn(true);
 
-        assertSame(active, service.approve(ApproveVehicleCommand.from(CODE)));
+        assertEquals(active.withBranchCode("CN-TEST01"), service.approve(ApproveVehicleCommand.from(CODE)));
 
         var order = inOrder(read, write);
         order.verify(read).loadAggregate(CODE);
@@ -250,7 +254,26 @@ class VehicleCommandServiceTest {
         order.verify(read).findByCode(CODE);
 
         verifyNoMoreInteractions(read, write);
-        verifyNoInteractions(branches);
+        verify(branches).findById(42L);
+        verifyNoMoreInteractions(branches);
+    }
+
+    /** Thiếu chi nhánh sau ghi phải ném lỗi để transaction rollback, không trả response thiếu mã. */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void rejectsMissingBranchAfterTransition(boolean approval) {
+        VehicleStatus initial = approval ? VehicleStatus.PENDING_APPROVAL : VehicleStatus.DRAFT;
+        VehicleStatus target = approval ? VehicleStatus.ACTIVE : VehicleStatus.PENDING_APPROVAL;
+        when(read.loadAggregate(CODE)).thenReturn(Optional.of(aggregate(initial, TODAY.plusDays(1), TODAY.plusDays(1))));
+        when(write.updateStatus(CODE, initial, target)).thenReturn(true);
+        when(read.findByCode(CODE)).thenReturn(Optional.of(detail(target, TODAY.plusDays(1), TODAY.plusDays(1))));
+        when(branches.findById(42L)).thenReturn(Optional.empty());
+        var failure = assertThrowsExactly(IllegalStateException.class, () -> transition(approval));
+        assertTrue(failure.getMessage().contains("missing branch"));
+        verify(write).updateStatus(CODE, initial, target);
+        verifyNoMoreInteractions(write);
+        verify(branches).findById(42L);
+        verifyNoMoreInteractions(branches);
     }
 
     /**
@@ -565,7 +588,9 @@ class VehicleCommandServiceTest {
                 FuelType.PETROL,
                 "CN-TEST01",
                 null,
-                null
+                null,
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                SPECIFICATIONS.make(), SPECIFICATIONS.model()
         );
     }
 
@@ -589,7 +614,7 @@ class VehicleCommandServiceTest {
                 FuelType.PETROL,
                 42L,
                 status,
-                new VehicleDocuments(inspection, insurance)
+                new VehicleDocuments(inspection, insurance), SPECIFICATIONS
         );
     }
 
@@ -615,7 +640,9 @@ class VehicleCommandServiceTest {
                 42L,
                 status,
                 inspection,
-                insurance
+                insurance,
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
         );
     }
 

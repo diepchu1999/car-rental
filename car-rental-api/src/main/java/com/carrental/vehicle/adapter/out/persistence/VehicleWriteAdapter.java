@@ -81,6 +81,10 @@ class VehicleWriteAdapter implements WriteVehiclePort {
     public boolean insert(Vehicle vehicle) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("code", vehicle.code(), Types.VARCHAR)
+                .addValue("seats", vehicle.specifications().seats(), Types.INTEGER)
+                .addValue("transmission", vehicle.specifications().transmission().name(), Types.VARCHAR)
+                .addValue("make", vehicle.specifications().make(), Types.VARCHAR)
+                .addValue("model", vehicle.specifications().model(), Types.VARCHAR)
                 .addValue(
                         "plateNumber",
                         vehicle.plateNumber(),

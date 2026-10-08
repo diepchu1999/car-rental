@@ -52,15 +52,35 @@ class ApiExceptionHandlerTest {
     }
 
     /**
-     * Cung cấp bốn nhóm lỗi cùng HTTP, mã và thông báo mong đợi.
+     * Cung cấp bốn nhóm lỗi và các mã điều kiện thuê cùng HTTP, thông báo mong đợi.
      *
      * <p>Giá trị mong đợi được viết tường minh để test phát hiện
      * thay đổi ngoài ý muốn của hợp đồng lỗi.
      *
-     * @return dữ liệu kiểm thử cho bốn nhóm DomainException
+     * @return dữ liệu kiểm thử cho DomainException và mã lỗi điều kiện thuê Task 6
      */
     private static Stream<Arguments> domainFailureCases() {
         return Stream.of(
+                Arguments.of("search-rental-type", 422, "SEARCH_RENTAL_TYPE_NOT_SUPPORTED",
+                        "Monthly rental search is not supported yet."),
+                Arguments.of("search-drive-mode", 422, "SEARCH_DRIVE_MODE_NOT_SUPPORTED",
+                        "Search with a driver is not supported yet."),
+                Arguments.of("search-pickup", 422, "SEARCH_PICKUP_METHOD_NOT_SUPPORTED",
+                        "Search with vehicle delivery is not supported yet."),
+                Arguments.of("search-sort", 422, "SEARCH_SORT_NOT_SUPPORTED",
+                        "Only nearest-first search is currently supported."),
+                Arguments.of(
+                        "rental-duration", 422, "RENTAL_DURATION_TOO_SHORT",
+                        "The rental duration is shorter than the required minimum."
+                ),
+                Arguments.of(
+                        "branch-hours", 422, "OUTSIDE_BRANCH_HOURS",
+                        "Pickup and return must be within branch opening hours."
+                ),
+                Arguments.of(
+                        "booking-window", 422, "BOOKING_WINDOW_VIOLATION",
+                        "Pickup is outside the allowed advance booking window."
+                ),
                 Arguments.of(
                         "invalid-input",
                         400,
@@ -295,6 +315,13 @@ class ApiExceptionHandlerTest {
         @GetMapping("/test/errors/{scenario}")
         void fail(@PathVariable("scenario") String scenario) {
             throw switch (scenario) {
+                case "search-rental-type" -> DomainException.ruleViolation(ErrorCode.SEARCH_RENTAL_TYPE_NOT_SUPPORTED);
+                case "search-drive-mode" -> DomainException.ruleViolation(ErrorCode.SEARCH_DRIVE_MODE_NOT_SUPPORTED);
+                case "search-pickup" -> DomainException.ruleViolation(ErrorCode.SEARCH_PICKUP_METHOD_NOT_SUPPORTED);
+                case "search-sort" -> DomainException.ruleViolation(ErrorCode.SEARCH_SORT_NOT_SUPPORTED);
+                case "rental-duration" -> DomainException.ruleViolation(ErrorCode.RENTAL_DURATION_TOO_SHORT);
+                case "branch-hours" -> DomainException.ruleViolation(ErrorCode.OUTSIDE_BRANCH_HOURS);
+                case "booking-window" -> DomainException.ruleViolation(ErrorCode.BOOKING_WINDOW_VIOLATION);
                 case "invalid-input" -> DomainException.invalidInput(
                         "A required field is missing."
                 );

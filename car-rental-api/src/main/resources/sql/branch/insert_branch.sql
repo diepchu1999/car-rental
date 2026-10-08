@@ -3,10 +3,14 @@
 -- Chỉ bỏ qua xung đột mã nghiệp vụ; không cập nhật bản ghi cũ.
 INSERT INTO branch.branch (
     code,
+    name,
+    address,
     location
 )
 VALUES (
            :code,
+           :name,
+           :address,
            CAST(
                    public.ST_SetSRID(
                            public.ST_MakePoint(:longitude, :latitude),

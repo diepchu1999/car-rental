@@ -80,7 +80,9 @@ class AdminBranchController {
     ) {
         CreateBranchCommand command = CreateBranchCommand.from(
                 request.latitude(),
-                request.longitude()
+                request.longitude(),
+                request.name(),
+                request.address()
         );
 
         BranchDetail view = createBranchUseCase.create(command);

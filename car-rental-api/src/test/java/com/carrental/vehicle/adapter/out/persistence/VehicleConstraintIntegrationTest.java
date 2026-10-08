@@ -76,6 +76,87 @@ class VehicleConstraintIntegrationTest {
         updateOwnershipSql = sqlLoader.load(UPDATE_OWNERSHIP_SQL_PATH);
     }
 
+    /** BR-018: CSDL chấp nhận mọi số chỗ được chốt cùng cả hai hộp số. */
+    @ParameterizedTest
+    @CsvSource({"4, MANUAL", "4, AUTOMATIC", "5, MANUAL", "5, AUTOMATIC",
+            "7, MANUAL", "7, AUTOMATIC", "16, MANUAL", "16, AUTOMATIC"})
+    void acceptsSupportedSpecifications(int seats, String transmission) {
+        MapSqlParameterSource parameters = specificationParameters()
+                .addValue("seats", seats, Types.INTEGER)
+                .addValue("transmission", transmission, Types.VARCHAR);
+        assertEquals(1, jdbcTemplate.update(insertSql, parameters));
+    }
+
+    /** Ghi SQL trực tiếp số chỗ sai phải nhận 23514 đúng constraint, không dựa vào domain. */
+    @ParameterizedTest
+    @ValueSource(ints = {-1, 0, 3, 6, 8, 17})
+    void rejectsUnsupportedSeats(int seats) {
+        MapSqlParameterSource parameters = specificationParameters().addValue("seats", seats, Types.INTEGER);
+        assertDatabaseViolation(() -> jdbcTemplate.update(insertSql, parameters), "23514", "chk_vehicle_seats");
+    }
+
+    /** Hộp số ngoài tập BR-018 phải bị constraint riêng từ chối. */
+    @ParameterizedTest
+    @ValueSource(strings = {"CVT", "manual", "", " "})
+    void rejectsUnsupportedTransmission(String transmission) {
+        MapSqlParameterSource parameters = specificationParameters()
+                .addValue("transmission", transmission, Types.VARCHAR);
+        assertDatabaseViolation(() -> jdbcTemplate.update(insertSql, parameters),
+                "23514", "chk_vehicle_transmission");
+    }
+
+    /** BR-018: cả chuỗi rỗng và khoảng trắng ở hãng đều bị CSDL chặn. */
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "\t\r\n"})
+    void rejectsBlankMake(String make) {
+        MapSqlParameterSource parameters = specificationParameters().addValue("make", make, Types.VARCHAR);
+        assertDatabaseViolation(() -> jdbcTemplate.update(insertSql, parameters),
+                "23514", "chk_vehicle_make_not_blank");
+    }
+
+    /** BR-018: kiểm riêng constraint dòng xe để tránh một constraint khác che lỗi. */
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "\t\r\n"})
+    void rejectsBlankModel(String model) {
+        MapSqlParameterSource parameters = specificationParameters().addValue("model", model, Types.VARCHAR);
+        assertDatabaseViolation(() -> jdbcTemplate.update(insertSql, parameters),
+                "23514", "chk_vehicle_model_not_blank");
+    }
+
+    /** Từng cột mới đều NOT NULL; kiểm SQLSTATE 23502 và đúng cột gây lỗi. */
+    @ParameterizedTest
+    @ValueSource(strings = {"seats", "transmission", "make", "model"})
+    void rejectsNullSpecificationColumn(String column) {
+        int type = column.equals("seats") ? Types.INTEGER : Types.VARCHAR;
+        MapSqlParameterSource parameters = specificationParameters().addValue(column, null, type);
+        DataIntegrityViolationException failure = assertThrows(DataIntegrityViolationException.class,
+                () -> jdbcTemplate.update(insertSql, parameters));
+        PSQLException postgres = assertInstanceOf(PSQLException.class, failure.getMostSpecificCause());
+        assertEquals("23502", postgres.getSQLState());
+        ServerErrorMessage details = postgres.getServerErrorMessage();
+        assertNotNull(details);
+        assertEquals("vehicle", details.getSchema());
+        assertEquals("vehicle", details.getTable());
+        assertEquals(column, details.getColumn());
+    }
+
+    /** Dữ liệu hợp lệ để mỗi test BR-018 chỉ đổi đúng một trường cần kiểm. */
+    private static MapSqlParameterSource specificationParameters() {
+        return new MapSqlParameterSource()
+                .addValue("code", "XE-SPEC01", Types.VARCHAR)
+                .addValue("plateNumber", "SPEC-01", Types.VARCHAR)
+                .addValue("ownershipType", "COMPANY", Types.VARCHAR)
+                .addValue("fuelType", "PETROL", Types.VARCHAR)
+                .addValue("branchId", 42L, Types.BIGINT)
+                .addValue("status", "DRAFT", Types.VARCHAR)
+                .addValue("inspectionExpiresOn", null, Types.DATE)
+                .addValue("liabilityInsuranceExpiresOn", null, Types.DATE)
+                .addValue("seats", 5, Types.INTEGER)
+                .addValue("transmission", "AUTOMATIC", Types.VARCHAR)
+                .addValue("make", "Toyota", Types.VARCHAR)
+                .addValue("model", "Vios", Types.VARCHAR);
+    }
+
     /**
      * Chứng minh xe công ty có chi nhánh được CSDL chấp nhận.
      *
@@ -308,6 +389,10 @@ class VehicleConstraintIntegrationTest {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("code", code, Types.VARCHAR)
                 .addValue("plateNumber", plateNumber, Types.VARCHAR)
+                .addValue("seats", 5, Types.INTEGER)
+                .addValue("transmission", "AUTOMATIC", Types.VARCHAR)
+                .addValue("make", "Toyota", Types.VARCHAR)
+                .addValue("model", "Vios", Types.VARCHAR)
                 .addValue("ownershipType", ownershipType, Types.VARCHAR)
                 .addValue("fuelType", "PETROL", Types.VARCHAR)
                 .addValue("branchId", branchId, Types.BIGINT)

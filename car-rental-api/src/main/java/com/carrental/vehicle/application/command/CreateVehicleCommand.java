@@ -5,6 +5,8 @@ import com.carrental.shared.validation.Validations;
 import com.carrental.vehicle.domain.FuelType;
 import com.carrental.vehicle.domain.OwnershipType;
 import com.carrental.vehicle.domain.VehicleDocuments;
+import com.carrental.vehicle.domain.VehicleSpecifications;
+import com.carrental.vehicle.domain.Transmission;
 
 import java.time.LocalDate;
 
@@ -31,13 +33,15 @@ import java.time.LocalDate;
  * @param fuelType loại nhiên liệu của xe
  * @param branchCode mã nghiệp vụ của chi nhánh cần liên kết
  * @param documents thông tin hạn giấy tờ, không được null
+ * @param specifications thuộc tính xe đã kiểm tra theo BR-018
  */
 public record CreateVehicleCommand(
         String plateNumber,
         OwnershipType ownershipType,
         FuelType fuelType,
         String branchCode,
-        VehicleDocuments documents
+        VehicleDocuments documents,
+        VehicleSpecifications specifications
 ) {
 
     /**
@@ -74,6 +78,7 @@ public record CreateVehicleCommand(
                 branchCode,
                 "branchCode"
         );
+        specifications = Validations.required(specifications, "specifications");
         documents = Validations.required(
                 documents,
                 "documents"
@@ -97,6 +102,10 @@ public record CreateVehicleCommand(
      * @param inspectionExpiresOn ngày đăng kiểm hết hiệu lực, có thể null
      * @param liabilityInsuranceExpiresOn ngày bảo hiểm TNDS hết hiệu lực,
      *                                    có thể null
+     * @param seats số chỗ theo BR-018
+     * @param transmission hộp số
+     * @param make hãng xe
+     * @param model dòng xe
      * @return command đã được kiểm tra cấu trúc đầu vào
      * @throws DomainException nếu thiếu trường bắt buộc
      *                         hoặc chuỗi bắt buộc không có nội dung
@@ -107,7 +116,11 @@ public record CreateVehicleCommand(
             FuelType fuelType,
             String branchCode,
             LocalDate inspectionExpiresOn,
-            LocalDate liabilityInsuranceExpiresOn
+            LocalDate liabilityInsuranceExpiresOn,
+            Integer seats,
+            Transmission transmission,
+            String make,
+            String model
     ) {
         return new CreateVehicleCommand(
                 plateNumber,
@@ -117,7 +130,8 @@ public record CreateVehicleCommand(
                 new VehicleDocuments(
                         inspectionExpiresOn,
                         liabilityInsuranceExpiresOn
-                )
+                ),
+                new VehicleSpecifications(seats, transmission, make, model)
         );
     }
 }

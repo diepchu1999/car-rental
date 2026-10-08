@@ -1,0 +1,4249 @@
+{
+  "info": {
+    "name": "Car Rental - Task 06 - Search",
+    "description": "Task 6: Phần 1 (BR-018), Phần 2 (BR-808), Phần 6 tìm xe public (BR-125/126). Backend local áp dụng V007; chọn environment Car Rental - Local. Các nhóm không có chữ Manual tự tạo dữ liệu riêng, chạy lại được; không tự xóa dữ liệu. Các nhóm Manual cần chạy SQL fixture riêng và theo thứ tự nghiệm thu: rental and daily buffer, compliance hold, hourly buffer. Đọc mô tả từng nhóm trước khi chạy; trạng thái fixture thay đổi giữa các bước. Không chạy cả collection một lượt. Search chưa giữ chỗ, không có giá hoặc ảnh.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "p1BranchCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "p1VehicleCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "p1CreatedVehicle",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "p1DocumentExpiry",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "p2BranchCode",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "p2CreatedBranch",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Part 1 - Vehicle attributes (BR-018)",
+      "description": "Chạy 18 request theo thứ tự. Mã chi nhánh/xe tự lưu vào collection; biển số và tên chi nhánh ngẫu nhiên. Request chi nhánh đã cập nhật BR-808; không ghi lịch xe.",
+      "item": [
+        {
+          "name": "01 - Create fixture branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-003, BR-808: tạo chi nhánh đủ tên/địa chỉ làm dữ liệu đầu vào và tự lưu mã.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \"{{p1BranchName}}\",\n  \"address\": \"123 Task 6 Street\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Xóa tham chiếu lượt cũ để một request thất bại không vô tình dùng lại xe cũ.",
+                  "[\"p1BranchCode\", \"p1VehicleCode\", \"p1CreatedVehicle\"].forEach(function (key) {",
+                  "    pm.collectionVariables.set(key, \"\");",
+                  "});",
+                  "// Ngày giấy tờ ở tương lai; đây chỉ là dữ liệu thử, không phải quy tắc nghiệp vụ.",
+                  "const expiry = new Date();",
+                  "expiry.setUTCFullYear(expiry.getUTCFullYear() + 2);",
+                  "pm.collectionVariables.set(\"p1DocumentExpiry\", expiry.toISOString().slice(0, 10));",
+                  "pm.variables.set(\"p1BranchName\", \"Task 6 Part 1 \" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Branch created with valid code and coordinates\", function () {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    pm.expect(body.data.code).to.match(/^CN-[A-Z0-9]{6}$/);",
+                  "    pm.expect(body.data).to.have.all.keys(\"code\", \"latitude\", \"longitude\", \"name\", \"address\");",
+                  "    pm.expect(body.data.name).to.eql(pm.variables.get(\"p1BranchName\"));",
+                  "    pm.expect(body.data.address).to.eql(\"123 Task 6 Street\");",
+                  "    pm.expect(body.data.latitude).to.be.closeTo(10.762622, 0.000001);",
+                  "    pm.expect(body.data.longitude).to.be.closeTo(106.660172, 0.000001);",
+                  "    pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/api/v1/admin/branches/\" + body.data.code);",
+                  "});",
+                  "if (pm.response.code === 201 && body.success === true && body.data && /^CN-[A-Z0-9]{6}$/.test(body.data.code)) {",
+                  "    pm.collectionVariables.set(\"p1BranchCode\", body.data.code);",
+                  "};"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Create vehicle with required attributes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018, BR-001: tạo xe đủ bốn thuộc tính, kiểm COMPANY/DRAFT và tự lưu mã xe.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.collectionVariables.set(\"p1VehicleCode\", \"\");",
+                  "pm.collectionVariables.set(\"p1CreatedVehicle\", \"\");",
+                  "if (!pm.collectionVariables.get(\"p1BranchCode\")) { throw new Error(\"Run request 01 successfully first.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "const sent = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
+                  "pm.test(\"Vehicle created with all submitted attributes\", function () {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    pm.expect(body.data).to.have.all.keys(\"code\", \"plateNumber\", \"ownershipType\", \"fuelType\", \"branchCode\", \"status\", \"inspectionExpiresOn\", \"liabilityInsuranceExpiresOn\", \"seats\", \"transmission\", \"make\", \"model\");",
+                  "    pm.expect(body.data.code).to.match(/^XE-[A-Z0-9]{6}$/);",
+                  "    pm.expect(body.data.status).to.eql(\"DRAFT\");",
+                  "    pm.expect(body.data.ownershipType).to.eql(\"COMPANY\");",
+                  "    pm.expect(body.data.branchCode).to.eql(sent.branchCode);",
+                  "    [\"plateNumber\", \"fuelType\", \"inspectionExpiresOn\", \"liabilityInsuranceExpiresOn\", \"seats\", \"transmission\", \"make\", \"model\"].forEach(function (field) {",
+                  "        pm.expect(body.data[field], field).to.eql(sent[field]);",
+                  "    });",
+                  "    pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/api/v1/admin/vehicles/\" + body.data.code);",
+                  "});",
+                  "if (pm.response.code === 201 && body.success === true && body.data && /^XE-[A-Z0-9]{6}$/.test(body.data.code)) {",
+                  "    pm.collectionVariables.set(\"p1VehicleCode\", body.data.code);",
+                  "    pm.collectionVariables.set(\"p1CreatedVehicle\", JSON.stringify(body.data));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Read draft vehicle",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p1VehicleCode}}",
+            "description": "BR-018: đọc lại đủ thuộc tính đã lưu, không chỉ kiểm response tạo xe."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"p1VehicleCode\")) { throw new Error(\"Run requests 01 and 02 successfully first.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Stored attributes preserved with expected status\", function () {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    const expected = JSON.parse(pm.collectionVariables.get(\"p1CreatedVehicle\"));",
+                  "    expected.status = \"DRAFT\";",
+                  "    pm.expect(body.data).to.deep.eql(expected);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Submit vehicle for approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p1VehicleCode}}/submit-for-approval",
+            "description": "BR-010, BR-018: gửi duyệt giữ nguyên bốn thuộc tính xe."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"p1VehicleCode\")) { throw new Error(\"Run requests 01 and 02 successfully first.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Stored attributes preserved with expected status\", function () {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    const expected = JSON.parse(pm.collectionVariables.get(\"p1CreatedVehicle\"));",
+                  "    expected.status = \"PENDING_APPROVAL\";",
+                  "    pm.expect(body.data).to.deep.eql(expected);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Approve vehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p1VehicleCode}}/approve",
+            "description": "BR-005, BR-010, BR-018: duyệt xe có giấy tờ còn hạn, giữ nguyên thuộc tính."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"p1VehicleCode\")) { throw new Error(\"Run requests 01 and 02 successfully first.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Stored attributes preserved with expected status\", function () {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    const expected = JSON.parse(pm.collectionVariables.get(\"p1CreatedVehicle\"));",
+                  "    expected.status = \"ACTIVE\";",
+                  "    pm.expect(body.data).to.deep.eql(expected);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Read approved vehicle",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p1VehicleCode}}",
+            "description": "BR-018: dữ liệu ACTIVE đọc từ CSDL vẫn giữ đủ thuộc tính."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"p1VehicleCode\")) { throw new Error(\"Run requests 01 and 02 successfully first.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Stored attributes preserved with expected status\", function () {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    const expected = JSON.parse(pm.collectionVariables.get(\"p1CreatedVehicle\"));",
+                  "    expected.status = \"ACTIVE\";",
+                  "    pm.expect(body.data).to.deep.eql(expected);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Reject six seats",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: số chỗ 6 phải bị từ chối bằng đúng lỗi nghiệp vụ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 6,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", function () { pm.response.to.have.status(422); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"VEHICLE_INVALID_SEATS\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Reject missing seats",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: thiếu seats phải trả lỗi đầu vào, không tự dùng giá trị mặc định.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.error.message).to.eql(\"seats is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Reject missing transmission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: thiếu transmission phải trả lỗi đầu vào, không tự dùng giá trị mặc định.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.error.message).to.eql(\"transmission is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - Reject missing make",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: thiếu make phải trả lỗi đầu vào, không tự dùng giá trị mặc định.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"model\": \"Vios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.error.message).to.eql(\"make is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - Reject missing model",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: thiếu model phải trả lỗi đầu vào, không tự dùng giá trị mặc định.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.error.message).to.eql(\"model is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 - Reject null seats",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: seats bằng null phải bị từ chối.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": null,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.error.message).to.eql(\"seats is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 - Reject null transmission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: transmission bằng null phải bị từ chối.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": null,\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.error.message).to.eql(\"transmission is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 - Reject null make",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: make bằng null phải bị từ chối.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": null,\n  \"model\": \"Vios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.error.message).to.eql(\"make is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 - Reject null model",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: model bằng null phải bị từ chối.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.error.message).to.eql(\"model is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 - Reject blank make",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: make chỉ chứa khoảng trắng phải bị từ chối.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \" \\t\\n\",\n  \"model\": \"Vios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.error.message).to.eql(\"make must not be blank.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 - Reject blank model",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: model chỉ chứa khoảng trắng phải bị từ chối.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \" \\t\\n\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "    pm.expect(body.error.message).to.eql(\"model must not be blank.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 - Reject unknown transmission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018: hộp số ngoài MANUAL/AUTOMATIC phải trả lỗi đầu vào.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"UNKNOWN\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Mỗi lần gửi tạo biển số mới, tránh lỗi trùng biển số che lỗi cần kiểm.",
+                  "pm.variables.set(\"requestPlate\", \"T06-P1-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Expected error code and no success data\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 2 - Branch display fields (BR-808)",
+      "description": "Chạy 10 request theo thứ tự; 01 tạo mới, 02 đọc lại, 03–10 thử phá hoại từng trường. Thư mục độc lập Phần 1, có thể chạy lại. Mỗi request có ba pm.test.",
+      "item": [
+        {
+          "name": "01 - Create branch with display fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-808: tạo chi nhánh, giữ nguyên tên/địa chỉ và tự lưu mã cho bước đọc lại.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \"{{p2RequestName}}\",\n  \"address\": \" 123 Task 6 Street \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"p2BranchCode\", \"\");",
+                  "pm.collectionVariables.set(\"p2CreatedBranch\", \"\");",
+                  "pm.variables.set(\"p2RequestName\", \" Task 6 Part 2 \" + pm.variables.replaceIn(\"{{$guid}}\") + \" \");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", function () { pm.response.to.have.status(201); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "const sent = JSON.parse(pm.variables.replaceIn(pm.request.body.raw));",
+                  "pm.test(\"Branch preserves all display fields\", function () {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    pm.expect(body.data).to.have.all.keys(\"code\", \"latitude\", \"longitude\", \"name\", \"address\");",
+                  "    pm.expect(body.data.code).to.match(/^CN-[A-Z0-9]{6}$/);",
+                  "    pm.expect(body.data.name).to.eql(sent.name);",
+                  "    pm.expect(body.data.address).to.eql(sent.address);",
+                  "    pm.expect(body.data.latitude).to.be.closeTo(sent.latitude, 0.000001);",
+                  "    pm.expect(body.data.longitude).to.be.closeTo(sent.longitude, 0.000001);",
+                  "    pm.expect(pm.response.headers.get(\"Location\")).to.eql(\"/api/v1/admin/branches/\" + body.data.code);",
+                  "});",
+                  "if (pm.response.code === 201 && body.success === true && body.data && /^CN-[A-Z0-9]{6}$/.test(body.data.code)) {",
+                  "    pm.collectionVariables.set(\"p2BranchCode\", body.data.code);",
+                  "    pm.collectionVariables.set(\"p2CreatedBranch\", JSON.stringify(body.data));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Read branch display fields",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches/{{p2BranchCode}}",
+            "description": "BR-808: đọc lại độc lập đúng tên và địa chỉ đã lưu."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"p2BranchCode\")) { throw new Error(\"Run request 01 successfully first.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Stored branch matches creation response\", function () {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    pm.expect(body.data).to.deep.eql(JSON.parse(pm.collectionVariables.get(\"p2CreatedBranch\")));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Reject missing name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-808: từ chối name missing với đúng lỗi đầu vào.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"address\": \" 123 Task 6 Street \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p2RequestName\", \" Task 6 Part 2 \" + pm.variables.replaceIn(\"{{$guid}}\") + \" \");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Exact validation error\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.eql(\"name is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Reject missing address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-808: từ chối address missing với đúng lỗi đầu vào.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \"{{p2RequestName}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p2RequestName\", \" Task 6 Part 2 \" + pm.variables.replaceIn(\"{{$guid}}\") + \" \");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Exact validation error\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.eql(\"address is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Reject null name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-808: từ chối name null với đúng lỗi đầu vào.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": null,\n  \"address\": \" 123 Task 6 Street \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p2RequestName\", \" Task 6 Part 2 \" + pm.variables.replaceIn(\"{{$guid}}\") + \" \");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Exact validation error\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.eql(\"name is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Reject null address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-808: từ chối address null với đúng lỗi đầu vào.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \"{{p2RequestName}}\",\n  \"address\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p2RequestName\", \" Task 6 Part 2 \" + pm.variables.replaceIn(\"{{$guid}}\") + \" \");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Exact validation error\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.eql(\"address is required.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Reject empty name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-808: từ chối name empty với đúng lỗi đầu vào.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \"\",\n  \"address\": \" 123 Task 6 Street \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p2RequestName\", \" Task 6 Part 2 \" + pm.variables.replaceIn(\"{{$guid}}\") + \" \");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Exact validation error\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.eql(\"name must not be blank.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Reject empty address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-808: từ chối address empty với đúng lỗi đầu vào.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \"{{p2RequestName}}\",\n  \"address\": \"\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p2RequestName\", \" Task 6 Part 2 \" + pm.variables.replaceIn(\"{{$guid}}\") + \" \");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Exact validation error\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.eql(\"address must not be blank.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Reject blank name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-808: từ chối name blank với đúng lỗi đầu vào.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \" \\t\\n\",\n  \"address\": \" 123 Task 6 Street \"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p2RequestName\", \" Task 6 Part 2 \" + pm.variables.replaceIn(\"{{$guid}}\") + \" \");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Exact validation error\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.eql(\"name must not be blank.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - Reject blank address",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-808: từ chối address blank với đúng lỗi đầu vào.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \"{{p2RequestName}}\",\n  \"address\": \" \\t\\n\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p2RequestName\", \" Task 6 Part 2 \" + pm.variables.replaceIn(\"{{$guid}}\") + \" \");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", function () { pm.response.to.have.status(400); });",
+                  "const body = pm.response.json();",
+                  "pm.test(\"JSON response envelope\", function () {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "});",
+                  "pm.test(\"Exact validation error\", function () {",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.eql(\"address must not be blank.\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 6 - Public vehicle search",
+      "description": "Chạy toàn bộ thư mục theo thứ tự. Tự tạo ba chi nhánh và năm xe; mỗi lượt model/biển số riêng. Không cần chạy Part 1/2 trước. Không tự xóa fixture. Khóa lịch thủ công theo hướng dẫn riêng sau bước kiểm API.",
+      "item": [
+        {
+          "name": "01 - Create Origin branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-003/808: tạo chi nhánh Origin và lưu mã tự động.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.76,\n  \"longitude\": 106.66,\n  \"name\": \"Task 6 Origin {{p6Model}}\",\n  \"address\": \"123 Search Street\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Fixture riêng mỗi lượt, không xóa dữ liệu hoặc dùng lại mã cũ.",
+                  "[\"p6OriginBranch\",\"p6NearBranch\",\"p6FarBranch\",\"p6NearVehicle\",\"p6OriginA\",\"p6OriginB\",\"p6FarVehicle\",\"p6DraftVehicle\",\"p6Cursor\"].forEach(key => pm.collectionVariables.unset(key));",
+                  "pm.collectionVariables.set(\"p6Model\", \"T06-Search-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const start = new Date(); start.setUTCDate(start.getUTCDate() + 2); start.setUTCHours(3, 0, 0, 0);",
+                  "pm.collectionVariables.set(\"p6Start\", start.toISOString());",
+                  "pm.collectionVariables.set(\"p6End\", new Date(start.getTime() + 6 * 3600000).toISOString());",
+                  "pm.collectionVariables.set(\"p6ThreeHourEnd\", new Date(start.getTime() + 3 * 3600000).toISOString());",
+                  "const early = new Date(start); early.setUTCHours(22);",
+                  "pm.collectionVariables.set(\"p6EarlyStart\", early.toISOString());",
+                  "pm.collectionVariables.set(\"p6EarlyEnd\", new Date(early.getTime() + 6 * 3600000).toISOString());",
+                  "const late = new Date(start); late.setUTCMonth(late.getUTCMonth() + 7);",
+                  "pm.collectionVariables.set(\"p6LateStart\", late.toISOString());",
+                  "pm.collectionVariables.set(\"p6LateEnd\", new Date(late.getTime() + 6 * 3600000).toISOString());",
+                  "const expiry = new Date(start); expiry.setUTCFullYear(expiry.getUTCFullYear() + 2);",
+                  "pm.collectionVariables.set(\"p6Expiry\", expiry.toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Branch created\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.code).to.match(/^CN-[A-Z0-9]{6}$/); pm.expect(body.data.latitude).to.eql(10.76); });",
+                  "if (pm.response.code === 201 && body.success) pm.collectionVariables.set(\"p6OriginBranch\", body.data.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Create Near branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-003/808: tạo chi nhánh Near và lưu mã tự động.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.761,\n  \"longitude\": 106.66,\n  \"name\": \"Task 6 Near {{p6Model}}\",\n  \"address\": \"123 Search Street\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Branch created\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.code).to.match(/^CN-[A-Z0-9]{6}$/); pm.expect(body.data.latitude).to.eql(10.761); });",
+                  "if (pm.response.code === 201 && body.success) pm.collectionVariables.set(\"p6NearBranch\", body.data.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Create Far branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-003/808: tạo chi nhánh Far và lưu mã tự động.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 11.76,\n  \"longitude\": 106.66,\n  \"name\": \"Task 6 Far {{p6Model}}\",\n  \"address\": \"123 Search Street\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Branch created\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.code).to.match(/^CN-[A-Z0-9]{6}$/); pm.expect(body.data.latitude).to.eql(11.76); });",
+                  "if (pm.response.code === 201 && body.success) pm.collectionVariables.set(\"p6FarBranch\", body.data.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Create p6NearVehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6NearBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p6Plate\", \"T06-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if (!pm.collectionVariables.get(\"p6NearBranch\")) throw new Error(\"Run branch setup first.\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Draft vehicle\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"DRAFT\"); pm.expect(body.data.model).to.eql(pm.collectionVariables.get(\"p6Model\")); });",
+                  "if (pm.response.code === 201 && body.success) pm.collectionVariables.set(\"p6NearVehicle\", body.data.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - submit-for-approval p6NearVehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p6NearVehicle}}/submit-for-approval",
+            "description": "BR-010/005: đưa xe qua vòng đời duyệt thật."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Vehicle PENDING_APPROVAL\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"PENDING_APPROVAL\"); pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"p6NearVehicle\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - approve p6NearVehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p6NearVehicle}}/approve",
+            "description": "BR-010/005: đưa xe qua vòng đời duyệt thật."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Vehicle ACTIVE\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"ACTIVE\"); pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"p6NearVehicle\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Create p6OriginA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p6Plate\", \"T06-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if (!pm.collectionVariables.get(\"p6OriginBranch\")) throw new Error(\"Run branch setup first.\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Draft vehicle\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"DRAFT\"); pm.expect(body.data.model).to.eql(pm.collectionVariables.get(\"p6Model\")); });",
+                  "if (pm.response.code === 201 && body.success) pm.collectionVariables.set(\"p6OriginA\", body.data.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - submit-for-approval p6OriginA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p6OriginA}}/submit-for-approval",
+            "description": "BR-010/005: đưa xe qua vòng đời duyệt thật."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Vehicle PENDING_APPROVAL\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"PENDING_APPROVAL\"); pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"p6OriginA\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - approve p6OriginA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p6OriginA}}/approve",
+            "description": "BR-010/005: đưa xe qua vòng đời duyệt thật."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Vehicle ACTIVE\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"ACTIVE\"); pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"p6OriginA\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - Create p6OriginB",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p6Plate\", \"T06-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if (!pm.collectionVariables.get(\"p6OriginBranch\")) throw new Error(\"Run branch setup first.\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Draft vehicle\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"DRAFT\"); pm.expect(body.data.model).to.eql(pm.collectionVariables.get(\"p6Model\")); });",
+                  "if (pm.response.code === 201 && body.success) pm.collectionVariables.set(\"p6OriginB\", body.data.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - submit-for-approval p6OriginB",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p6OriginB}}/submit-for-approval",
+            "description": "BR-010/005: đưa xe qua vòng đời duyệt thật."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Vehicle PENDING_APPROVAL\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"PENDING_APPROVAL\"); pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"p6OriginB\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 - approve p6OriginB",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p6OriginB}}/approve",
+            "description": "BR-010/005: đưa xe qua vòng đời duyệt thật."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Vehicle ACTIVE\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"ACTIVE\"); pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"p6OriginB\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 - Create p6FarVehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6FarBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p6Plate\", \"T06-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if (!pm.collectionVariables.get(\"p6FarBranch\")) throw new Error(\"Run branch setup first.\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Draft vehicle\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"DRAFT\"); pm.expect(body.data.model).to.eql(pm.collectionVariables.get(\"p6Model\")); });",
+                  "if (pm.response.code === 201 && body.success) pm.collectionVariables.set(\"p6FarVehicle\", body.data.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 - submit-for-approval p6FarVehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p6FarVehicle}}/submit-for-approval",
+            "description": "BR-010/005: đưa xe qua vòng đời duyệt thật."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Vehicle PENDING_APPROVAL\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"PENDING_APPROVAL\"); pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"p6FarVehicle\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 - approve p6FarVehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{p6FarVehicle}}/approve",
+            "description": "BR-010/005: đưa xe qua vòng đời duyệt thật."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Vehicle ACTIVE\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"ACTIVE\"); pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"p6FarVehicle\")); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 - Create p6DraftVehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"p6Plate\", \"T06-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "if (!pm.collectionVariables.get(\"p6OriginBranch\")) throw new Error(\"Run branch setup first.\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Draft vehicle\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.data.status).to.eql(\"DRAFT\"); pm.expect(body.data.model).to.eql(pm.collectionVariables.get(\"p6Model\")); });",
+                  "if (pm.response.code === 201 && body.success) pm.collectionVariables.set(\"p6DraftVehicle\", body.data.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "17 - Find nearby active vehicles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
+            "description": "BR-010/110/112/125/126: Find nearby active vehicles."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Public page contract\", () => {",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
+                  "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
+                  "  });",
+                  "});",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort().concat(pm.collectionVariables.get(\"p6NearVehicle\"))));",
+                  "pm.test(\"Branch display and meters\", () => { const a = body.data.items[0]; const b = body.data.items[2]; pm.expect(a.branch.code).to.eql(pm.collectionVariables.get(\"p6OriginBranch\")); pm.expect(a.branch.name).to.include(pm.collectionVariables.get(\"p6Model\")); pm.expect(a.branch.address).to.eql(\"123 Search Street\"); pm.expect(a.distanceMeters).to.eql(0); pm.expect(b.distanceMeters).to.be.within(100,120); pm.expect(body.data.nextCursor).to.eql(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "18 - Filter all supported attributes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&seats=5&transmission=AUTOMATIC&fuelType=PETROL&make=%20tOyOtA%20&collateralFree=true",
+            "description": "BR-010/110/112/125/126: Filter all supported attributes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Public page contract\", () => {",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
+                  "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
+                  "  });",
+                  "});",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort().concat(pm.collectionVariables.get(\"p6NearVehicle\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "19 - Restrict radius to 50 meters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&radiusKm=0.05",
+            "description": "BR-010/110/112/125/126: Restrict radius to 50 meters."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Public page contract\", () => {",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
+                  "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
+                  "  });",
+                  "});",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort()));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "20 - Nonmatching seats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&seats=7",
+            "description": "BR-010/110/112/125/126: Nonmatching seats."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Public page contract\", () => {",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
+                  "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
+                  "  });",
+                  "});",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([].map(key => pm.collectionVariables.get(key))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "21 - Require collateral",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&collateralFree=false",
+            "description": "BR-010/110/112/125/126: Require collateral."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Public page contract\", () => {",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
+                  "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
+                  "  });",
+                  "});",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([].map(key => pm.collectionVariables.get(key))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "22 - Hourly search",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=HOURLY&driveMode=SELF_DRIVE&model={{p6Model}}",
+            "description": "BR-010/110/112/125/126: Hourly search."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Public page contract\", () => {",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
+                  "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
+                  "  });",
+                  "});",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort().concat(pm.collectionVariables.get(\"p6NearVehicle\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "23 - Cursor page one",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&limit=1",
+            "description": "BR-010/110/112/125/126: Cursor page one."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset(\"p6Cursor\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Public page contract\", () => {",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
+                  "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
+                  "  });",
+                  "});",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort().slice(0, 1)));",
+                  "pm.test(\"Next cursor exists\", () => pm.expect(body.data.nextCursor).to.be.a(\"string\").and.not.empty);",
+                  "if (pm.response.code === 200 && body.success) pm.collectionVariables.set(\"p6Cursor\", body.data.nextCursor);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "24 - Cursor page two",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&limit=2&cursor={{p6Cursor}}",
+            "description": "BR-010/110/112/125/126: Cursor page two."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"p6Cursor\")) throw new Error(\"Run cursor page one first.\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Public page contract\", () => {",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
+                  "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
+                  "  });",
+                  "});",
+                  "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"p6OriginA\",\"p6OriginB\"].map(key => pm.collectionVariables.get(key)).sort().slice(1).concat(pm.collectionVariables.get(\"p6NearVehicle\"))));",
+                  "pm.test(\"Last page\", () => pm.expect(body.data.nextCursor).to.eql(null));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "25 - Reject radius 31",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&radiusKm=31",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "26 - Reject missing rental start",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "27 - Reject missing rental end",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "28 - Reject three hour rental",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6ThreeHourEnd}}&rentalType=HOURLY&driveMode=SELF_DRIVE&model={{p6Model}}",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"RENTAL_DURATION_TOO_SHORT\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "29 - Reject pickup at 05:00",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6EarlyStart}}&endExclusive={{p6EarlyEnd}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"OUTSIDE_BRANCH_HOURS\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "30 - Reject pickup after seven months",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6LateStart}}&endExclusive={{p6LateEnd}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"BOOKING_WINDOW_VIOLATION\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "31 - Reject driver service",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=WITH_DRIVER&model={{p6Model}}",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"SEARCH_DRIVE_MODE_NOT_SUPPORTED\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "32 - Reject monthly package",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=MONTHLY&driveMode=SELF_DRIVE&model={{p6Model}}",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"SEARCH_RENTAL_TYPE_NOT_SUPPORTED\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "33 - Reject delivery",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&pickupMethod=DELIVERY",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"SEARCH_PICKUP_METHOD_NOT_SUPPORTED\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "34 - Reject price sorting",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&sort=PRICE_ASC",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"SEARCH_SORT_NOT_SUPPORTED\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "35 - Reject rating sorting",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&sort=RATING_DESC",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"SEARCH_SORT_NOT_SUPPORTED\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "36 - Reject page size 101",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&limit=101",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "37 - Reject blank page size",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&limit=",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "38 - Reject six seats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&seats=6",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"VEHICLE_INVALID_SEATS\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "39 - Reject ownership filter",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&ownershipType=COMPANY",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "40 - Reject price filter",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&minPrice=100",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "41 - Reject malformed cursor",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&cursor=broken",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "42 - Reject cursor with changed radius",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&cursor={{p6Cursor}}&radiusKm=5",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "43 - Reject invalid boolean",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&collateralFree=maybe",
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "44 - Reject pickup in thirty minutes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6SoonStart}}&endExclusive={{p6SoonEnd}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
+            "description": "BR-121: đặt trước 30 phút bị từ chối; nếu giờ nhận/trả ngoài 06–23h thì BR-119 được kiểm trước. Test Clock cố định kiểm riêng mã BOOKING_WINDOW_VIOLATION."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const start = new Date(Date.now() + 30 * 60000); const end = new Date(start.getTime() + 4 * 3600000);",
+                  "pm.variables.set(\"p6SoonStart\", start.toISOString()); pm.variables.set(\"p6SoonEnd\", end.toISOString());",
+                  "// Nếu nhận/trả nằm ngoài giờ chi nhánh, BR-119 được kiểm trước BR-121.",
+                  "const inHours = date => { const shifted = new Date(date.getTime() + 7 * 3600000); const seconds = shifted.getUTCHours()*3600 + shifted.getUTCMinutes()*60 + shifted.getUTCSeconds() + shifted.getUTCMilliseconds()/1000; return seconds >= 6*3600 && seconds <= 23*3600; };",
+                  "pm.variables.set(\"p6SoonError\", inHours(start) && inHours(end) ? \"BOOKING_WINDOW_VIOLATION\" : \"OUTSIDE_BRANCH_HOURS\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
+                  "pm.test(\"Exact time-dependent error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(pm.variables.get(\"p6SoonError\")); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 6 - Manual hourly buffer",
+      "description": "BR-104/109/113/116: chỉ chạy sau khi COMMIT cả ba file manual_search_rental_fixture.sql, manual_search_compliance_fixture.sql và manual_search_hourly_fixture.sql trong SQL Console IntelliJ. GET chỉ đọc fixture ngày 09/10/2026, không phụ thuộc biến p6*. Chạy lại được khi fixture còn nguyên và ngày còn hợp lệ theo BR-121. Không chạy cả collection. Với bộ fixture khác, cập nhật đồng bộ SQL và URL/assertion.",
+      "item": [
+        {
+          "name": "01 - Hourly buffer blocks at 10",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T03:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=HOURLY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
+            "description": "BR-104/116: tìm 10:00–16:00 giờ Việt Nam; cả hai khóa thuê còn đệm, xe thứ ba bị khóa giấy tờ, nên danh sách rỗng."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Public search envelope\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "  pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(body.data.nextCursor).to.eql(null);",
+                  "});",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([]));",
+                  "pm.test(\"Compliance-blocked vehicle stays absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-09Z3NS\"));",
+                  "pm.test(\"Public fields and fixture identity\", () => {",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.collateralFree).to.eql(true);",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Hourly buffer ends at 11",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T04:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=HOURLY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
+            "description": "BR-109/116, ADR-0005: tìm 11:00–16:00; XE-TTJ8LW hết đệm một giờ, XE-B76A44 còn đệm hai giờ tới 12:00."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Public search envelope\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "  pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(body.data.nextCursor).to.eql(null);",
+                  "});",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-TTJ8LW\"]));",
+                  "pm.test(\"Compliance-blocked vehicle stays absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-09Z3NS\"));",
+                  "pm.test(\"Public fields and fixture identity\", () => {",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.collateralFree).to.eql(true);",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Both stored rental buffers end at 12",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T05:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=HOURLY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
+            "description": "BR-109/113/116: tìm 12:00–16:00 đủ bốn giờ; hai khóa thuê đã hết đệm, khóa giấy tờ vẫn chặn."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Public search envelope\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "  pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(body.data.nextCursor).to.eql(null);",
+                  "});",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-B76A44\",\"XE-TTJ8LW\"]));",
+                  "pm.test(\"Compliance-blocked vehicle stays absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-09Z3NS\"));",
+                  "pm.test(\"Public fields and fixture identity\", () => {",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.collateralFree).to.eql(true);",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 6 - Manual compliance hold",
+      "description": "BR-015: chạy sau khi COMMIT manual_search_rental_fixture.sql và manual_search_compliance_fixture.sql trong SQL Console IntelliJ. Nhóm GET chỉ đọc bộ fixture local đã xác nhận, chạy lại được khi fixture còn nguyên và ngày thuê còn hợp lệ theo BR-121. Không chạy toàn bộ collection. Không phụ thuộc biến p6*. Với bộ fixture khác, cập nhật đồng bộ SQL và URL/assertion.",
+      "item": [
+        {
+          "name": "01 - Compliance blocks after daily buffer ends",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T05:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
+            "description": "BR-015/109: tìm 12:00–16:00 ngày 09/10/2026 (giờ Việt Nam); XE-B76A44 hết đệm xuất hiện lại, XE-09Z3NS vẫn bị khóa giấy tờ."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Public search envelope\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "  pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(body.data.nextCursor).to.eql(null);",
+                  "});",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-B76A44\", \"XE-TTJ8LW\"]));",
+                  "pm.test(\"Compliance-blocked vehicle is absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-09Z3NS\"));",
+                  "pm.test(\"Public fields and fixture identity\", () => {",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.collateralFree).to.eql(true);",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Compliance still blocks next day",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-10T05:00:00.000Z&endExclusive=2026-10-10T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
+            "description": "BR-015: tìm 12:00–16:00 ngày 10/10/2026 (giờ Việt Nam); khóa giấy tờ không có cận trên vẫn loại XE-09Z3NS."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Public search envelope\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "  pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(body.data.nextCursor).to.eql(null);",
+                  "});",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-B76A44\", \"XE-TTJ8LW\"]));",
+                  "pm.test(\"Compliance-blocked vehicle is absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-09Z3NS\"));",
+                  "pm.test(\"Public fields and fixture identity\", () => {",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.collateralFree).to.eql(true);",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 6 - Manual rental and daily buffer",
+      "description": "Chỉ chạy sau khi Tech Owner đã chạy và COMMIT src/test/resources/sql/availability/manual_search_rental_fixture.sql trong SQL Console IntelliJ. Ba GET chỉ đọc fixture đã xác nhận ngày 09/10/2026, không tạo dữ liệu và không đè biến Runner. Chạy lại được khi fixture vẫn nguyên trạng và ngày thuê còn hợp lệ theo BR-121. Không chạy cùng nhóm 44 request tạo dữ liệu. Khi dùng bộ fixture khác, cập nhật đồng bộ SQL và URL/assertion của nhóm này.",
+      "item": [
+        {
+          "name": "01 - Rental overlap at 10",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T03:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
+            "description": "BR-104: tìm 10:00–16:00 ngày 09/10/2026 (giờ Việt Nam); XE-B76A44 đang có khóa KL-T6M001 nên không xuất hiện. Chạy sau manual_search_rental_fixture.sql và COMMIT. Request chỉ đọc, dùng fixture đã xác nhận; không phụ thuộc biến p6* của Runner."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Public search envelope\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "  pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(body.data.nextCursor).to.eql(null);",
+                  "});",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-09Z3NS\",\"XE-TTJ8LW\"]));",
+                  "pm.test(\"Public fields and fixture identity\", () => {",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.collateralFree).to.eql(true);",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Daily buffer blocks at 11",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T04:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
+            "description": "BR-109: chuyến mẫu trả lúc 10:00, đệm tới 12:00; tìm từ 11:00 vẫn không thấy XE-B76A44. Chạy sau manual_search_rental_fixture.sql và COMMIT. Request chỉ đọc, dùng fixture đã xác nhận; không phụ thuộc biến p6* của Runner."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Public search envelope\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "  pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(body.data.nextCursor).to.eql(null);",
+                  "});",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-09Z3NS\",\"XE-TTJ8LW\"]));",
+                  "pm.test(\"Public fields and fixture identity\", () => {",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.collateralFree).to.eql(true);",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Daily buffer ends at 12",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T05:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
+            "description": "BR-109, ADR-0005: tìm từ đúng cận cuối 12:00 thấy lại XE-B76A44; khoảng [) không chồng khi chỉ chạm biên. Chạy sau manual_search_rental_fixture.sql và COMMIT. Request chỉ đọc, dùng fixture đã xác nhận; không phụ thuộc biến p6* của Runner."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Public search envelope\", () => {",
+                  "  pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");",
+                  "  pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "  pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null);",
+                  "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
+                  "  pm.expect(body.data.nextCursor).to.eql(null);",
+                  "});",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-09Z3NS\",\"XE-B76A44\",\"XE-TTJ8LW\"]));",
+                  "pm.test(\"Public fields and fixture identity\", () => {",
+                  "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
+                  "  body.data.items.forEach(item => {",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.collateralFree).to.eql(true);",
+                  "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
+                  "  });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

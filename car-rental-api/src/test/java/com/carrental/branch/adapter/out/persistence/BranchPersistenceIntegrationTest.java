@@ -61,7 +61,7 @@ class BranchPersistenceIntegrationTest {
     ) {
         Branch branch = new Branch(
                 "CN-READ01",
-                new BranchLocation(latitude, longitude)
+                new BranchLocation(latitude, longitude), "Test Branch", "123 Test Street"
         );
 
         assertTrue(writeBranchPort.insert(branch));
@@ -70,6 +70,8 @@ class BranchPersistenceIntegrationTest {
 
         assertTrue(detail.id() > 0);
         assertEquals(branch.code(), detail.code());
+        assertEquals(branch.name(), detail.name());
+        assertEquals(branch.address(), detail.address());
         assertEquals(latitude, detail.latitude());
         assertEquals(longitude, detail.longitude());
     }
@@ -95,7 +97,7 @@ class BranchPersistenceIntegrationTest {
     void rejectsDuplicateCodeWithoutChangingExistingBranchOrAbortingTransaction() {
         Branch original = new Branch(
                 "CN-DUP001",
-                new BranchLocation(10.762622, 106.660172)
+                new BranchLocation(10.762622, 106.660172), "Test Branch", "123 Test Street"
         );
 
         assertTrue(writeBranchPort.insert(original));
@@ -105,7 +107,7 @@ class BranchPersistenceIntegrationTest {
 
         Branch conflicting = new Branch(
                 original.code(),
-                new BranchLocation(21.028511, 105.804817)
+                new BranchLocation(21.028511, 105.804817), "Other Branch", "456 Other Street"
         );
 
         assertFalse(writeBranchPort.insert(conflicting));
@@ -117,7 +119,7 @@ class BranchPersistenceIntegrationTest {
 
         Branch another = new Branch(
                 "CN-NEXT01",
-                conflicting.location()
+                conflicting.location(), "Test Branch", "123 Test Street"
         );
 
         assertTrue(writeBranchPort.insert(another));

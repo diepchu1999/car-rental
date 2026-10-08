@@ -11,7 +11,11 @@ INSERT INTO vehicle.vehicle (
     branch_id,
     status,
     inspection_expires_on,
-    liability_insurance_expires_on
+    liability_insurance_expires_on,
+    seats,
+    transmission,
+    make,
+    model
 )
 VALUES (
            :code,
@@ -21,6 +25,10 @@ VALUES (
            :branchId,
            :status,
            :inspectionExpiresOn,
-           :liabilityInsuranceExpiresOn
+           :liabilityInsuranceExpiresOn,
+           :seats,
+           :transmission,
+           :make,
+           :model
        )
 ON CONFLICT (code) DO NOTHING;

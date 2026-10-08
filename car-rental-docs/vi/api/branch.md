@@ -3,6 +3,8 @@
 ## Phạm vi
 
 Task 4 cung cấp chức năng tạo và đọc danh tính, vị trí chi nhánh.
+Task 6 Phần 2 bổ sung tên và địa chỉ bắt buộc theo BR-808 ngay trong v1,
+theo ngoại lệ thay đổi trước phát hành của api-guideline.
 
 - Vị trí chi nhánh phục vụ BR-003: xe công ty sử dụng vị trí chi nhánh khi tìm kiếm.
 - Mã chi nhánh theo database-guideline mục 2: `CN-` và sáu ký tự thuộc `A-Z`, `0-9`.
@@ -37,6 +39,8 @@ Header:
 ```http
 Content-Type: application/json
 Accept: application/json
+X-Client-Platform: web
+X-Client-Version: 0.0.1
 ```
 
 Body:
@@ -44,16 +48,22 @@ Body:
 ```json
 {
   "latitude": 10.762622,
-  "longitude": 106.660172
+  "longitude": 106.660172,
+  "name": "Central Branch",
+  "address": "123 Main Street"
 }
 ```
 
 | Trường | Kiểu JSON | Bắt buộc | Điều kiện |
 |---|---|---|---|
+| `name` | string | Có | Không null, rỗng hoặc chỉ chứa khoảng trắng |
+| `address` | string | Có | Không null, rỗng hoặc chỉ chứa khoảng trắng |
 | `latitude` | number | Có | Hữu hạn, từ -90 đến 90, bao gồm hai biên |
 | `longitude` | number | Có | Hữu hạn, từ -180 đến 180, bao gồm hai biên |
 
 - Không chấp nhận thiếu hoặc `null` ở một trong hai tọa độ.
+- Tên và địa chỉ được giữ nguyên cách viết, không tự cắt khoảng trắng hay đổi kiểu chữ.
+- Không áp độ dài tối đa hoặc tính duy nhất cho tên/địa chỉ khi BR-808 chưa quy định.
 - Tọa độ bằng `0` hợp lệ.
 - Không tự làm tròn hoặc thay tọa độ thiếu bằng `0`.
 - `code`, `id` và `managerId` không thuộc hợp đồng request.
@@ -81,7 +91,9 @@ Body mẫu:
   "data": {
     "code": "CN-3TR7WK",
     "latitude": 10.762622,
-    "longitude": 106.660172
+    "longitude": 106.660172,
+    "name": "Central Branch",
+    "address": "123 Main Street"
   },
   "error": null
 }
@@ -96,7 +108,9 @@ Request:
 
 ```json
 {
-  "longitude": 106.660172
+  "longitude": 106.660172,
+  "name": "Central Branch",
+  "address": "123 Main Street"
 }
 ```
 
@@ -153,13 +167,15 @@ HTTP status: `200 OK`.
   "data": {
     "code": "CN-3TR7WK",
     "latitude": 10.762622,
-    "longitude": 106.660172
+    "longitude": 106.660172,
+    "name": "Central Branch",
+    "address": "123 Main Street"
   },
   "error": null
 }
 ```
 
-Response chỉ có mã nghiệp vụ và tọa độ trong `data`.
+Response có `code`, `latitude`, `longitude`, `name`, `address` trong `data`.
 Không công khai trường `id` của application view.
 
 ### Response không tìm thấy
@@ -181,7 +197,7 @@ HTTP status: `404 Not Found`.
 
 | Endpoint | HTTP | error.code | Trường hợp |
 |---|---|---|---|
-| POST | 400 | `INVALID_REQUEST` | JSON không đọc được, thiếu hoặc null tọa độ, tọa độ không hữu hạn hoặc ngoài giới hạn |
+| POST | 400 | `INVALID_REQUEST` | JSON không đọc được, thiếu hoặc null tọa độ, tọa độ không hữu hạn hoặc ngoài giới hạn; thiếu/null/rỗng/trắng tên hoặc địa chỉ |
 | POST | 415 | `INVALID_REQUEST` | Content-Type không được endpoint hỗ trợ |
 | GET | 404 | `BRANCH_NOT_FOUND` | Không tìm thấy chi nhánh theo mã |
 | POST, GET | 500 | `INTERNAL_ERROR` | Lỗi hệ thống ngoài dự kiến |
@@ -201,3 +217,25 @@ Lỗi hệ thống sử dụng thông báo công khai:
 
 Không đưa stack trace, câu SQL hoặc thông tin kết nối vào response.
 Phía gọi xử lý dựa trên `error.code`, không dựa trên nội dung `error.message`.
+
+## Lỗi tên và địa chỉ — BR-808
+
+Thiếu hoặc null trả `400 / INVALID_REQUEST`, với thông báo
+`name is required.` hoặc `address is required.`.
+Chuỗi rỗng hoặc trắng trả cùng mã lỗi, với thông báo
+`name must not be blank.` hoặc `address must not be blank.`.
+
+## Collection Postman — Task 6, Phần 2
+
+- Import [collection Task 6](../../../postman/task-06-search.postman_collection.json)
+  và [environment local](../../../postman/local.postman_environment.json).
+- Chọn environment `Car Rental - Local`; backend phải đã áp dụng V007.
+- Chạy thư mục `Part 2 - Branch display fields (BR-808)` theo thứ tự 01–10.
+- 01 tạo chi nhánh với tên ngẫu nhiên và tự lưu mã; 02 đọc lại đầy đủ tên/địa chỉ.
+- 03–10 cố tình thiếu, null, rỗng hoặc trắng từng trường; phải nhận
+  `400 / INVALID_REQUEST` với đúng thông báo. Mỗi request có ba `pm.test`.
+- Có thể chạy lại toàn bộ thư mục nhiều lần. Mỗi lượt tạo thêm một chi nhánh;
+  không tự xóa dữ liệu và không cần copy mã giữa các request.
+- Trước lần áp dụng V007, kiểm tra dữ liệu mẫu local: migration không điền tên hay
+  địa chỉ phỏng đoán cho bản ghi cũ. Nếu còn chi nhánh, phải xử lý dữ liệu đã được
+  Tech Owner xác nhận trước khi khởi động app; không xóa volume một cách mặc định.

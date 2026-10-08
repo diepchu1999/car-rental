@@ -47,6 +47,8 @@ public final class Vehicle {
 
     private final VehicleDocuments documents;
 
+    private final VehicleSpecifications specifications;
+
     /**
      * Khởi tạo dữ liệu xe với các kiểm tra cấu trúc dùng chung.
      *
@@ -66,6 +68,7 @@ public final class Vehicle {
      * @param branchId định danh chi nhánh, nếu có phải lớn hơn không
      * @param status trạng thái được cung cấp bởi đường khởi tạo tương ứng
      * @param documents thông tin hạn giấy tờ, không được null
+     * @param specifications thuộc tính xe bắt buộc theo BR-018
      * @throws DomainException nếu dữ liệu không đáp ứng cấu trúc yêu cầu
      */
     private Vehicle(
@@ -75,7 +78,8 @@ public final class Vehicle {
             FuelType fuelType,
             Long branchId,
             VehicleStatus status,
-            VehicleDocuments documents
+            VehicleDocuments documents,
+            VehicleSpecifications specifications
     ) {
         this.code = Validations.requiredText(code, "code");
 
@@ -107,6 +111,7 @@ public final class Vehicle {
         this.branchId = branchId;
         this.status = Validations.required(status, "status");
         this.documents = Validations.required(documents, "documents");
+        this.specifications = Validations.required(specifications, "specifications");
     }
 
     /**
@@ -125,6 +130,7 @@ public final class Vehicle {
      * @param fuelType loại nhiên liệu
      * @param branchId định danh chi nhánh liên kết
      * @param documents thông tin giấy tờ, có thể chứa ngày chưa được cung cấp
+     * @param specifications thuộc tính xe bắt buộc theo BR-018
      * @return xe mới ở trạng thái DRAFT
      * @throws DomainException nếu dữ liệu không hợp lệ
      */
@@ -134,7 +140,8 @@ public final class Vehicle {
             OwnershipType ownershipType,
             FuelType fuelType,
             Long branchId,
-            VehicleDocuments documents
+            VehicleDocuments documents,
+            VehicleSpecifications specifications
     ) {
         return new Vehicle(
                 code,
@@ -143,7 +150,8 @@ public final class Vehicle {
                 fuelType,
                 branchId,
                 VehicleStatus.DRAFT,
-                documents
+                documents,
+                specifications
         );
     }
 
@@ -163,6 +171,7 @@ public final class Vehicle {
      * @param branchId định danh chi nhánh đã lưu, có thể null
      * @param status trạng thái đã lưu
      * @param documents thông tin giấy tờ đã lưu
+     * @param specifications thuộc tính xe đã lưu theo BR-018
      * @return aggregate biểu diễn dữ liệu đã lưu
      * @throws DomainException nếu dữ liệu không đáp ứng cấu trúc yêu cầu
      */
@@ -173,7 +182,8 @@ public final class Vehicle {
             FuelType fuelType,
             Long branchId,
             VehicleStatus status,
-            VehicleDocuments documents
+            VehicleDocuments documents,
+            VehicleSpecifications specifications
     ) {
         return new Vehicle(
                 code,
@@ -182,7 +192,8 @@ public final class Vehicle {
                 fuelType,
                 branchId,
                 status,
-                documents
+                documents,
+                specifications
         );
     }
 
@@ -256,7 +267,8 @@ public final class Vehicle {
                 fuelType,
                 branchId,
                 newStatus,
-                documents
+                documents,
+                specifications
         );
     }
 
@@ -321,5 +333,10 @@ public final class Vehicle {
      */
     public VehicleDocuments documents() {
         return documents;
+    }
+
+    /** Trả thuộc tính BR-018, giữ nguyên qua mọi bước chuyển trạng thái. */
+    public VehicleSpecifications specifications() {
+        return specifications;
     }
 }

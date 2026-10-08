@@ -192,7 +192,7 @@ class BranchPostgisIntegrationTest {
     ) {
         Branch branch = new Branch(
                 code,
-                new BranchLocation(latitude, longitude)
+                new BranchLocation(latitude, longitude), "Test Branch", "123 Test Street"
         );
 
         assertTrue(

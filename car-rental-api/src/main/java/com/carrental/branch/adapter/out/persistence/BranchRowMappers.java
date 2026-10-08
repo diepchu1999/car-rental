@@ -1,6 +1,7 @@
 package com.carrental.branch.adapter.out.persistence;
 
 import com.carrental.branch.application.view.BranchDetail;
+import com.carrental.branch.application.view.BranchDistanceSummary;
 import org.springframework.jdbc.core.RowMapper;
 
 /**
@@ -11,11 +12,18 @@ import org.springframework.jdbc.core.RowMapper;
  */
 final class BranchRowMappers {
 
+    /** Giữ nguyên khoảng cách PostGIS theo mét và đầy đủ tên/địa chỉ BR-808. */
+    static final RowMapper<BranchDistanceSummary> DISTANCE =
+            (resultSet, rowNumber) -> new BranchDistanceSummary(
+                    resultSet.getLong("id"), resultSet.getString("code"),
+                    resultSet.getString("name"), resultSet.getString("address"),
+                    resultSet.getDouble("distance_meters"));
+
     /**
      * Ánh xạ dòng hiện tại sang thông tin chi tiết chi nhánh.
      *
      * <p>Các tên cột phải khớp với kết quả truy vấn:
-     * id, code, latitude và longitude.
+     * id, code, latitude, longitude, name và address.
      *
      * <p>Spring quản lý việc duyệt và đóng kết quả truy vấn.
      * Bộ ánh xạ không tự chuyển dòng hoặc đóng ResultSet.
@@ -25,7 +33,9 @@ final class BranchRowMappers {
                     resultSet.getLong("id"),
                     resultSet.getString("code"),
                     resultSet.getDouble("latitude"),
-                    resultSet.getDouble("longitude")
+                    resultSet.getDouble("longitude"),
+                    resultSet.getString("name"),
+                    resultSet.getString("address")
             );
 
     /**

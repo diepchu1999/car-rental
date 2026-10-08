@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -148,7 +149,9 @@ class VehicleReadAdapterIntegrationTest {
                 branchId,
                 status,
                 inspectionExpiresOn,
-                liabilityInsuranceExpiresOn
+                liabilityInsuranceExpiresOn,
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
         );
 
         assertEquals(expected, result.orElseThrow());
@@ -271,6 +274,7 @@ class VehicleReadAdapterIntegrationTest {
         assertEquals(fuelType, actual.fuelType());
         assertEquals(branchId, actual.branchId());
         assertEquals(status, actual.status());
+        assertEquals(SPECIFICATIONS, actual.specifications());
         assertNotNull(actual.documents());
         assertEquals(
                 inspectionExpiresOn,
@@ -428,6 +432,10 @@ class VehicleReadAdapterIntegrationTest {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue("code", code, Types.VARCHAR)
                 .addValue("plateNumber", plateNumber, Types.VARCHAR)
+                .addValue("seats", 5, Types.INTEGER)
+                .addValue("transmission", "AUTOMATIC", Types.VARCHAR)
+                .addValue("make", "Toyota", Types.VARCHAR)
+                .addValue("model", "Vios", Types.VARCHAR)
                 .addValue(
                         "ownershipType",
                         ownershipType.name(),

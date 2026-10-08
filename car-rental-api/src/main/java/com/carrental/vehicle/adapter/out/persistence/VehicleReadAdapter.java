@@ -3,6 +3,8 @@ package com.carrental.vehicle.adapter.out.persistence;
 import com.carrental.shared.sql.SqlLoader;
 import com.carrental.vehicle.application.port.out.ReadVehiclePort;
 import com.carrental.vehicle.application.view.VehicleDetail;
+import com.carrental.vehicle.application.view.VehicleSearchCandidate;
+import com.carrental.vehicle.application.query.ListSearchVehiclesQuery;
 import com.carrental.vehicle.domain.Vehicle;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.support.DataAccessUtils;
@@ -11,6 +13,7 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.sql.Types;
 import java.util.Optional;
 
 /**
@@ -28,6 +31,7 @@ class VehicleReadAdapter implements ReadVehiclePort {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final String findByCodeSql;
+    private final String findSearchCandidatesSql;
 
     /**
      * Khởi tạo adapter và tải câu truy vấn một lần.
@@ -45,9 +49,30 @@ class VehicleReadAdapter implements ReadVehiclePort {
             SqlLoader sqlLoader
     ) {
         this.jdbcTemplate = jdbcTemplate;
+        this.findSearchCandidatesSql = sqlLoader.load(VehicleSqlPaths.FIND_SEARCH_CANDIDATES);
         this.findByCodeSql = sqlLoader.load(
                 VehicleSqlPaths.FIND_BY_CODE
         );
+    }
+
+    /**
+     * Đọc ứng viên bằng một câu SQL tham số hóa, không truy vấn từng xe.
+     * Kiểu JDBC tường minh cho phép PostgreSQL xử lý bộ lọc null mà không phải đoán kiểu.
+     */
+    @Override
+    public List<VehicleSearchCandidate> findSearchCandidates(ListSearchVehiclesQuery query) {
+        if (query.branchIds().isEmpty()) {
+            return List.of();
+        }
+        var parameters = new MapSqlParameterSource()
+                .addValue("branch_ids", query.branchIds())
+                .addValue("seats", query.seats(), Types.INTEGER)
+                .addValue("transmission", query.transmission() == null ? null : query.transmission().name(), Types.VARCHAR)
+                .addValue("fuel_type", query.fuelType() == null ? null : query.fuelType().name(), Types.VARCHAR)
+                .addValue("make", query.make(), Types.VARCHAR)
+                .addValue("model", query.model(), Types.VARCHAR);
+        return List.copyOf(jdbcTemplate.query(findSearchCandidatesSql, parameters,
+                VehicleRowMappers.SEARCH_CANDIDATE));
     }
 
     /**

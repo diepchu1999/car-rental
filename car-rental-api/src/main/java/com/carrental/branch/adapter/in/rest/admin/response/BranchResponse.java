@@ -16,11 +16,15 @@ import java.util.Objects;
  * @param code mã nghiệp vụ của chi nhánh
  * @param latitude vĩ độ tính bằng độ
  * @param longitude kinh độ tính bằng độ
+ * @param name tên chi nhánh theo BR-808
+ * @param address địa chỉ chi nhánh theo BR-808
  */
 public record BranchResponse(
         String code,
         double latitude,
-        double longitude
+        double longitude,
+        String name,
+        String address
 ) {
 
     /**
@@ -45,7 +49,9 @@ public record BranchResponse(
         return new BranchResponse(
                 view.code(),
                 view.latitude(),
-                view.longitude()
+                view.longitude(),
+                view.name(),
+                view.address()
         );
     }
 }

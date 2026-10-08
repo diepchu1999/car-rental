@@ -1,96 +1,67 @@
 package com.carrental.branch.application.service;
 
-import com.carrental.branch.api.BranchDirectory;
-import com.carrental.branch.api.BranchRef;
+import com.carrental.branch.application.port.in.FindBranchUseCase;
+import com.carrental.branch.application.port.in.FindBranchByIdUseCase;
+import com.carrental.branch.application.query.FindBranchByIdQuery;
 import com.carrental.branch.application.port.in.GetBranchUseCase;
+import com.carrental.branch.application.port.in.ListNearbyBranchesUseCase;
 import com.carrental.branch.application.port.out.ReadBranchPort;
 import com.carrental.branch.application.query.GetBranchQuery;
+import com.carrental.branch.application.query.ListNearbyBranchesQuery;
 import com.carrental.branch.application.view.BranchDetail;
+import com.carrental.branch.application.view.BranchDistanceSummary;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
+import com.carrental.shared.validation.Validations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import java.util.List;
 import java.util.Optional;
 
 /**
- * Điều phối việc đọc thông tin chi nhánh theo mã nghiệp vụ.
- *
- * <p>Thông tin chi nhánh phục vụ quan hệ xe công ty với chi nhánh
- * và vị trí của xe theo BR-003.
- *
- * <p>Cổng GetBranchUseCase trả chi tiết cho luồng đọc trong module.
- * Cổng BranchDirectory chỉ cung cấp định danh tối thiểu
- * cho các module khác.
- *
- * <p>Service không thay đổi dữ liệu và không sinh mã mới.
- * Mỗi cổng giữ cách xử lý trường hợp không tìm thấy
- * theo hợp đồng riêng của nó.
+ * Điều phối tra cứu chi nhánh theo mã hoặc bán kính (BR-003, BR-808).
+ * Service trả read model nội bộ; adapter/in/internal ánh xạ hợp đồng cross-module.
+ * Không ghi dữ liệu, không tính khoảng cách hoặc đọc dữ liệu module vehicle.
  */
 @Service
-class BranchQueryService implements GetBranchUseCase, BranchDirectory {
-
+class BranchQueryService implements GetBranchUseCase, FindBranchUseCase, FindBranchByIdUseCase, ListNearbyBranchesUseCase {
     private final ReadBranchPort readBranchPort;
 
-    /**
-     * Nhận cổng đọc chi nhánh do Spring cung cấp.
-     *
-     * @param readBranchPort cổng tra cứu chi nhánh theo mã nghiệp vụ
-     */
+    /** Nhận một cổng đọc gộp cho resource chi nhánh theo module-architecture §3. */
     BranchQueryService(ReadBranchPort readBranchPort) {
         this.readBranchPort = readBranchPort;
     }
 
-    /**
-     * Trả thông tin chi nhánh ứng với mã trong query.
-     *
-     * <p>Giữ nguyên mã đầu vào đã được query kiểm tra,
-     * không cắt khoảng trắng hoặc thay đổi kiểu chữ.
-     *
-     * <p>Chỉ kết quả rỗng mới được chuyển thành lỗi không tìm thấy.
-     * Lỗi truy cập dữ liệu được truyền ra ngoài nguyên trạng.
-     *
-     * @param query yêu cầu tra cứu đã được kiểm tra, không được null
-     * @return thông tin chi tiết của chi nhánh tìm được
-     * @throws DomainException nếu không tìm thấy chi nhánh,
-     *                        với mã lỗi BRANCH_NOT_FOUND
-     */
+    /** Đọc bắt buộc cho API admin; giữ nguyên BRANCH_NOT_FOUND khi không có chi nhánh. */
     @Override
     @Transactional(readOnly = true)
     public BranchDetail get(GetBranchQuery query) {
+        Validations.required(query, "query");
         return readBranchPort.findByCode(query.code())
-                .orElseThrow(() -> DomainException.notFound(
-                        ErrorCode.BRANCH_NOT_FOUND
-                ));
+                .orElseThrow(() -> DomainException.notFound(ErrorCode.BRANCH_NOT_FOUND));
     }
 
-    /**
-     * Tra cứu định danh chi nhánh để cung cấp cho module khác.
-     *
-     * <p>Tái dùng query để kiểm tra mã đầu vào khác null và không trắng.
-     * Mã được giữ nguyên, không tự cắt khoảng trắng hoặc đổi kiểu chữ.
-     *
-     * <p>Chỉ chuyển id và code sang hợp đồng công khai BranchRef,
-     * không đưa application view của branch qua ranh giới module.
-     *
-     * <p>Không tìm thấy trả Optional rỗng để module gọi quyết định
-     * cách xử lý. Lỗi truy cập dữ liệu được truyền ra ngoài nguyên trạng.
-     *
-     * @param code mã nghiệp vụ của chi nhánh cần tìm
-     * @return định danh chi nhánh nếu tìm thấy; Optional rỗng nếu không có;
-     *         không bao giờ trả null
-     * @throws DomainException nếu mã là null hoặc trắng,
-     *                        với mã lỗi INVALID_REQUEST
-     */
+    /** Đọc tùy chọn cho cổng cross-module: không tìm thấy trả rỗng, lỗi lưu trữ truyền nguyên. */
     @Override
     @Transactional(readOnly = true)
-    public Optional<BranchRef> findByCode(String code) {
-        GetBranchQuery query = GetBranchQuery.from(code);
+    public Optional<BranchDetail> find(GetBranchQuery query) {
+        Validations.required(query, "query");
+        return readBranchPort.findByCode(query.code());
+    }
 
-        return readBranchPort.findByCode(query.code())
-                .map(view -> new BranchRef(
-                        view.id(),
-                        view.code()
-                ));
+    /** Tra tham chiếu nội bộ trong transaction chỉ đọc theo ADR-0008; không tự đổi thành lỗi 404. */
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<BranchDetail> findById(FindBranchByIdQuery query) {
+        Validations.required(query, "query");
+        return readBranchPort.findById(query.id());
+    }
+
+    /** Trả toàn bộ chi nhánh trong bán kính bằng một lượt đọc, chưa phân trang tìm xe. */
+    @Override
+    @Transactional(readOnly = true)
+    public List<BranchDistanceSummary> list(ListNearbyBranchesQuery query) {
+        Validations.required(query, "query");
+        return List.copyOf(readBranchPort.findWithinRadius(query));
     }
 }

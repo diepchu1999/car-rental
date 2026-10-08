@@ -38,7 +38,7 @@ class BranchTest {
             "CN-ZZZZZZ"
     })
     void preservesValidCodeAndLocation(String code) {
-        Branch branch = new Branch(code, VALID_LOCATION);
+        Branch branch = new Branch(code, VALID_LOCATION, "Test Branch", "123 Test Street");
 
         assertEquals(code, branch.code());
         assertSame(VALID_LOCATION, branch.location());
@@ -51,7 +51,7 @@ class BranchTest {
     @Test
     void rejectsMissingCode() {
         assertInvalidInput(
-                () -> new Branch(null, VALID_LOCATION),
+                () -> new Branch(null, VALID_LOCATION, "Test Branch", "123 Test Street"),
                 "code is required."
         );
     }
@@ -67,7 +67,7 @@ class BranchTest {
     @ValueSource(strings = {" ", "\t\n", "\u2003"})
     void rejectsBlankCodes(String code) {
         assertInvalidInput(
-                () -> new Branch(code, VALID_LOCATION),
+                () -> new Branch(code, VALID_LOCATION, "Test Branch", "123 Test Street"),
                 "code must not be blank."
         );
     }
@@ -96,7 +96,7 @@ class BranchTest {
     })
     void rejectsMalformedCodes(String code) {
         assertInvalidInput(
-                () -> new Branch(code, VALID_LOCATION),
+                () -> new Branch(code, VALID_LOCATION, "Test Branch", "123 Test Street"),
                 "code must contain CN- followed by six uppercase ASCII letters or digits."
         );
     }
@@ -109,7 +109,7 @@ class BranchTest {
     @Test
     void rejectsMissingLocation() {
         assertInvalidInput(
-                () -> new Branch("CN-ABC123", null),
+                () -> new Branch("CN-ABC123", null, "Test Branch", "123 Test Street"),
                 "location is required."
         );
     }

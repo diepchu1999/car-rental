@@ -1,12 +1,13 @@
 # API xe — admin
 
-## Phạm vi Task 4
+## Phạm vi Task 4, Task 6 và Task 6b
 
 - BR-001: lưu loại sở hữu, bất biến sau khi tạo; API GĐ1 chỉ tạo `COMPANY`.
 - BR-003: tra cứu chi nhánh đã tồn tại qua `branch.api.BranchDirectory` trước khi tạo xe.
 - BR-005: lưu ngày hết hạn; kiểm có đủ và còn hạn tại bước duyệt.
 - BR-010 và status-flow §4: `DRAFT → PENDING_APPROVAL → ACTIVE`.
 - BR-410: `PETROL`, `DIESEL`, `ELECTRIC`, `HYBRID`.
+- BR-018: bắt buộc số chỗ, hộp số, hãng và dòng xe ngay khi tạo.
 - Không xác thực/phân quyền trong task này. Namespace admin không tự bảo vệ API.
 - Không xử lý availability, partner onboarding, điều chuyển, sửa giấy tờ hoặc thanh lý.
 
@@ -30,13 +31,29 @@ Content-Type: `application/json`.
 {
   "plateNumber": "51H-123.45",
   "fuelType": "PETROL",
+  "seats": 5,
+  "transmission": "AUTOMATIC",
+  "make": "Toyota",
+  "model": "Vios",
   "branchCode": "CN-3TR7WK",
   "inspectionExpiresOn": "2030-12-31",
   "liabilityInsuranceExpiresOn": "2030-12-31"
 }
 ```
 
-Ba trường `plateNumber`, `fuelType`, `branchCode` bắt buộc. Chuỗi không được trắng.
+Bảy trường `plateNumber`, `fuelType`, `branchCode`, `seats`, `transmission`, `make`, `model`
+bắt buộc, không nhận null. Chuỗi không được rỗng hoặc chỉ chứa khoảng trắng.
+
+| Trường BR-018 | Hợp đồng |
+|---|---|
+| `seats` | Số nguyên thuộc tập `4`, `5`, `7`, `16` |
+| `transmission` | `MANUAL` hoặc `AUTOMATIC` |
+| `make` | Hãng xe nhập tự do, giữ nguyên cách viết; không đặt độ dài tối đa |
+| `model` | Dòng xe nhập tự do, giữ nguyên cách viết; không đặt độ dài tối đa |
+
+Thay đổi bắt buộc này được duyệt trước phát hành, chỉ local: cập nhật trực tiếp `v1`, không mở `v2`.
+Request cũ thiếu bốn trường mới không còn hợp lệ. Không tự suy hãng/dòng hoặc điền giá trị mặc định.
+
 Không tự chuẩn hóa biển số; chưa có quy tắc định dạng biển số được chốt.
 Hai ngày theo `YYYY-MM-DD`, có thể bỏ qua hoặc gửi null ở bước tạo bản nháp.
 Giấy tờ đã hết hạn cũng không ngăn tạo DRAFT; chúng ngăn bước duyệt.
@@ -54,7 +71,11 @@ Response 201, ví dụ `Location: /api/v1/admin/vehicles/XE-8KQ4M2`:
     "plateNumber": "51H-123.45",
     "ownershipType": "COMPANY",
     "fuelType": "PETROL",
-    "branchId": 42,
+    "seats": 5,
+    "transmission": "AUTOMATIC",
+    "make": "Toyota",
+    "model": "Vios",
+    "branchCode": "CN-3TR7WK",
     "status": "DRAFT",
     "inspectionExpiresOn": "2030-12-31",
     "liabilityInsuranceExpiresOn": "2030-12-31"
@@ -63,10 +84,14 @@ Response 201, ví dụ `Location: /api/v1/admin/vehicles/XE-8KQ4M2`:
 }
 ```
 
-`branchId` là tham chiếu chi nhánh chỉ đọc trong API admin hiện tại, không phải input hoặc URL.
-Không trả `id` của xe, không JOIN schema branch để bổ sung dữ liệu ngoài hợp đồng hiện có.
-Nếu cần trả `branchCode`/thông tin chi nhánh trong tương lai, bổ sung tra cứu qua `branch.api`,
-không suy mã từ ID và không đọc thẳng bảng của module khác.
+Từ Task 6b, cả bốn endpoint trả **`branchCode`**, không còn `branchId` và không trả `id` của xe (R12).
+Đây là thay đổi trước phát hành, sửa thẳng `v1` theo api-guideline, không tạo `v2`.
+Mã chi nhánh được application lấy qua `branch.api`; CSDL vẫn chỉ lưu `branch_id`,
+không thêm cột `branch_code`, không suy mã từ ID và không JOIN chéo schema (ADR-0008).
+Luồng tạo xe tái sử dụng mã chi nhánh đã tra trước khi chèn; luồng đọc/gửi duyệt/duyệt tra bằng ID đã lưu.
+`branchCode` có thể null nếu hồ sơ không có liên kết chi nhánh; luồng tạo COMPANY ở GĐ1 luôn có mã.
+Có ID tham chiếu nhưng chi nhánh không tồn tại là lỗi toàn vẹn nội bộ (500 `INTERNAL_ERROR`),
+không trả mã giả/null hoặc biến thành lỗi 404 của mã xe. Lỗi sau ghi làm rollback giao dịch.
 
 Service thử tối đa năm mã `XE-<6>` nếu trùng mã. Trùng biển số dừng ngay, không thử lại.
 Endpoint chưa hỗ trợ Idempotency-Key; gửi lại cùng biển số sẽ nhận 409.
@@ -74,6 +99,7 @@ Endpoint chưa hỗ trợ Idempotency-Key; gửi lại cùng biển số sẽ nh
 ## Đọc, gửi duyệt và phê duyệt
 
 GET trả cùng hình dạng dữ liệu như POST tạo xe, kể cả giấy tờ null hoặc đã hết hạn.
+Gửi duyệt và phê duyệt giữ nguyên cả bốn thuộc tính BR-018.
 
 Hai POST chuyển trạng thái không cần body. Body không được dùng để chọn trạng thái,
 ngày duyệt hoặc sửa thông tin giấy tờ.
@@ -94,6 +120,7 @@ duyệt chặn đúng; đừng thêm endpoint sửa chỉ để hoàn thành ví
 | HTTP | error.code | Khi nào |
 |---|---|---|
 | 400 | INVALID_REQUEST | Thiếu trường, chuỗi trắng, enum/ngày/JSON không hợp lệ |
+| 422 | VEHICLE_INVALID_SEATS | Số chỗ ngoài tập `4`, `5`, `7`, `16` theo BR-018 |
 | 404 | BRANCH_NOT_FOUND | Mã chi nhánh không tồn tại khi tạo |
 | 404 | VEHICLE_NOT_FOUND | Xe không tồn tại khi đọc/gửi duyệt/duyệt |
 | 409 | VEHICLE_PLATE_ALREADY_EXISTS | PostgreSQL từ chối do trùng biển số |
@@ -122,3 +149,41 @@ Ví dụ lỗi:
 
 Thông báo code là tiếng Anh; giao diện Việt hóa sau dựa trên `error.code`.
 Không trả SQL, stack trace hoặc chi tiết kết nối ra HTTP.
+
+## Collection Postman — Task 6b, Phần 3
+
+Import `postman/task-06b-review.postman_collection.json`, chọn **Car Rental - Local**,
+khởi động lại backend rồi chạy riêng thư mục **Part 3 - Vehicle branch code** theo thứ tự 01–07.
+Không cần chạy Phần 1 trước, không cần SQL hoặc chép biến giữa các request.
+
+- 01 tạo chi nhánh; 02 tạo xe; 03 đọc DRAFT; 04 gửi duyệt; 05 duyệt; 06 đọc ACTIVE.
+- Mọi response xe thành công phải có `branchCode` đúng mã chi nhánh ở request 01,
+  không có `id` hoặc `branchId`, và giữ nguyên dữ liệu qua các lần chuyển trạng thái.
+- 07 duyệt lại xe ACTIVE: **422 `VEHICLE_INVALID_STATUS_TRANSITION`**, test vẫn phải xanh.
+- Mỗi lượt tạo một bộ dữ liệu mới với biển số/tên ngẫu nhiên và giấy tờ còn hạn;
+  không xóa dữ liệu của lượt trước. Collection Task 6 cũng đã cập nhật sang hợp đồng `branchCode`.
+
+## Collection Postman — Task 6, Phần 1
+
+- Import [collection Task 6](../../../postman/task-06-search.postman_collection.json)
+  và [environment local](../../../postman/local.postman_environment.json).
+- Chọn environment `Car Rental - Local`; `baseUrl` mặc định `http://localhost:8081`.
+  Nếu cổng backend local khác, chỉ đổi `baseUrl` trong Postman.
+- Backend phải đang chạy và Flyway đã áp dụng V007; request tạo chi nhánh đã bổ sung tên/địa chỉ theo BR-808.
+- Dùng Collection Runner chạy toàn bộ thư mục `Part 1 - Vehicle attributes (BR-018)`
+  theo thứ tự 01–18. Không cần token hoặc copy mã giữa các request.
+- Request 01 tự tạo chi nhánh và lưu mã; request 02 sinh biển số ngẫu nhiên, tạo xe
+  rồi lưu mã cùng dữ liệu để các request sau đối chiếu. Ngày hết hạn giấy tờ được
+  sinh ở tương lai cho bộ dữ liệu thử, không phải chính sách nghiệp vụ.
+- Request 03–06 kiểm đọc lại và giữ nguyên thuộc tính qua gửi duyệt/phê duyệt.
+- Request 07 kiểm số chỗ 6 (`422 / VEHICLE_INVALID_SEATS`); 08–11 kiểm thiếu từng
+  thuộc tính; 12–15 kiểm từng thuộc tính null; 16–17 kiểm hãng/dòng trắng; 18 kiểm
+  hộp số lạ (các trường hợp này là `400 / INVALID_REQUEST`).
+- Mỗi request có `pm.test` kiểm mã HTTP, envelope và dữ liệu/mã lỗi tương ứng.
+  Không coi request phá hoại là trượt chỉ vì HTTP 400/422: test phải xanh khi lỗi
+  đúng hợp đồng. Không dùng Collection Runner với cấu hình dừng chỉ vì HTTP 4xx.
+- Chạy lại cả thư mục không cần dọn CSDL: mỗi lượt tạo thêm một chi nhánh và một xe
+  mẫu mới. Collection không tự xóa dữ liệu, không ghi lịch; giữ lại mã fixture khi
+  cần dọn có kiểm soát. Trước lần áp dụng V007, xử lý dữ liệu cũ theo hướng dẫn Phần 2.
+- Phép thử constraint SQL chạy riêng trong IntelliJ SQL Console bằng transaction
+  rồi `ROLLBACK`; collection không thay thế việc kiểm constraint tại PostgreSQL.

@@ -12,6 +12,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import java.time.LocalDate;
 import java.util.stream.Stream;
 
+import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -269,7 +270,7 @@ class VehicleLifecycleTest {
                 OwnershipType.COMPANY,
                 fuelType,
                 BRANCH_ID,
-                documents
+                documents, SPECIFICATIONS
         );
     }
 
@@ -294,7 +295,7 @@ class VehicleLifecycleTest {
                 FuelType.PETROL,
                 BRANCH_ID,
                 status,
-                documents
+                documents, SPECIFICATIONS
         );
     }
 
@@ -319,6 +320,7 @@ class VehicleLifecycleTest {
         assertEquals(expectedFuelType, vehicle.fuelType());
         assertEquals(BRANCH_ID, vehicle.branchId());
         assertSame(expectedDocuments, vehicle.documents());
+        assertSame(SPECIFICATIONS, vehicle.specifications());
     }
 
     /**

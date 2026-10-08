@@ -1,5 +1,7 @@
 package com.carrental.vehicle.application.service;
 
+import com.carrental.branch.api.BranchDirectory;
+
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
 import com.carrental.vehicle.application.port.in.GetVehicleUseCase;
@@ -19,14 +21,17 @@ import org.springframework.transaction.annotation.Transactional;
 class VehicleQueryService implements GetVehicleUseCase {
 
     private final ReadVehiclePort readVehiclePort;
+    private final BranchDirectory branchDirectory;
 
     /**
      * Khởi tạo service với cổng đọc thông tin xe.
      *
      * @param readVehiclePort cổng truy xuất thông tin xe
+     * @param branchDirectory cổng tra mã chi nhánh từ tham chiếu ID nội bộ
      */
-    VehicleQueryService(ReadVehiclePort readVehiclePort) {
+    VehicleQueryService(ReadVehiclePort readVehiclePort, BranchDirectory branchDirectory) {
         this.readVehiclePort = readVehiclePort;
+        this.branchDirectory = branchDirectory;
     }
 
     /**
@@ -43,6 +48,7 @@ class VehicleQueryService implements GetVehicleUseCase {
     @Transactional(readOnly = true)
     public VehicleDetail get(GetVehicleQuery query) {
         return readVehiclePort.findByCode(query.code())
+                .map(detail -> VehicleDetailEnricher.enrich(detail, branchDirectory))
                 .orElseThrow(() ->
                         DomainException.notFound(ErrorCode.VEHICLE_NOT_FOUND));
     }

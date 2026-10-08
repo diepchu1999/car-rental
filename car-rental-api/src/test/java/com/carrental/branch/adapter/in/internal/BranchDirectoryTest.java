@@ -1,8 +1,8 @@
-package com.carrental.branch.application.service;
+package com.carrental.branch.adapter.in.internal;
 
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchRef;
-import com.carrental.branch.application.port.out.ReadBranchPort;
+import com.carrental.branch.application.port.in.FindBranchUseCase;
 import com.carrental.branch.application.view.BranchDetail;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * liên kết xe công ty với chi nhánh đã tồn tại theo BR-003.
  *
  * <p>Test gọi thông qua interface BranchDirectory.
- * Cổng đọc được thay bằng lambda có kết quả kiểm soát được.
+ * Use case được thay bằng lambda có kết quả kiểm soát được.
  *
  * <p>Không khởi động Spring hoặc kết nối cơ sở dữ liệu.
  * Nhóm test này kiểm hành vi Java, không kiểm cơ chế transaction.
@@ -41,26 +41,25 @@ class BranchDirectoryTest {
      * Kết quả chỉ chứa id và code theo hợp đồng BranchRef.
      */
     @Test
-    void returnsReferenceFromReadPort() {
+    void returnsReferenceFromUseCase() {
         String code = "CN-READ01";
 
         BranchDetail storedBranch = new BranchDetail(
                 42L,
                 code,
                 10.762622,
-                106.660172
+                106.660172, "Test Branch", "123 Test Street"
         );
 
         List<String> requestedCodes = new ArrayList<>();
 
-        ReadBranchPort readBranchPort = requestedCode -> {
+        FindBranchUseCase lookup = query -> {
+            String requestedCode = query.code();
             requestedCodes.add(requestedCode);
             return Optional.of(storedBranch);
         };
 
-        BranchDirectory directory = new BranchQueryService(
-                readBranchPort
-        );
+        BranchDirectory directory = directoryWithLookup(lookup);
 
         Optional<BranchRef> actual = directory.findByCode(code);
 
@@ -88,14 +87,13 @@ class BranchDirectoryTest {
     void returnsEmptyWithoutChangingRequestedCode(String code) {
         List<String> requestedCodes = new ArrayList<>();
 
-        ReadBranchPort readBranchPort = requestedCode -> {
+        FindBranchUseCase lookup = query -> {
+            String requestedCode = query.code();
             requestedCodes.add(requestedCode);
             return Optional.empty();
         };
 
-        BranchDirectory directory = new BranchQueryService(
-                readBranchPort
-        );
+        BranchDirectory directory = directoryWithLookup(lookup);
 
         Optional<BranchRef> actual = directory.findByCode(code);
 
@@ -117,17 +115,16 @@ class BranchDirectoryTest {
             " ",
             "\t\n"
     })
-    void rejectsInvalidCodeBeforeCallingReadPort(String code) {
+    void rejectsInvalidCodeBeforeCallingUseCase(String code) {
         List<String> requestedCodes = new ArrayList<>();
 
-        ReadBranchPort readBranchPort = requestedCode -> {
+        FindBranchUseCase lookup = query -> {
+            String requestedCode = query.code();
             requestedCodes.add(requestedCode);
             return Optional.empty();
         };
 
-        BranchDirectory directory = new BranchQueryService(
-                readBranchPort
-        );
+        BranchDirectory directory = directoryWithLookup(lookup);
 
         DomainException failure = assertThrowsExactly(
                 DomainException.class,
@@ -171,14 +168,13 @@ class BranchDirectoryTest {
 
         List<String> requestedCodes = new ArrayList<>();
 
-        ReadBranchPort readBranchPort = requestedCode -> {
+        FindBranchUseCase lookup = query -> {
+            String requestedCode = query.code();
             requestedCodes.add(requestedCode);
             throw storageFailure;
         };
 
-        BranchDirectory directory = new BranchQueryService(
-                readBranchPort
-        );
+        BranchDirectory directory = directoryWithLookup(lookup);
 
         IllegalStateException actual = assertThrowsExactly(
                 IllegalStateException.class,
@@ -187,5 +183,14 @@ class BranchDirectoryTest {
 
         assertSame(storageFailure, actual);
         assertEquals(List.of(code), requestedCodes);
+    }
+
+    /** Cấp use case tra mã; truy vấn bán kính không được gọi trong những kịch bản này. */
+    private static BranchDirectory directoryWithLookup(FindBranchUseCase lookup) {
+        return new BranchDirectoryAdapter(lookup, query -> {
+            throw new AssertionError("Nearby lookup must not be called during code lookup.");
+        }, query -> {
+            throw new AssertionError("ID lookup must not be called during code lookup.");
+        });
     }
 }

@@ -59,8 +59,8 @@ codex chỉ chạy lệnh **đọc**: `git status`, `git diff`, `git log`, tìm 
 2. **Đầu mỗi phần:** làm gì, vì sao, trích mã BR. **Cuối mỗi phần:** liệt kê file đã tạo hoặc sửa.
 3. **Hướng dẫn chạy đủ để làm theo mà không phải đoán:**
    - **Test:** đúng lệnh `./mvnw ... -Dtest=...`, chạy ở thư mục nào, kết quả đúng trông thế nào.
-   - **API (Postman):** method, URL đầy đủ, header, body JSON hoàn chỉnh để dán vào, mã HTTP và response
-     mong đợi. Request sau dùng kết quả request trước thì nói rõ lấy trường nào, dán vào đâu.
+   - **API (Postman):** giao **file collection import được** (mục "Postman" dưới) — Tech Owner import rồi
+     bấm chạy, không copy tay. Trong hướng dẫn chỉ cần nói chạy thư mục hay request nào, kết quả mong đợi.
    - **SQL kiểm tra CSDL:** câu lệnh hoàn chỉnh, chạy bằng gì, kết quả mong đợi. Câu phá hoại chạy
      trong `BEGIN ... ROLLBACK` để không để lại dữ liệu.
    - Nếu kết quả sai thì thường sai ở đâu.
@@ -71,6 +71,26 @@ codex chỉ chạy lệnh **đọc**: `git status`, `git diff`, `git log`, tìm 
 6. **Tóm tắt test:** viết test xong thì tóm tắt từng test một dòng — nó khẳng định điều gì. Không dán
    code test. Tech Owner không đọc code, đây là cách họ biết cái gì đã được phủ.
 7. **Viết bằng tiếng Việt.**
+
+### Postman — file import được, không bắt copy tay
+
+- **Mỗi task một collection**: `postman/task-<số>-<tên>.postman_collection.json`, định dạng Postman
+  Collection v2.1. Dùng chung environment `postman/local.postman_environment.json` — chỉ chứa `baseUrl`
+  (`http://localhost:8081`, theo `CAR_RENTAL_API_PORT`) và biến không bí mật.
+- Thư mục con theo **phần** của task, request xếp **đúng thứ tự chạy**. Mỗi request có mô tả một dòng:
+  nó chứng minh điều gì, trích BR.
+- **Không bắt copy giữa các request:** giá trị request sau cần (mã xe, mã chi nhánh, cursor...) do script
+  `Tests` của request trước lưu vào biến collection.
+- **Chạy lại được nhiều lần** mà không phải dọn CSDL: giá trị phải duy nhất (biển số, tên...) sinh ngẫu
+  nhiên trong script `Pre-request`.
+- Mỗi request có `pm.test` kiểm mã HTTP và trường quan trọng — kể cả request phá hoại, kiểm **đúng mã lỗi**.
+  Tech Owner chạy cả thư mục bằng Collection Runner và thấy ngay đạt hay trượt.
+- Header theo api-guideline (`X-Client-Platform`, `X-Client-Version`).
+- **Không đưa secret hay token thật** vào file.
+- Bước không làm được bằng API (ví dụ chèn khoá lịch — `availability` không có REST) thì giữ ở dạng SQL
+  trong hướng dẫn, ghi rõ chạy xen vào giữa request nào.
+- Trước khi giao, kiểm file là JSON hợp lệ (lệnh chỉ đọc). Endpoint đổi thì sửa collection **trong cùng
+  thay đổi**, như danh mục endpoint.
 
 ### Chốt chặn
 
@@ -89,7 +109,7 @@ codex chỉ chạy lệnh **đọc**: `git status`, `git diff`, `git log`, tìm 
 2. Báo cáo:
    - Tóm tắt từng test một dòng.
    - Danh sách file đã tạo hoặc sửa.
-   - **Bộ request Postman** của cả việc, gom một chỗ theo thứ tự chạy, nếu có.
+   - **File collection Postman** (và environment nếu mới tạo): đường dẫn, cách import, thứ tự chạy thư mục.
    - Chỗ tài liệu chưa rõ hoặc mâu thuẫn — ghi lại, đừng tự quyết.
    - Đề xuất commit message, **không kèm dòng `Co-Authored-By`**.
 3. Nhắc Tech Owner: commit xong thì nhờ Chief Architect review.

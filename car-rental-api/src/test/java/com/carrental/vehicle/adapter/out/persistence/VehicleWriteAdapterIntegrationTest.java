@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.util.Optional;
 import java.util.stream.Stream;
 
+import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -109,7 +110,7 @@ class VehicleWriteAdapterIntegrationTest {
                 OwnershipType.COMPANY,
                 FuelType.ELECTRIC,
                 BRANCH_ID + 1L,
-                new VehicleDocuments(null, null)
+                new VehicleDocuments(null, null), SPECIFICATIONS
         );
 
         assertFalse(writeVehiclePort.insert(conflicting));
@@ -182,7 +183,7 @@ class VehicleWriteAdapterIntegrationTest {
                 OwnershipType.COMPANY,
                 FuelType.PETROL,
                 null,
-                new VehicleDocuments(null, null)
+                new VehicleDocuments(null, null), SPECIFICATIONS
         );
 
         DataIntegrityViolationException failure = assertThrows(
@@ -217,7 +218,7 @@ class VehicleWriteAdapterIntegrationTest {
                         OwnershipType.COMPANY,
                         FuelType.DIESEL,
                         BRANCH_ID,
-                        new VehicleDocuments(null, null)
+                        new VehicleDocuments(null, null), SPECIFICATIONS
                 ),
                 Vehicle.createDraft(
                         VEHICLE_CODE,
@@ -228,7 +229,7 @@ class VehicleWriteAdapterIntegrationTest {
                         new VehicleDocuments(
                                 INSPECTION_EXPIRES_ON,
                                 null
-                        )
+                        ), SPECIFICATIONS
                 ),
                 Vehicle.createDraft(
                         VEHICLE_CODE,
@@ -239,7 +240,7 @@ class VehicleWriteAdapterIntegrationTest {
                         new VehicleDocuments(
                                 null,
                                 LIABILITY_INSURANCE_EXPIRES_ON
-                        )
+                        ), SPECIFICATIONS
                 ),
                 Vehicle.createDraft(
                         VEHICLE_CODE,
@@ -250,7 +251,7 @@ class VehicleWriteAdapterIntegrationTest {
                         new VehicleDocuments(
                                 LocalDate.of(2000, 1, 10),
                                 LocalDate.of(2001, 2, 20)
-                        )
+                        ), SPECIFICATIONS
                 ),
                 Vehicle.createDraft(
                         VEHICLE_CODE,
@@ -261,7 +262,7 @@ class VehicleWriteAdapterIntegrationTest {
                         new VehicleDocuments(
                                 INSPECTION_EXPIRES_ON,
                                 LIABILITY_INSURANCE_EXPIRES_ON
-                        )
+                        ), SPECIFICATIONS
                 )
         );
     }
@@ -289,7 +290,7 @@ class VehicleWriteAdapterIntegrationTest {
                 new VehicleDocuments(
                         INSPECTION_EXPIRES_ON,
                         LIABILITY_INSURANCE_EXPIRES_ON
-                )
+                ), SPECIFICATIONS
         );
     }
 
@@ -324,7 +325,9 @@ class VehicleWriteAdapterIntegrationTest {
                 expected.branchId(),
                 expected.status(),
                 expected.documents().inspectionExpiresOn(),
-                expected.documents().liabilityInsuranceExpiresOn()
+                expected.documents().liabilityInsuranceExpiresOn(),
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
         );
 
         assertEquals(expectedDetail, actual);

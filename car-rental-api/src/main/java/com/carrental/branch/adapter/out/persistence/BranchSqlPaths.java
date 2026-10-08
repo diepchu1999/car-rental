@@ -8,6 +8,12 @@ package com.carrental.branch.adapter.out.persistence;
  */
 final class BranchSqlPaths {
 
+    /** Tra chi nhánh từ ID nội bộ để trả mã nghiệp vụ qua API module. */
+    static final String FIND_BY_ID = "sql/branch/find_branch_by_id.sql";
+
+    /** Truy vấn production tìm chi nhánh trong bán kính bằng ST_DWithin. */
+    static final String FIND_WITHIN_RADIUS = "sql/branch/find_branches_within_radius.sql";
+
     /**
      * Đường dẫn câu lệnh chèn chi nhánh mới.
      */
