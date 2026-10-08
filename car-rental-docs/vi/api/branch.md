@@ -23,6 +23,8 @@ Tài liệu liên quan:
 
 ## Danh mục endpoint
 
+Mọi endpoint áp dụng [header truy vết X-Request-Id](http-headers.md); response JSON không đổi.
+
 | HTTP method | Path | Chức năng | Thành công |
 |---|---|---|---|
 | POST | `/api/v1/admin/branches` | Tạo chi nhánh | 201 |

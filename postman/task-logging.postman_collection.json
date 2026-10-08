@@ -1,0 +1,351 @@
+{
+  "info": {
+    "name": "Car Rental - Logging",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Kiểm log local theo security-guideline §3. Chọn Car Rental - Local. Part 1 tạo/đọc chi nhánh giả theo BR-003/BR-808; xem SQL và ms trong console backend bật sql-log. Không dùng dữ liệu thật. Mỗi lượt tạo dữ liệu riêng, không cần copy mã."
+  },
+  "item": [
+    {
+      "name": "Part 1 - SQL logging",
+      "description": "Chạy request 01 rồi 02 khi backend bật sql-log, quan sát câu INSERT và SELECT nhiều dòng. Tắt profile và chạy lại: API vẫn đúng nhưng không có log P6Spy.",
+      "item": [
+        {
+          "name": "01 - Create SQL log fixture branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-003/BR-808: tạo chi nhánh giả; security-guideline §3: quan sát INSERT có giá trị tham số và thời gian ms, không dùng dữ liệu thật.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \"{{sqlLogBranchName}}\",\n  \"address\": \"SQL logging fixture address\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"sqlLogBranchCode\", \"\");",
+                  "pm.collectionVariables.set(\"sqlLogBranchName\", \"SQL-LOG-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Branch persisted with generated code\", () => {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    pm.expect(body.data.code).to.match(/^CN-[A-Z0-9]{6}$/);",
+                  "    pm.expect(body.data.name).to.eql(pm.collectionVariables.get(\"sqlLogBranchName\"));",
+                  "    pm.expect(body.data.address).to.eql(\"SQL logging fixture address\");",
+                  "});",
+                  "if (pm.response.code === 201 && body.success && body.data && /^CN-[A-Z0-9]{6}$/.test(body.data.code)) {",
+                  "    pm.collectionVariables.set(\"sqlLogBranchCode\", body.data.code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Read SQL log fixture branch",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches/{{sqlLogBranchCode}}",
+            "description": "BR-003/BR-808: đọc chi nhánh vừa tạo; security-guideline §3: quan sát SELECT có mã CN trong tham số và comment giữ nguyên xuống dòng."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get(\"sqlLogBranchCode\")) { throw new Error(\"Run request 01 successfully first.\"); }"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Stored branch matches this run\", () => {",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"sqlLogBranchCode\"));",
+                  "    pm.expect(body.data.name).to.eql(pm.collectionVariables.get(\"sqlLogBranchName\"));",
+                  "    pm.expect(body.data.address).to.eql(\"SQL logging fixture address\");",
+                  "    pm.expect(body.data).not.to.have.property(\"id\");",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 2 - Request ID",
+      "description": "Không cần dữ liệu của Part 1. Chạy 01 → 04, tất cả pm.test phải xanh. Chỉ kiểm header, không log body/token/header/query string.",
+      "item": [
+        {
+          "name": "01 - Generate missing request ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/actuator/health",
+            "description": "Security guideline §3: không gửi ID, health vẫn UP và response có UUID mới."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const requestId = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Response has one safe request ID\", () => {",
+                  "    pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1);",
+                  "    pm.expect(requestId).to.be.a(\"string\").and.match(/^[A-Za-z0-9-]{1,64}$/);",
+                  "});",
+                  "pm.test(\"Server generated a UUID\", () => pm.expect(requestId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Health remains UP\", () => pm.expect(body.status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Preserve safe request ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{loggingRequestIdInput}}"
+              }
+            ],
+            "url": "{{baseUrl}}/actuator/health",
+            "description": "Security guideline §3: dùng lại nguyên vẹn ID hợp lệ, không đổi hành vi health."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"loggingRequestIdInput\", \"postman-\" + pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const requestId = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Response has one safe request ID\", () => {",
+                  "    pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1);",
+                  "    pm.expect(requestId).to.be.a(\"string\").and.match(/^[A-Za-z0-9-]{1,64}$/);",
+                  "});",
+                  "pm.test(\"Safe ID is echoed exactly\", () => pm.expect(requestId).to.eql(pm.variables.get(\"loggingRequestIdInput\")));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Health remains UP\", () => pm.expect(body.status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Replace forbidden character",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{loggingRequestIdInput}}"
+              }
+            ],
+            "url": "{{baseUrl}}/actuator/health",
+            "description": "Security guideline §3: ký tự cấm underscore bị loại, trả UUID mới; không gửi CR/LF thật qua HTTP."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"loggingRequestIdInput\", \"unsafe_request_id\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const requestId = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Response has one safe request ID\", () => {",
+                  "    pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1);",
+                  "    pm.expect(requestId).to.be.a(\"string\").and.match(/^[A-Za-z0-9-]{1,64}$/);",
+                  "});",
+                  "pm.test(\"Server generated a UUID\", () => pm.expect(requestId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
+                  "pm.test(\"Unsafe input is not reflected\", () => pm.expect(requestId).not.to.eql(pm.variables.get(\"loggingRequestIdInput\")));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Health remains UP\", () => pm.expect(body.status).to.eql(\"UP\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Replace oversized ID on API error",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{loggingRequestIdInput}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles",
+            "description": "Security guideline §3: ID 65 ký tự bị thay; API thiếu đầu vào vẫn trả 400 INVALID_REQUEST, JSON không thêm requestId."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"loggingRequestIdInput\", \"a\".repeat(65));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const requestId = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Response has one safe request ID\", () => {",
+                  "    pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1);",
+                  "    pm.expect(requestId).to.be.a(\"string\").and.match(/^[A-Za-z0-9-]{1,64}$/);",
+                  "});",
+                  "pm.test(\"Server generated a UUID\", () => pm.expect(requestId).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/));",
+                  "pm.test(\"Unsafe input is not reflected\", () => pm.expect(requestId).not.to.eql(pm.variables.get(\"loggingRequestIdInput\")));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"API error shape is unchanged\", () => {",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

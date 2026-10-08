@@ -19,6 +19,8 @@ Hiện chỉ chạy local. Rate limit theo security-guideline chưa được hi�
 
 ## GET /api/v1/public/vehicles
 
+Áp dụng [header truy vết X-Request-Id](http-headers.md); response JSON không đổi.
+
 Không có request body. Gửi các trường bằng query parameters, tên phân biệt hoa thường.
 
 Header khuyến nghị:

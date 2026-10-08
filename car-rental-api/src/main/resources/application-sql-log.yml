@@ -1,0 +1,14 @@
+# Chỉ dùng local với dữ liệu giả; tuyệt đối không bật trên môi trường có dữ liệu thật.
+# Không dùng sqlSingleLine: comment -- đầu file phải kết thúc ở đúng dấu xuống dòng.
+decorator:
+  datasource:
+    enabled: true
+    p6spy:
+      enable-logging: true
+      logging: slf4j
+      log-format: "SQL (%(executionTime) ms):\n%(sql)"
+      exclude-categories: info,debug,result,resultset,commit,rollback
+
+logging:
+  level:
+    p6spy: INFO
