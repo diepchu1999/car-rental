@@ -24,6 +24,35 @@ không có gì nhìn thấy được, và mọi hiểu sai lộ ra ở thời đ
 Lát cắt đầu tiên cố tình chọn phần khó nhất: nếu cách chống trùng lịch có bất ngờ gì, ta muốn biết
 ở tuần đầu chứ không phải tháng thứ ba khi năm vùng khác đã xây đè lên.
 
+## Làm rõ 08/10/2026 — API trước, giao diện ở cuối mỗi lát cắt
+
+Không bỏ lát cắt dọc. Mục này ghi lại cách đang làm thật, và chốt mốc giao diện — vì bản gốc ở trên
+nói "xuyên toàn bộ các tầng … giao diện", trong khi từ Task 5 Tech Owner quyết làm API trước, kiểm
+bằng Postman. Một ADR ghi khác cách làm thật sẽ dạy người đọc rằng các ADR khác cũng chỉ là gợi ý.
+
+**1. Trong một lát cắt: API trước.** Mỗi module làm xong API thì kiểm bằng collection Postman import
+được (`.ai/prompts/implement.md`, mục Postman). Ở bước này, "demo được" nghĩa là collection chạy được
+bằng Collection Runner và mọi `pm.test` xanh.
+
+**2. Giao diện ở cuối mỗi lát cắt, trước khi sang lát cắt sau.** Với lát cắt 1: sau khi xong
+`payment`, làm `customer-web` cho luồng **tìm xe → đặt xe → trả cọc**, rồi mới sang lát cắt 2.
+
+Lý do giữ mốc này: lý do gốc của ADR là **phát hiện hiểu sai nghiệp vụ sớm**. Postman kiểm "API trả
+đúng không", không kiểm "khách có hiểu màn hình không". Ví dụ: kết quả tìm xe chưa có giá chỉ thật sự
+lộ ra khi nhìn thấy một màn hình tìm xe không có giá. Làm API cho nhiều lát cắt rồi mới làm giao diện
+là đúng loại rủi ro ADR này sinh ra để tránh.
+
+Chưa chốt: phạm vi `admin-web` cho lát cắt 1 (duyệt xe, xác nhận cọc thủ công — ADR-0011), và thời
+điểm làm mobile.
+
+**3. `identity` làm trước `booking`, không phải trước cả lát cắt 1.** Hệ quả gốc ghi "nền tảng dùng
+chung (`identity`…) phải làm trước lát cắt 1". Tìm xe không cần đăng nhập (`/api/v1/public`,
+api-guideline §2), nên phần đầu lát cắt 1 làm được mà chưa có tài khoản. Đặt xe thì bắt buộc phải có
+tài khoản và giấy phép lái xe đã xác minh (BR-106, BR-120).
+
+Thứ tự còn lại của lát cắt 1: chốt BR-218 → `pricing` → `identity` → `booking` → `payment` →
+`customer-web`.
+
 ## Hệ quả
 - Nền tảng dùng chung (`identity`, hạ tầng local, tiện ích, test kiến trúc) phải làm trước lát cắt 1.
 - Mỗi lát cắt kết thúc bằng thứ **demo được**, không phải bằng một tầng đã xong.
