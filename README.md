@@ -4,12 +4,8 @@ Nền tảng cho thuê xe hơi — marketplace P2P **cộng** đội xe của ch
 
 ## Trạng thái
 
-| Hạng mục | Trạng thái |
-|---|---|
-| Nghiệp vụ giai đoạn 1 | ✅ 149 quy tắc BR đã chốt |
-| Kiến trúc | ✅ 15 ADR · 10 guideline |
-| Code | Đã có hạ tầng, khung backend, rule kiến trúc và code Task 4; chờ Tech Owner chạy nghiệm thu phần bổ sung |
-| Môi trường | Local, chưa build production |
+Số liệu dự án — số quy tắc đã chốt, module đã xong, số test — ghi **duy nhất** ở mục "Trạng thái" của
+[`CLAUDE.md`](CLAUDE.md). README không chép lại: hai nơi cùng ghi một con số thì sớm muộn sẽ lệch.
 
 ## Cấu trúc dự kiến
 
@@ -715,7 +711,7 @@ Không thêm biến bắt buộc vào `.env`.
 
 ## Bước tiếp theo
 
-Task 4: xem [hướng dẫn nghiệm thu shared, branch và vehicle](car-rental-docs/vi/dev-notes/task-04-shared-branch-vehicle.md).
-Code và test bổ sung chưa được Codex chạy theo yêu cầu của Tech Owner.
-
-Lát cắt dọc đầu tiên: **tìm xe → đặt xe → giữ chỗ → trả cọc** — chạm ngay vào rủi ro số một.
+Lát cắt dọc đầu tiên: **tìm xe → báo giá → đặt xe → giữ chỗ → trả cọc**. Đã xong tìm xe và cơ chế giữ
+chỗ. Thứ tự còn lại theo [ADR-0012](car-rental-docs/vi/decisions/adr-0012-vertical-slice-delivery.md)
+(mục "Làm rõ 08/10/2026"): chốt BR-218 → `pricing` → `identity` → `booking` → `payment` →
+`customer-web`.
