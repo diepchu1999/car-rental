@@ -29,6 +29,9 @@
 |---|---|---|---|
 | Giá ngày | `daily_rate` | Giá thuê **một ngày thường** của từng xe; mọi khoản theo giá ngày đều tính từ đây | BR-234 |
 | Loại ngày | `day_type` | `WEEKDAY` \| `WEEKEND` \| `HOLIDAY` — gắn cho từng khối 24 giờ của khoảng thuê | BR-218 |
+| Kỳ nghỉ lễ | `holiday_period` | Chuỗi ngày nghỉ liên tục chứa ít nhất một ngày lễ, **gồm cả Thứ Bảy, Chủ nhật trong chuỗi** — mọi ngày trong đó là `HOLIDAY` | BR-218 |
+| Lịch lễ | `holiday_calendar` | Danh sách ngày lễ đã khai báo, kèm **ngày cuối cùng đã khai báo** (`declared_through`); khoảng thuê vượt qua ngày đó thì không báo giá | BR-218 |
+| Tiền thuê | `rental_amount` | Tổng các dòng tiền thuê xe của một khoảng thuê — **chưa gồm** bảo hiểm và các phí khác; là giá hiển thị trong tìm kiếm | BR-126, BR-236 |
 | Tiền năng lượng | `energy_charge` | Tiền xăng/điện khách tiêu thụ, tính theo lượng thật | BR-415 |
 | Phí dịch vụ nhiên liệu | `refuel_service_fee` | **Chế tài** khi trả xe thiếu nhiên liệu — không phải tiền năng lượng | BR-414 |
 | Phụ phí vượt km | `excess_mileage_fee` | Phí khi vượt giới hạn km của cả chuyến | BR-401, BR-404 |
@@ -85,6 +88,12 @@
 |---|---|---|
 | Đơn thuê | `Booking` | Một lần thuê xe, từ lúc đặt tới lúc hoàn tất |
 | Báo giá | `Quote` | Kết quả tính giá, bất biến, có hạn dùng |
+| Dòng báo giá | `QuoteLine` | Một dòng tiền trên báo giá, làm tròn riêng tới 1.000đ (BR-236); loại dòng ở bốn dòng dưới và phí bảo hiểm |
+| Khối ngày | `DAY_BLOCK` | Một khối 24 giờ tính từ giờ nhận xe, mang loại ngày của giờ bắt đầu khối (BR-218, BR-235) |
+| Phần giờ lẻ | `REMAINDER_HOURS` | Số giờ sau khối 24 giờ cuối, ≤ 4 giờ, mỗi giờ 20% giá ngày (BR-235) |
+| Gói 4 giờ | `HOURLY_PACKAGE` | Phần đầu của gói giờ, 50% giá ngày (BR-114) |
+| Giờ vượt | `OVERAGE_HOURS` | Số giờ sau gói 4 giờ, mỗi giờ 10% giá ngày (BR-114) |
+| Hạn dùng báo giá | `expires_at` | Mốc báo giá hết hiệu lực; đặt xe sau mốc này bị từ chối `QUOTE_EXPIRED` (BR-122) |
 | Gói thuê | `RentalType` | Trục phân loại thứ hai (ADR-0004); ba giá trị ở ba dòng dưới |
 | Gói giờ | `HOURLY` | Thuê tối thiểu 4 giờ |
 | Gói ngày | `DAILY` | Thuê theo ngày |

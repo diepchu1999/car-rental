@@ -27,7 +27,7 @@ Gói gốc: `com.carrental`
 
 | Module | Schema | Trách nhiệm | GĐ |
 |---|---|---|---|
-| `vehicle` | `vehicle` | Danh mục xe, `ownership_type`, `fuel_type`, thuộc chi nhánh, duyệt lên sàn | 1 |
+| `vehicle` | `vehicle` | Danh mục xe, `ownership_type`, `fuel_type`, **giá ngày**, thuộc chi nhánh, duyệt lên sàn | 1 |
 | `fleet` | `fleet` | Bảo dưỡng, đăng kiểm, điều chuyển chi nhánh, bản ghi nạp nhiên liệu | 1 |
 | `availability` | `availability` | **Nguồn sự thật duy nhất** về xe rảnh hay bận | 1 |
 
@@ -36,7 +36,7 @@ Gói gốc: `com.carrental`
 | Module | Schema | Trách nhiệm | GĐ |
 |---|---|---|---|
 | `search` | — | Tìm xe theo vị trí và thời gian (read model, không sở hữu bảng gốc) | 1 |
-| `pricing` | `pricing` | Bảng giá, loại ngày, chiết khấu, phí tài xế/giao xe/bảo hiểm, mã giảm giá, báo giá | 1 |
+| `pricing` | `pricing` | Cách tính giá theo loại ngày và gói thuê, chiết khấu, phí tài xế/giao xe/bảo hiểm, mã giảm giá, báo giá | 1 |
 | `booking` | `booking` | Vòng đời đơn, gia hạn, đổi xe, huỷ | 1 |
 | `dispatch` | `dispatch` | Người lái được khai báo, phân công nhân viên giao xe | 1 |
 | `handover` | `handover` | Biên bản bàn giao, ODO, nhiên liệu, chữ ký, xác nhận hai phía | 1 |
@@ -116,6 +116,11 @@ phục vụ truy vấn nhiều tháng sau và không bao giờ đóng. Hai nhị
 **`config` là module riêng, không phải bảng phụ.** Tham số có khoảng hiệu lực và có lịch sử
 (ADR-0013). Để nó rải trong từng module thì mỗi module sẽ tự phát minh một kiểu lưu khác nhau.
 
+**Giá ngày nằm ở `vehicle`, không ở `pricing`.** Xe chỉ được duyệt khi đã có giá ngày (BR-234), và
+duyệt xe nằm ở `vehicle` — để giá ở `pricing` thì `vehicle` phải gọi sang `pricing`, tức nguồn cung phụ
+thuộc nhu cầu. Đặt cùng bảng xe còn cho phép một `CHECK` chặn xe `ACTIVE` không có giá, thay vì kiểm ở
+ứng dụng. `pricing` giữ **cách tính** — loại ngày, gói giờ, gói ngày, làm tròn, bảo hiểm — và báo giá.
+
 **`search` không sở hữu schema.** Nó là read model đọc từ `vehicle` và `availability`. Cho nó sở hữu
 bảng gốc là mở đường để nó dần biết những thứ không nên biết.
 
@@ -140,6 +145,9 @@ Các cổng chính:
 | `search` tìm chi nhánh trong bán kính | `branch` | `BranchDirectory` — PostGIS, trả cả khoảng cách |
 | `search` lấy xe hiển thị được | `vehicle` | `VehicleSearchDirectory` → `VehicleSearchView` |
 | `search` và `booking` kiểm điều kiện thuê | `booking` | `RentalTermsDirectory` — đệm, tối thiểu, giờ chi nhánh, cửa sổ đặt |
+| `pricing` lấy giá ngày của xe | `vehicle` | cổng riêng trong `vehicle.api` — chỉ thứ cần để tính giá, không có `ownershipType` |
+| `search` hiện tiền thuê, lọc và xếp theo giá | `pricing` | `pricing.api` — **cùng một cách tính** với báo giá (BR-126) |
+| `booking` lấy báo giá đã đóng băng | `pricing` | `pricing.api` — làm cùng `booking` |
 | `fleet` khoá lịch bảo dưỡng | `availability` | `AvailabilityDirectory.block(...)` |
 | `fleet` tạo khoá giấy tờ **lúc duyệt xe**, không đợi tới ngày hết hạn | `availability` | `AvailabilityDirectory.block(..., COMPLIANCE_HOLD)` |
 | `fleet` dời khoá giấy tờ khi giấy tờ được gia hạn | `availability` | `AvailabilityDirectory.moveComplianceHoldStart(...)` |

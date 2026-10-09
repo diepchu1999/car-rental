@@ -281,6 +281,10 @@ Gói 4 giờ tính **50% giá ngày**. Phần vượt tính **đúng như trả 
 Ví dụ: 5 giờ = 50% + 10% = **60%** giá ngày · 8 giờ = 50% + 4 × 10% = **90%** (vượt đúng 4 giờ chưa
 phải "quá 4 giờ") · **trên 8 giờ** thành 2 gói trở lên, chạm trần, bằng một ngày giá.
 
+Hệ quả của trần: **gói giờ dài hơn 8 giờ luôn tính đúng bằng gói ngày cho cùng khoảng** (BR-235), kể
+cả khi dài hơn 24 giờ — từ giờ thứ 9, mọi cách đếm "thêm một gói" đều ra giá bằng hoặc cao hơn gói ngày.
+Không cần, và không được, tự đặt cách đếm gói cho khoảng dài.
+
 Giá ngày là của chính chiếc xe (BR-234), theo loại ngày của **giờ nhận xe** (BR-218).
 
 Không chia đều giá ngày cho 24: chi phí cố định mỗi lượt (dọn xe, giao nhận, đi nạp nhiên liệu)
@@ -556,10 +560,27 @@ một chuyến từ thứ Sáu tới Chủ nhật có ngày thường lẫn ngà
 |---|---|---|
 | Ngày thường | Còn lại | Giá ngày |
 | Cuối tuần | Thứ Bảy, Chủ nhật | Giá ngày **+20%** |
-| Lễ tết | Lịch nghỉ chính thức nhà nước công bố mỗi năm, **kể cả ngày nghỉ bù** | Giá ngày **+50%** |
+| Lễ tết | Mọi ngày trong **kỳ nghỉ lễ** theo lịch nghỉ chính thức nhà nước công bố mỗi năm | Giá ngày **+50%** |
 
 Cả bốn — định nghĩa cuối tuần, hai mức tăng, danh sách ngày lễ — là tham số cấu hình (BR-225), không
 viết cứng. Danh sách ngày lễ là **dữ liệu** cập nhật mỗi năm; không thêm "ngày cao điểm" quanh Tết.
+
+**Kỳ nghỉ lễ** là chuỗi ngày nghỉ liên tục có chứa ít nhất một ngày lễ của Bộ luật Lao động: gồm ngày
+lễ, ngày nghỉ bù, ngày hoán đổi, và **cả Thứ Bảy, Chủ nhật nằm trong chuỗi đó**. Ví dụ Giỗ Tổ 2027 rơi
+vào thứ Sáu 16/4 thì cả 16–18/4 là lễ tết; Ngày Văn hóa 24/11/2026 rơi vào thứ Ba, thứ Hai vẫn đi làm,
+nên chỉ riêng 24/11. Lý do: Tết 2027 mùng 1 và mùng 2 rơi vào cuối tuần — chỉ tính "ngày được nghỉ vì
+lễ" thì mùng 1 Tết chỉ +20% trong khi 28 tháng Chạp +50%. Thông báo chính thức cũng đếm theo cách này
+("nghỉ 7 ngày liên tục"). Ngày ngoài kỳ nghỉ không tính, đúng câu "không thêm ngày cao điểm" ở trên.
+
+**Lấy lịch của khu vực công** (cán bộ, công chức, viên chức). Doanh nghiệp tư có thể chọn phương án
+khác nhau — Tết 2027 có ba phương án — nên chỉ lịch khu vực công là một lịch duy nhất. Dịp chưa có
+thông báo riêng thì suy từ Bộ luật Lao động (ngày lễ, nghỉ bù khi trùng ngày nghỉ hằng tuần), và cập
+nhật khi có thông báo.
+
+**Lịch lễ khai báo tới một ngày cụ thể.** Khoảng thuê kéo qua ngày cuối cùng đã khai báo thì **từ
+chối** báo giá và tìm kiếm cho khoảng đó (`HOLIDAY_CALENDAR_NOT_DECLARED`) — không tính tạm như ngày
+thường. Giá tạm sẽ bị đóng băng vào đơn (BR-122): đơn đặt dịp Tết năm sau mang giá ngày thường mà không
+ai biết. Với cửa sổ đặt 6 tháng (BR-121), lịch năm sau phải khai báo trước khoảng tháng 7.
 
 **Mỗi ngày thuê thuộc loại nào:** khoảng thuê chia thành từng **khối 24 giờ tính từ giờ nhận xe**. Mỗi
 khối lấy loại ngày theo **ngày lịch của giờ bắt đầu khối**, giờ Việt Nam. Ví dụ nhận thứ Sáu 10:00, trả
@@ -567,7 +588,7 @@ Chủ nhật 10:00: khối 1 bắt đầu thứ Sáu (ngày thường), khối 2
 
 **Cuối tuần trùng ngày lễ:** lấy mức **cao hơn** (+50%), không cộng dồn.
 *Nguồn: Tech Owner chốt 24/08/2026. Làm rõ 09/10/2026 — trước đó ghi "chưa chốt" dù BR-225 đã có giá
-trị khởi điểm cho cả ba.*
+trị khởi điểm cho cả ba; cùng ngày chốt kỳ nghỉ lễ, lịch khu vực công, và từ chối khi chưa khai báo lịch.*
 
 ### BR-219 — Phí thuê có tài xế ✅ GĐ1
 Tính **theo ngày**, cộng thẳng vào tổng đơn. Khách thấy một con số duy nhất, và cọc 30% tính trên
@@ -682,6 +703,9 @@ lấy giá của **chính chiếc xe đó**: tăng giá cuối tuần và lễ t
 **Bắt buộc có giá ngày trước khi duyệt xe** (BR-010): xe chưa có giá thì không lên sàn, vì khách tìm
 thấy một chiếc xe không báo được giá là hứa suông (BR-125). Đổi giá sau đó không ảnh hưởng đơn đã tạo
 (BR-122).
+
+Giá ngày **lớn hơn 0 và là bội số của 1.000đ** — mọi khoản tiền đều làm tròn tới 1.000đ (BR-236), giá
+gốc không lẻ hơn thế.
 *Nguồn: suy ra từ BR-408 ("giá thuê ngày của chính chiếc xe đó") và BR-210; Tech Owner duyệt 09/10/2026.*
 
 ### BR-235 — Gói ngày: tính theo khối 24 giờ, phần lẻ như trả trễ ✅ GĐ1
@@ -700,6 +724,17 @@ Dùng chung một cách tính cho đặt trước và trả trễ: khách đặt
 Mọi khoản tiền tính ra số lẻ (tăng giá theo loại ngày, gói giờ, phần giờ lẻ…) được **làm tròn từng dòng
 tới 1.000đ**, từ 500đ trở lên làm tròn lên. Tổng là tổng các dòng đã làm tròn — khách cộng tay các
 dòng trên báo giá phải ra đúng tổng.
+
+**Mỗi dòng là gì:**
+
+| Gói | Dòng |
+|---|---|
+| Gói ngày (BR-235) | **Mỗi khối 24 giờ một dòng** — mỗi khối có loại ngày riêng (BR-218) · phần giờ lẻ gộp **một dòng** |
+| Gói giờ (BR-114) | Gói 4 giờ **một dòng** · giờ vượt gộp **một dòng**. Trên 8 giờ thì dòng như gói ngày |
+| Bảo hiểm (BR-231) | **Một dòng** |
+
+Cách tách dòng quyết định tổng, nên phải cố định. Ví dụ giá ngày 855.000đ: ba ngày lễ tách ba dòng ra
+3 × 1.283.000 = **3.849.000đ**, gộp một dòng ra 3.848.000đ.
 *Nguồn: Tech Owner duyệt 09/10/2026.*
 
 ### BR-237 — Giờ lẻ làm tròn lên ✅ GĐ1

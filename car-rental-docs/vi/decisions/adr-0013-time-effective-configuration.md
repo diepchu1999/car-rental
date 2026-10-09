@@ -24,6 +24,24 @@ và đó chính là câu phải trả lời khi khách khiếu nại hoặc khi 
 Đây là mặt còn lại của ADR-0014: đơn đóng băng giá trị, còn cấu hình giữ lịch sử. Hai thứ cùng phục
 vụ một mục đích — làm cho quá khứ giải thích được.
 
+## Làm rõ 09/10/2026 — trước khi có module `config`
+
+Module `config` chưa làm. Cho tới khi có, tham số kinh doanh mà module đang làm cần — thời hạn giữ chỗ
+(BR-103), tham số giá và danh sách ngày lễ (BR-218, BR-122, BR-231) — đọc từ **cấu hình ứng dụng**
+qua một port, adapter nằm ở `adapter/out/configuration` của module dùng nó (`module-architecture.md` §2).
+
+**Mất gì:** không có lịch sử hiệu lực; đổi giá trị phải khởi động lại; danh sách ngày lễ nằm trong
+bản build nên đổi là phát hành lại — đúng điều quyết định này muốn tránh.
+
+**Vì sao chấp nhận:** chưa có khách, chưa chạy production. Và báo giá, đơn **lưu bản sao giá trị đã
+dùng** (ADR-0014), nên khi chuyển nguồn sang `config` không báo giá hay đơn nào đổi — chỉ thay adapter
+sau port.
+
+**Điều kiện:**
+- **Phải có module `config` trước khi chạy với khách thật.**
+- Tham số không có giá trị khởi điểm (phí bảo hiểm, BR-231) thì thiếu là ứng dụng **không khởi động** —
+  không điền sẵn một con số trong `application.yml`.
+
 ## Hệ quả
 - Đọc tham số luôn kèm mốc thời gian, không đọc "giá trị hiện tại" khi đang xử lý dữ liệu quá khứ.
 - Màn hình quản trị phải cho xem lịch sử thay đổi, không chỉ giá trị đang dùng.

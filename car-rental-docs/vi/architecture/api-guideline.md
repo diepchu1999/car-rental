@@ -113,6 +113,8 @@ Danh mục endpoint được lưu trong `../api/`, theo từng module.
 
 - [API chi nhánh — admin](../api/branch.md)
 - [API xe — admin](../api/vehicle.md)
+- [API tìm xe — public](../api/search.md)
+- [API báo giá — client](../api/pricing.md) — tạo ở Task 7
 
 Mọi thay đổi endpoint phải cập nhật danh mục trong **cùng** một thay đổi,
 theo khóa `HTTP method + path`.

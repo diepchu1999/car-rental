@@ -25,6 +25,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;     -- hash số định danh
 | Chi nhánh | `CN-<6>` | `CN-3TR7WK` |
 | Xe | `XE-<6>` | `XE-8KQ4M2` |
 | Khoá lịch | `KL-<6>` | `KL-5HV2QN` |
+| Báo giá | `BG-<yymm>-<6>` | `BG-2610-7QW3ZR` |
 | Đơn thuê | `DT-<yymm>-<6>` | `DT-2608-3XK9PQ` |
 | Thanh toán | `TT-<yymm>-<8>` | `TT-2608-4M2XK9PQ` |
 | Biên bản bàn giao | `BB-<yymm>-<6>` | `BB-2608-1AB2CD` |
@@ -299,6 +300,9 @@ Mất lịch sử nghĩa là mất khả năng trả lời "lúc khách đặt �
 đó chính là câu phải trả lời khi khiếu nại.
 
 Danh sách ngày lễ là **bảng dữ liệu**, không phải hằng số trong code.
+
+Module `config` chưa làm. Cho tới khi có, tham số và danh sách ngày lễ đọc từ cấu hình ứng dụng qua
+port — đánh đổi và điều kiện ở ADR-0013, mục làm rõ 09/10/2026.
 
 ---
 

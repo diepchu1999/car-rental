@@ -110,7 +110,14 @@ Mã lỗi là **hợp đồng ổn định** — mobile bản cũ hiển thị t
 | `SEARCH_RENTAL_TYPE_NOT_SUPPORTED` | 422 | Gói tháng chưa hỗ trợ trong tìm kiếm ở lát cắt hiện tại (BR-125) |
 | `SEARCH_DRIVE_MODE_NOT_SUPPORTED` | 422 | Có tài xế chưa hỗ trợ ở lát cắt hiện tại (BR-125) |
 | `SEARCH_PICKUP_METHOD_NOT_SUPPORTED` | 422 | Giao tận nơi chưa hỗ trợ ở lát cắt hiện tại (BR-125) |
-| `SEARCH_SORT_NOT_SUPPORTED` | 422 | Chỉ hỗ trợ sắp xếp gần nhất ở lát cắt hiện tại (BR-126) |
+| `SEARCH_SORT_NOT_SUPPORTED` | 422 | Xếp theo đánh giá chưa hỗ trợ — làm khi có đánh giá (BR-126, BR-901) |
+| `VEHICLE_DAILY_RATE_REQUIRED` | 422 | Duyệt xe chưa có giá ngày (BR-234, BR-010) |
+| `VEHICLE_INVALID_DAILY_RATE` | 422 | Giá ngày không lớn hơn 0 hoặc không là bội số của 1.000đ (BR-234) |
+| `QUOTE_NOT_FOUND` | 404 | Không tìm thấy báo giá theo mã `BG-<yymm>-<6>` |
+| `QUOTE_RENTAL_TYPE_NOT_SUPPORTED` | 422 | Gói tháng chưa hỗ trợ báo giá ở lát cắt hiện tại (BR-125, ADR-0012) |
+| `QUOTE_DRIVE_MODE_NOT_SUPPORTED` | 422 | Có tài xế chưa hỗ trợ báo giá ở lát cắt hiện tại (BR-125, ADR-0012) |
+| `QUOTE_PICKUP_METHOD_NOT_SUPPORTED` | 422 | Giao tận nơi chưa hỗ trợ báo giá ở lát cắt hiện tại (BR-125, ADR-0012) |
+| `HOLIDAY_CALENDAR_NOT_DECLARED` | 422 | Khoảng thuê kéo qua ngày cuối đã khai báo lịch lễ — từ chối báo giá và tìm kiếm (BR-218) |
 | `VEHICLE_HAS_ACTIVE_BOOKINGS` | 409 | Thanh lý xe còn đơn hiệu lực (BR-014) |
 | `CONTRACT_OVERDUE` | 403 | Hợp đồng có kỳ quá hạn, chặn nghiệp vụ khác (BR-224) |
 
