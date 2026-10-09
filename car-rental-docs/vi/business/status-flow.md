@@ -207,7 +207,7 @@ DRAFT ──► PENDING_APPROVAL ──► ACTIVE ◄──► INACTIVE
 
 | Chuyển | Điều kiện | Quy tắc |
 |---|---|---|
-| `PENDING_APPROVAL` → `ACTIVE` | `BRANCH_MANAGER` duyệt (xe công ty) · KYC thủ công (xe đối tác) | BR-010, BR-009 |
+| `PENDING_APPROVAL` → `ACTIVE` | `BRANCH_MANAGER` duyệt (xe công ty) · KYC thủ công (xe đối tác) · xe đã có giá ngày | BR-010, BR-009, BR-234 |
 | `ACTIVE` → `INACTIVE` | Tạm ngừng khai thác. **Không huỷ đơn đã xác nhận** | — |
 | `* ` → `RETIRED` | **Chặn nếu còn đơn hiệu lực trong tương lai** | BR-014 |
 

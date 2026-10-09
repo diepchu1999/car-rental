@@ -12,7 +12,7 @@ tài liệu · Principal Engineer (codex) hiện thực theo tài liệu đã ch
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Nghiệp vụ giai đoạn 1 | ✅ **157 quy tắc BR đã chốt** |
+| Nghiệp vụ giai đoạn 1 | ✅ **161 quy tắc BR đã chốt** |
 | Kiến trúc | ✅ 15 ADR ACCEPTED, 10 guideline, 12 rule khoá bằng test |
 | Code | 🟡 Đang làm — `shared`, `branch`, `vehicle`, `availability`, `search` xong; 1.729 test xanh |
 | Môi trường | Local, chưa build production |
@@ -57,7 +57,7 @@ test nào cần chạy lại, và cái gì có thể hỏng theo.
 **Nghiệp vụ** — `car-rental-docs/vi/business/`
 | File | Khi nào cần |
 |---|---|
-| `business-rules.md` | Luôn luôn — 157 quy tắc, và mục "chưa chốt" ở cuối |
+| `business-rules.md` | Luôn luôn — 161 quy tắc, và mục "chưa chốt" ở cuối |
 | `glossary.md` | Trước khi đặt tên bất cứ thứ gì |
 | `domain-map.md` | Khi cần biết việc này thuộc vùng nào |
 | `status-flow.md` | Khi chạm tới trạng thái đơn, khoá lịch, tiền, hợp đồng |

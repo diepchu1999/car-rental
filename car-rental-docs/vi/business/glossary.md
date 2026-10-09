@@ -27,6 +27,8 @@
 
 | Tiếng Việt | Trong code | Nghĩa | Quy tắc |
 |---|---|---|---|
+| Giá ngày | `daily_rate` | Giá thuê **một ngày thường** của từng xe; mọi khoản theo giá ngày đều tính từ đây | BR-234 |
+| Loại ngày | `day_type` | `WEEKDAY` \| `WEEKEND` \| `HOLIDAY` — gắn cho từng khối 24 giờ của khoảng thuê | BR-218 |
 | Tiền năng lượng | `energy_charge` | Tiền xăng/điện khách tiêu thụ, tính theo lượng thật | BR-415 |
 | Phí dịch vụ nhiên liệu | `refuel_service_fee` | **Chế tài** khi trả xe thiếu nhiên liệu — không phải tiền năng lượng | BR-414 |
 | Phụ phí vượt km | `excess_mileage_fee` | Phí khi vượt giới hạn km của cả chuyến | BR-401, BR-404 |

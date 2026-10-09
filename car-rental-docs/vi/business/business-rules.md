@@ -271,11 +271,23 @@ BR-114 đến BR-118.
 *Nguồn: Tech Owner chốt 24/08/2026.*
 
 ### BR-114 — Giá gói giờ ✅ GĐ1
-Gói 4 giờ tính **50% giá ngày**; mỗi giờ vượt quá 4 giờ tính theo mức riêng trong bảng giá.
+Gói 4 giờ tính **50% giá ngày**. Phần vượt tính **đúng như trả trễ gói giờ** (BR-118):
+
+- Mỗi giờ vượt = **20% giá gói giờ**, tức **10% giá ngày**.
+- Vượt **quá 4 giờ** thì thành **thêm một gói giờ**.
+- **Trần:** gói giờ không bao giờ đắt hơn **gói ngày tính cho cùng khoảng** (BR-235). Dưới 24 giờ, trần
+  chính là một ngày giá.
+
+Ví dụ: 5 giờ = 50% + 10% = **60%** giá ngày · 8 giờ = 50% + 4 × 10% = **90%** (vượt đúng 4 giờ chưa
+phải "quá 4 giờ") · **trên 8 giờ** thành 2 gói trở lên, chạm trần, bằng một ngày giá.
+
+Giá ngày là của chính chiếc xe (BR-234), theo loại ngày của **giờ nhận xe** (BR-218).
 
 Không chia đều giá ngày cho 24: chi phí cố định mỗi lượt (dọn xe, giao nhận, đi nạp nhiên liệu)
-không đổi dù khách thuê 4 giờ hay 24 giờ.
-*Nguồn: Tech Owner duyệt 24/08/2026.*
+không đổi dù khách thuê 4 giờ hay 24 giờ. Tính phần vượt giống trả trễ để đặt trước và trả trễ cùng
+một cách tính — như BR-235 làm với gói ngày.
+*Nguồn: Tech Owner duyệt 24/08/2026. Làm rõ 09/10/2026 — trước đó phần vượt ghi "theo mức riêng trong
+bảng giá", không có mức nào.*
 
 ### BR-115 — Giới hạn km của gói giờ ✅ GĐ1
 **12,5 km mỗi giờ thuê** — đúng bằng 300 km khi thuê tròn 24 giờ, nên nhất quán với cách tính gộp
@@ -342,6 +354,10 @@ một người có thể đã quên là lãng phí.
 ### BR-122 — Đơn đóng băng giá tại thời điểm đặt ✅ GĐ1
 Tổng tiền của một đơn được **chốt tại thời điểm khách đặt**. Bảng giá thay đổi sau đó không ảnh
 hưởng tới đơn đã tạo — cùng nguyên tắc với hoa hồng (BR-208) và tham số cấu hình (BR-225).
+
+**Báo giá có hạn dùng 15 phút** (tham số BR-225). Đặt xe bằng báo giá đã hết hạn bị từ chối
+(`QUOTE_EXPIRED`) — khách xin báo giá lại. Hạn ngắn để khách không đặt được theo một giá đã cũ; đủ dài
+để khách điền xong thông tin.
 *Nguồn: nguyên tắc nhất quán với BR-208, BR-225.*
 
 ### BR-123 — Xoá tài khoản khách ✅ GĐ1
@@ -406,10 +422,15 @@ Hai bộ lọc cần đặt nổi bật:
 thật sự quan tâm là *miễn thế chấp* và *đánh giá* — lọc theo tính chất khách quan tâm, không lọc
 theo nhãn sở hữu.
 
-**Thứ tự hiện thực:** lọc và xếp theo **giá** làm cùng `pricing` (và cần BR-218 chốt trước) · xếp theo
+**Giá hiển thị trong kết quả tìm kiếm** là **tổng tiền thuê xe cho đúng khoảng khách chọn**, đã tính
+loại ngày (BR-218), cách tính phần giờ lẻ (BR-235) và làm tròn (BR-236). **Không cộng phí bảo hiểm**
+— bảo hiểm là dòng riêng trong báo giá (BR-231), khách thấy đủ tổng trước khi đặt. Không hiện "giá từ X/ngày" —
+con số đó sai ngay khi khoảng thuê có cuối tuần hay ngày lễ. Lọc và xếp theo giá dùng chính tổng này.
+
+**Thứ tự hiện thực:** lọc và xếp theo **giá** làm cùng `pricing` · xếp theo
 **đánh giá** làm khi có đánh giá (BR-901) · lọc **giao tận nơi** làm cùng phân công nhân viên giao xe.
 Đây là thứ tự làm, không phải bỏ — cả ba vẫn thuộc giai đoạn 1.
-*Nguồn: Tech Owner duyệt 24/08/2026. Làm rõ 04/10/2026.*
+*Nguồn: Tech Owner duyệt 24/08/2026. Làm rõ 04/10/2026, 09/10/2026.*
 
 ### BR-127 — Xe hỏng trước giờ giao ✅ GĐ1
 Đơn đã `CONFIRMED` mà xe hỏng trước giờ bàn giao:
@@ -529,8 +550,24 @@ Cuối tuần và lễ tết có giá cao hơn.
 Giá của một đơn tính theo **từng ngày trong khoảng thuê**, không lấy một giá duy nhất nhân số ngày —
 một chuyến từ thứ Sáu tới Chủ nhật có ngày thường lẫn ngày cuối tuần.
 
-⚠️ Chưa chốt: định nghĩa "cuối tuần", danh sách ngày lễ, và mức tăng.
-*Nguồn: Tech Owner chốt 24/08/2026.*
+**Ba loại ngày, tính trên giá ngày của chính chiếc xe (BR-234):**
+
+| Loại ngày | Ngày nào | Giá |
+|---|---|---|
+| Ngày thường | Còn lại | Giá ngày |
+| Cuối tuần | Thứ Bảy, Chủ nhật | Giá ngày **+20%** |
+| Lễ tết | Lịch nghỉ chính thức nhà nước công bố mỗi năm, **kể cả ngày nghỉ bù** | Giá ngày **+50%** |
+
+Cả bốn — định nghĩa cuối tuần, hai mức tăng, danh sách ngày lễ — là tham số cấu hình (BR-225), không
+viết cứng. Danh sách ngày lễ là **dữ liệu** cập nhật mỗi năm; không thêm "ngày cao điểm" quanh Tết.
+
+**Mỗi ngày thuê thuộc loại nào:** khoảng thuê chia thành từng **khối 24 giờ tính từ giờ nhận xe**. Mỗi
+khối lấy loại ngày theo **ngày lịch của giờ bắt đầu khối**, giờ Việt Nam. Ví dụ nhận thứ Sáu 10:00, trả
+Chủ nhật 10:00: khối 1 bắt đầu thứ Sáu (ngày thường), khối 2 bắt đầu thứ Bảy (cuối tuần).
+
+**Cuối tuần trùng ngày lễ:** lấy mức **cao hơn** (+50%), không cộng dồn.
+*Nguồn: Tech Owner chốt 24/08/2026. Làm rõ 09/10/2026 — trước đó ghi "chưa chốt" dù BR-225 đã có giá
+trị khởi điểm cho cả ba.*
 
 ### BR-219 — Phí thuê có tài xế ✅ GĐ1
 Tính **theo ngày**, cộng thẳng vào tổng đơn. Khách thấy một con số duy nhất, và cọc 30% tính trên
@@ -612,7 +649,11 @@ lẫn hoá đơn — không gộp vào giá thuê.
 
 Bảo hiểm là lý do khách dám thuê xe tự lái (BR-602). Giấu nó vào giá thuê là giấu mất điểm bán hàng
 mạnh nhất, và đi ngược nguyên tắc minh bạch đã áp dụng cho tiền năng lượng (BR-419).
-*Nguồn: Tech Owner chốt 24/08/2026.*
+
+**Mức phí:** cách tính (cố định mỗi ngày tính tiền, hoặc % tiền thuê) và giá trị là **tham số cấu hình
+bắt buộc khai báo** (BR-225), **chưa có giá trị khởi điểm** — chờ làm việc với nhà bảo hiểm. Thiếu
+tham số thì ứng dụng **không khởi động**, thay vì tự điền một con số giả định rồi báo giá sai cho khách.
+*Nguồn: Tech Owner chốt 24/08/2026. Làm rõ 09/10/2026.*
 
 ### BR-232 — Khách chuyển khoản thừa ✅ GĐ1
 Phần thừa được ghi nhận và **hoàn về tài khoản đã đăng ký trong 3 ngày làm việc** (như BR-215).
@@ -629,6 +670,42 @@ trong hợp đồng.
 Trạng thái này **cần `ADMIN` kích hoạt** — nó là bước đối đầu trực tiếp với khách và không được để
 xảy ra do một thao tác nhầm ở chi nhánh.
 *Nguồn: Chief Architect phát hiện khi vẽ máy trạng thái, Tech Owner duyệt 24/08/2026.*
+
+### BR-234 — Mỗi xe có giá ngày riêng ✅ GĐ1
+Mỗi xe có một **giá ngày** — giá thuê một ngày thường — do admin nhập. Mọi khoản tính theo giá ngày đều
+lấy giá của **chính chiếc xe đó**: tăng giá cuối tuần và lễ tết (BR-218), gói giờ (BR-114), phí trả trễ
+(BR-408), phân khúc thế chấp (BR-210).
+
+**Bắt buộc có giá ngày trước khi duyệt xe** (BR-010): xe chưa có giá thì không lên sàn, vì khách tìm
+thấy một chiếc xe không báo được giá là hứa suông (BR-125). Đổi giá sau đó không ảnh hưởng đơn đã tạo
+(BR-122).
+*Nguồn: suy ra từ BR-408 ("giá thuê ngày của chính chiếc xe đó") và BR-210; Tech Owner duyệt 09/10/2026.*
+
+### BR-235 — Gói ngày: tính theo khối 24 giờ, phần lẻ như trả trễ ✅ GĐ1
+Gói ngày tính theo từng **khối 24 giờ tính từ giờ nhận xe**; mỗi khối theo loại ngày của nó (BR-218).
+
+Phần lẻ sau khối 24 giờ cuối cùng tính **đúng như trả xe trễ** (BR-408): **≤ 4 giờ** thì mỗi giờ 20% giá
+ngày; **quá 4 giờ** thì thành thêm một ngày. Giá ngày của phần lẻ theo loại ngày của giờ bắt đầu phần lẻ.
+
+**Tối thiểu một ngày:** khoảng thuê ngắn hơn 24 giờ theo gói ngày tính bằng một khối.
+
+Dùng chung một cách tính cho đặt trước và trả trễ: khách đặt 26 giờ và khách đặt 24 giờ rồi trả trễ
+2 giờ trả cùng một số tiền.
+*Nguồn: Tech Owner duyệt 09/10/2026.*
+
+### BR-236 — Làm tròn tiền tới 1.000đ ✅ GĐ1
+Mọi khoản tiền tính ra số lẻ (tăng giá theo loại ngày, gói giờ, phần giờ lẻ…) được **làm tròn từng dòng
+tới 1.000đ**, từ 500đ trở lên làm tròn lên. Tổng là tổng các dòng đã làm tròn — khách cộng tay các
+dòng trên báo giá phải ra đúng tổng.
+*Nguồn: Tech Owner duyệt 09/10/2026.*
+
+### BR-237 — Giờ lẻ làm tròn lên ✅ GĐ1
+Mọi quy tắc tính "**mỗi giờ**" — giờ vượt của gói giờ (BR-114), trả trễ gói giờ (BR-118), trả trễ gói
+ngày (BR-408), phần giờ lẻ của gói ngày (BR-235) — **làm tròn lên theo giờ**: lẻ 1 phút cũng tính 1 giờ.
+
+Áp như nhau cho đặt trước và trả trễ. Không có thời gian ân hạn — nếu muốn nương tay cho khách trễ vài
+phút, đó là một con số phải chốt riêng.
+*Nguồn: Tech Owner duyệt 09/10/2026.*
 
 ---
 
@@ -745,6 +822,8 @@ với hoa hồng (BR-208).
 | Trần ứng trả chi phí năng lượng (BR-422) | 500.000đ/chuyến |
 | Số ngày báo trước khi giấy tờ hết hạn (BR-017) | 30 ngày |
 | **Thời hạn giữ chỗ** (BR-103) | 1 tiếng |
+| Hạn dùng báo giá (BR-122) | 15 phút |
+| Phí bảo hiểm theo chuyến — cách tính và giá trị (BR-231) | **Chưa có — bắt buộc khai báo**, thiếu thì ứng dụng không khởi động |
 
 Lý do: Tech Owner chưa có xe, chưa có khách, chưa có dữ liệu thị trường — mọi con số hiện tại là
 phỏng đoán có tham chiếu. Đóng cứng phỏng đoán vào code nghĩa là mỗi lần sửa phải chờ một đợt
