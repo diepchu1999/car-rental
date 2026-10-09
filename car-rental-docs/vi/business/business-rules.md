@@ -653,6 +653,9 @@ mạnh nhất, và đi ngược nguyên tắc minh bạch đã áp dụng cho ti
 **Mức phí:** cách tính (cố định mỗi ngày tính tiền, hoặc % tiền thuê) và giá trị là **tham số cấu hình
 bắt buộc khai báo** (BR-225), **chưa có giá trị khởi điểm** — chờ làm việc với nhà bảo hiểm. Thiếu
 tham số thì ứng dụng **không khởi động**, thay vì tự điền một con số giả định rồi báo giá sai cho khách.
+
+Với cách tính cố định mỗi ngày: số ngày là số ngày tính tiền của gói ngày (BR-235); **gói giờ tính 1 ngày**,
+bất kể dài bao nhiêu giờ — gói giờ vốn có trần bằng một ngày giá (BR-114).
 *Nguồn: Tech Owner chốt 24/08/2026. Làm rõ 09/10/2026.*
 
 ### BR-232 — Khách chuyển khoản thừa ✅ GĐ1
