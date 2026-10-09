@@ -30,7 +30,7 @@ public final class JobLoggingTaskDecorator implements TaskDecorator {
             Boolean previousExecution = JOB_EXECUTION.get();
             JOB_EXECUTION.set(true);
             MDC.put(RequestIdFilter.MDC_KEY, "job-" + UUID.randomUUID());
-            // Callback đã được gắn tên sẽ đặt api trước khi gọi hàm job; không kế thừa api của worker.
+            // Observation handler đặt tên khi method @Scheduled chạy; không kế thừa api của worker.
             MDC.put(RequestIdFilter.API_MDC_KEY, "-");
             try {
                 runnable.run();

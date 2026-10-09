@@ -78,14 +78,13 @@ public final class RequestIdFilter extends OncePerRequestFilter {
         doFilterInternal(request, response, filterChain);
     }
 
-    /** Giữ method/path ban đầu qua redispatch; không đọc query, body hay header để tạo nhãn API. */
+    /** Giữ nhãn đã escape/giới hạn qua redispatch; không đọc query/body/header hoặc sửa URI xử lý thật. */
     private String resolveApi(HttpServletRequest request) {
         Object existing = request.getAttribute(API_ATTRIBUTE);
         if (existing instanceof String api) {
             return api;
         }
-        String api = LogValueSanitizer.escape(request.getMethod()) + " "
-                + LogValueSanitizer.escape(request.getRequestURI());
+        String api = LogValueSanitizer.escapeApi(request.getMethod() + " " + request.getRequestURI());
         request.setAttribute(API_ATTRIBUTE, api);
         return api;
     }

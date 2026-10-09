@@ -23,6 +23,7 @@ public final class ScheduledJobObservationHandler implements ObservationHandler<
 
     /**
      * Context cung cấp user class đã bỏ CGLIB và method gốc dù ngoài nó là OutcomeTrackingRunnable.
+     * Nhãn job dùng cùng giới hạn/escape như HTTP trước khi vào MDC.
      * Không xóa api ở onStop: observation dừng trước ErrorHandler nên phải để decorator ngoài cùng
      * khôi phục MDC sau khi tóm tắt lỗi và stack trace được ghi xong.
      */
@@ -30,7 +31,8 @@ public final class ScheduledJobObservationHandler implements ObservationHandler<
     public void onStart(ScheduledTaskObservationContext context) {
         if (JobLoggingTaskDecorator.isJobExecution()) {
             MDC.put(RequestIdFilter.API_MDC_KEY,
-                    context.getTargetClass().getSimpleName() + "." + context.getMethod().getName());
+                    LogValueSanitizer.escapeApi(context.getTargetClass().getSimpleName()
+                            + "." + context.getMethod().getName()));
         }
     }
 }

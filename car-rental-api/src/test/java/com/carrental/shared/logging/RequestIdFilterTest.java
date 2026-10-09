@@ -238,14 +238,79 @@ class RequestIdFilterTest {
         assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
     }
 
-    /** Hai chain thực sự cùng hoạt động vẫn thấy ID riêng trước và sau điểm đồng bộ. */
+    /** Chỉ nhãn bị giới hạn; chain nhận nguyên URI, method, query, ID và không bị chặn vì path dài. */
+    @ParameterizedTest
+    @ValueSource(ints = {511, 512, 513, 4096})
+    void limitsApiWithoutChangingRequestOrResponse(int labelLength) throws Exception {
+        String path = "/" + "a".repeat(labelLength - 5);
+        String fullApi = "GET " + path;
+        String expected = labelLength <= 512 ? fullApi : fullApi.substring(0, 501) + "[truncated]";
+        var request = new MockHttpServletRequest("GET", path);
+        request.setQueryString("secret=query-sentinel");
+        request.addHeader(RequestIdFilter.HEADER_NAME, "safe-long-path");
+        var response = new MockHttpServletResponse();
+        filter.doFilter(request, response, (original, result) -> {
+            assertSame(request, original);
+            assertEquals(path, request.getRequestURI());
+            assertEquals("GET", request.getMethod());
+            assertEquals("secret=query-sentinel", request.getQueryString());
+            assertEquals(expected, MDC.get(RequestIdFilter.API_MDC_KEY));
+            assertEquals("safe-long-path", MDC.get(RequestIdFilter.MDC_KEY));
+            result.getWriter().write("unchanged");
+        });
+        assertEquals("unchanged", response.getContentAsString());
+        assertEquals("safe-long-path", response.getHeader(RequestIdFilter.HEADER_NAME));
+        assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
+    }
+
+    /** Đường dẫn ngắn trước escape nhưng dài sau escape vẫn bị chặn, không để CR/LF thật vào MDC. */
     @Test
-    void isolatesConcurrentRequests() throws Exception {
+    void boundsApiAfterControlCharacterExpansion() throws Exception {
+        var request = new MockHttpServletRequest("GET", "/" + "\n".repeat(300));
+        filter.doFilter(request, new MockHttpServletResponse(), (original, response) ->
+                assertEquals("GET /" + "\\n".repeat(248) + "[truncated]", MDC.get(RequestIdFilter.API_MDC_KEY)));
+    }
+
+    /** Async/error dùng lại nhãn đã cắt ban đầu, không cắt/escape lần hai hay đổi thành /error. */
+    @ParameterizedTest
+    @EnumSource(value = DispatcherType.class, names = {"ERROR", "ASYNC"})
+    void preservesBoundedApiAcrossRedispatch(DispatcherType dispatcherType) throws Exception {
+        String path = "/" + "a".repeat(1024);
+        String expected = "GET /" + "a".repeat(496) + "[truncated]";
+        var request = new MockHttpServletRequest("GET", path);
+        request.addHeader(RequestIdFilter.HEADER_NAME, "bounded-redispatch");
+        var response = new MockHttpServletResponse();
+        filter.doFilter(request, response, (original, result) ->
+                assertEquals(expected, MDC.get(RequestIdFilter.API_MDC_KEY)));
+        request.setDispatcherType(dispatcherType);
+        request.setRequestURI("/error");
+        request.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, path);
+        try (var executor = Executors.newSingleThreadExecutor()) {
+            executor.submit(() -> {
+                try {
+                    filter.doFilter(request, response, (original, result) -> {
+                        assertEquals(expected, MDC.get(RequestIdFilter.API_MDC_KEY));
+                        assertEquals("bounded-redispatch", MDC.get(RequestIdFilter.MDC_KEY));
+                    });
+                    assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
+                    assertNull(MDC.get(RequestIdFilter.MDC_KEY));
+                    return null;
+                } finally {
+                    MDC.clear();
+                }
+            }).get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    /** Hai chain thực sự cùng hoạt động vẫn thấy ID riêng trước và sau điểm đồng bộ. */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void isolatesConcurrentRequests(boolean longPath) throws Exception {
         var entered = new CountDownLatch(2);
         var executor = Executors.newFixedThreadPool(2);
         try {
-            var first = executor.submit(() -> runConcurrentRequest("client-first", entered));
-            var second = executor.submit(() -> runConcurrentRequest("client-second", entered));
+            var first = executor.submit(() -> runConcurrentRequest("client-first", entered, longPath));
+            var second = executor.submit(() -> runConcurrentRequest("client-second", entered, longPath));
             assertEquals("client-first", first.get(10, TimeUnit.SECONDS));
             assertEquals("client-second", second.get(10, TimeUnit.SECONDS));
         } finally {
@@ -255,8 +320,11 @@ class RequestIdFilterTest {
     }
 
     /** Chạy một request trên worker, kiểm MDC trong chain và sau khi filter trả về. */
-    private String runConcurrentRequest(String requestId, CountDownLatch entered) throws Exception {
-        var request = new MockHttpServletRequest("GET", "/test/" + requestId);
+    private String runConcurrentRequest(String requestId, CountDownLatch entered, boolean longPath) throws Exception {
+        String path = "/test/" + requestId + (longPath ? "a".repeat(1024) : "");
+        String expectedApi = "GET " + path;
+        String expectedLabel = longPath ? expectedApi.substring(0, 501) + "[truncated]" : expectedApi;
+        var request = new MockHttpServletRequest("GET", path);
         request.setQueryString("secret=" + requestId);
         request.addHeader(RequestIdFilter.HEADER_NAME, requestId);
         var response = new MockHttpServletResponse();
@@ -264,7 +332,7 @@ class RequestIdFilterTest {
             assertNull(MDC.get(RequestIdFilter.MDC_KEY));
             filter.doFilter(request, response, (ignoredRequest, ignoredResponse) -> {
                 assertEquals(requestId, MDC.get(RequestIdFilter.MDC_KEY));
-                assertEquals("GET /test/" + requestId, MDC.get(RequestIdFilter.API_MDC_KEY));
+                assertEquals(expectedLabel, MDC.get(RequestIdFilter.API_MDC_KEY));
                 entered.countDown();
                 try {
                     assertTrue(entered.await(5, TimeUnit.SECONDS), "Both requests must enter concurrently.");
@@ -273,7 +341,7 @@ class RequestIdFilterTest {
                     throw new IOException("Interrupted while coordinating requests.", exception);
                 }
                 assertEquals(requestId, MDC.get(RequestIdFilter.MDC_KEY));
-                assertEquals("GET /test/" + requestId, MDC.get(RequestIdFilter.API_MDC_KEY));
+                assertEquals(expectedLabel, MDC.get(RequestIdFilter.API_MDC_KEY));
             });
             assertNull(MDC.get(RequestIdFilter.MDC_KEY));
             assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));

@@ -100,6 +100,40 @@ class SqlCallerFlowIntegrationTest {
         }
     }
 
+    /** HTTP thật vẫn tra đủ mã và trả lỗi cũ; chỉ nhãn api của SQL bị cắt, không thay tham số nghiệp vụ. */
+    @Test
+    void boundsLongApiContextWithoutTruncatingDatabaseInput() throws Exception {
+        String code = "LOG-BOUND-" + "a".repeat(1024) + "-tail";
+        String path = "/api/v1/admin/branches/" + code;
+        String id = "bounded-" + UUID.randomUUID();
+        String expectedApi = ("GET " + path).substring(0, 501) + "[truncated]";
+        try (var logs = new LogEventCapture("p6spy")) {
+            var response = get(path + "?probe=not-in-api-context", id);
+            assertEquals(404, response.statusCode(), response.body());
+            assertEquals(List.of(id), response.headers().allValues("X-Request-Id"));
+            JsonNode body = mapper.readTree(response.body());
+            assertEquals(Set.of("success", "data", "error"), Set.copyOf(body.propertyNames()));
+            assertFalse(body.path("success").booleanValue());
+            assertTrue(body.path("data").isNull());
+            assertEquals(Set.of("code", "message"), Set.copyOf(body.path("error").propertyNames()));
+            assertEquals("BRANCH_NOT_FOUND", body.path("error").path("code").asString());
+            assertFalse(response.body().contains("[truncated]"));
+            assertFalse(response.body().contains("caller:"));
+            assertFalse(response.body().contains(code));
+            if (!sqlLogEnabled()) {
+                assertTrue(logs.events().isEmpty());
+                return;
+            }
+            var events = requestSql(logs, id);
+            assertEquals(1, events.size());
+            assertEquals(512, expectedApi.length());
+            assertContext(events.getFirst(), id, expectedApi);
+            assertTrue(events.getFirst().getFormattedMessage().contains(code),
+                    "The database must receive the full input, not the truncated log label.");
+            assertFalse(events.getFirst().getFormattedMessage().contains("not-in-api-context"));
+        }
+    }
+
     /** BR-125: tìm được xe thật và cùng một SQL chứa hai service trùng tên nhưng khác đường dẫn module. */
     @Test
     void distinguishesBothVehicleSearchServicesOnRealSearchRoute() throws Exception {
