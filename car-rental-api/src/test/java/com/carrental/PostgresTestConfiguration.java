@@ -1,8 +1,15 @@
 package com.carrental;
 
+import com.github.gavlyukovskiy.boot.jdbc.decorator.DecoratedDataSource;
+import com.p6spy.engine.spy.P6DataSource;
+import com.zaxxer.hikari.HikariDataSource;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.test.context.DynamicPropertyRegistrar;
+import org.springframework.util.Assert;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
@@ -14,6 +21,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import javax.sql.DataSource;
 
 /**
  * Cấu hình PostgreSQL thật dùng chung cho các integration test.
@@ -57,6 +65,32 @@ public class PostgresTestConfiguration {
      * Khởi tạo cấu hình test để Spring tạo các bean được khai báo.
      */
     public PostgresTestConfiguration() {
+    }
+
+    /**
+     * Chặn test xanh giả do chỉ bật tên profile nhưng datasource không thực sự đi qua P6Spy.
+     * Mọi integration test dùng cấu hình này kiểm đúng mode: mặc định Hikari trực tiếp;
+     * chỉ lượt chạy chủ đích với sql-log mới có decorator và P6Spy. Không đổi cấu hình production.
+     */
+    @Bean
+    SmartInitializingSingleton verifySqlLoggingDataSourceMode(DataSource dataSource, Environment environment) {
+        return () -> {
+            boolean enabled = environment.acceptsProfiles(Profiles.of("sql-log"));
+            Assert.state(enabled == environment.getProperty("decorator.datasource.enabled", Boolean.class, false),
+                    "Datasource decoration must match the explicit sql-log profile.");
+            if (enabled) {
+                Assert.state(dataSource instanceof DecoratedDataSource,
+                        "sql-log must use an actually decorated datasource.");
+                DecoratedDataSource decorated = (DecoratedDataSource) dataSource;
+                Assert.state(decorated.getDecoratedDataSource() instanceof P6DataSource,
+                        "sql-log must execute through P6Spy, not another decorator.");
+                Assert.state(decorated.getRealDataSource() instanceof HikariDataSource,
+                        "The original Hikari connection pool must be preserved.");
+            } else {
+                Assert.state(dataSource instanceof HikariDataSource,
+                        "Without sql-log the datasource must be Hikari directly, with no decorator.");
+            }
+        };
     }
 
     /**

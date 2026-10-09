@@ -99,6 +99,11 @@ codex chỉ chạy lệnh **đọc**: `git status`, `git diff`, `git log`, tìm 
   tài liệu sai hoặc mâu thuẫn với code thì báo — sửa tài liệu chuẩn là việc của Chief Architect.
   **Ngoại lệ:** danh mục endpoint `car-rental-docs/vi/api/` mô tả code đã viết, nên **bạn phải cập nhật
   nó trong cùng thay đổi** với endpoint (api-guideline §9).
+- **README chỉ ghi hiện trạng và cách dùng**: chạy local, bật/tắt một tính năng, đọc log. Không ghi
+  nhật ký task — không tiêu đề theo phần hay theo lần review, không tóm tắt từng test, không ghi chú kiểu
+  "đã xoá…, có thể khôi phục": những thứ đó vào **báo cáo cuối task** (git log giữ lịch sử). Viết vào
+  README thì sửa đúng mục đang mô tả tính năng đó, không thêm mục mới cho mỗi lần làm. Không sửa mục
+  "Trạng thái" của README — nó trỏ sang `CLAUDE.md`, nơi duy nhất ghi số liệu dự án.
 - **Không làm quá phạm vi.** Thấy việc đáng làm ngoài phạm vi thì ghi chú ở cuối, đừng tự làm.
 - Chạm tài nguyên tranh chấp thì **test đồng thời thật** với PostgreSQL thật, và chỉ cách **chứng minh
   test đỏ được** khi tắt cơ chế bảo vệ (`backend-guideline.md` §6).
@@ -107,7 +112,7 @@ codex chỉ chạy lệnh **đọc**: `git status`, `git diff`, `git log`, tìm 
 
 1. Hướng dẫn Tech Owner chạy `./mvnw clean verify` ở `car-rental-api/`, báo số test và số giây.
 2. Báo cáo:
-   - Tóm tắt từng test một dòng.
+   - Tóm tắt từng test một dòng — trong báo cáo, **không** vào README.
    - Danh sách file đã tạo hoặc sửa.
    - **File collection Postman** (và environment nếu mới tạo): đường dẫn, cách import, thứ tự chạy thư mục.
    - Chỗ tài liệu chưa rõ hoặc mâu thuẫn — ghi lại, đừng tự quyết.

@@ -1,9 +1,15 @@
 package com.carrental.availability.adapter.in.scheduler;
 
 import com.carrental.availability.application.port.in.ExpireReservationHoldsUseCase;
+import com.carrental.shared.logging.LogEventCapture;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
+import org.springframework.boot.autoconfigure.AutoConfigurations;
+import org.springframework.boot.autoconfigure.task.TaskSchedulingAutoConfiguration;
+import org.springframework.boot.micrometer.observation.autoconfigure.ObservationAutoConfiguration;
+import org.springframework.boot.micrometer.observation.autoconfigure.ScheduledTasksObservationAutoConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.ClassPathBeanDefinitionScanner;
 import org.springframework.scheduling.TaskScheduler;
@@ -12,6 +18,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -69,20 +76,36 @@ class ReservationHoldExpirySchedulerTest {
         var useCase = mock(ExpireReservationHoldsUseCase.class);
         AtomicInteger calls = new AtomicInteger();
         CountDownLatch nextSucceeded = new CountDownLatch(1);
+        var ids = new CopyOnWriteArrayList<String>();
+        var apis = new CopyOnWriteArrayList<String>();
         when(useCase.expireHolds()).thenAnswer(invocation -> {
+            ids.add(MDC.get("requestId"));
+            apis.add(MDC.get("api"));
             if (calls.incrementAndGet() == 1) {
                 throw new IllegalStateException("Expected first sweep failure.");
             }
             nextSucceeded.countDown();
             return 0;
         });
-        runner(useCase).withPropertyValues("car-rental.availability.hold-sweep-interval=PT0.05S")
-                .withBean("taskScheduler", ThreadPoolTaskScheduler.class, ThreadPoolTaskScheduler::new)
+        try (var logs = new LogEventCapture("com.carrental.shared.config.SchedulerLoggingConfiguration")) {
+            runner(useCase).withPropertyValues("car-rental.availability.hold-sweep-interval=PT0.05S")
                 .run(context -> {
                     assertNull(context.getStartupFailure());
+                    assertInstanceOf(ThreadPoolTaskScheduler.class, context.getBean(TaskScheduler.class));
                     assertTrue(nextSucceeded.await(5, TimeUnit.SECONDS), "The next scheduled sweep must run.");
                     assertTrue(calls.get() >= 2);
+                    assertTrue(ids.getFirst().startsWith("job-"));
+                    assertNotEquals(ids.getFirst(), ids.get(1));
+                    assertTrue(apis.size() >= 2);
+                    apis.forEach(api -> assertEquals("ReservationHoldExpiryScheduler.sweep", api));
+                    assertEquals(1, logs.events().size());
+                    assertEquals(ids.getFirst(), logs.events().getFirst().getMDCPropertyMap().get("requestId"));
+                    assertEquals("ReservationHoldExpiryScheduler.sweep",
+                            logs.events().getFirst().getMDCPropertyMap().get("api"));
+                    assertTrue(logs.events().getFirst().getFormattedMessage()
+                            .contains("api=\"ReservationHoldExpiryScheduler.sweep\""));
                 });
+        }
     }
 
     /**
@@ -120,11 +143,14 @@ class ReservationHoldExpirySchedulerTest {
     /** Nạp cấu hình và adapter thật trong context nhỏ; không đọc application.properties của test. */
     private static ApplicationContextRunner runner(ExpireReservationHoldsUseCase useCase) {
         return new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class,
+                        ObservationAutoConfiguration.class, ScheduledTasksObservationAutoConfiguration.class))
                 .withPropertyValues("car-rental.availability.hold-duration=PT1H",
-                        "car-rental.availability.hold-sweep-interval=PT30S")
+                        "car-rental.availability.hold-sweep-interval=PT30S",
+                        "car-rental.time-zone=Asia/Ho_Chi_Minh", "spring.threads.virtual.enabled=false")
                 .withBean(ExpireReservationHoldsUseCase.class, () -> useCase)
                 .withUserConfiguration(ReservationHoldExpiryScheduler.class)
                 .withInitializer(context -> new ClassPathBeanDefinitionScanner((BeanDefinitionRegistry) context)
-                        .scan("com.carrental.availability.config"));
+                        .scan("com.carrental.availability.config", "com.carrental.shared.config"));
     }
 }

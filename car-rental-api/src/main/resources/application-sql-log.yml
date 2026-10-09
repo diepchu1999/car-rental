@@ -1,0 +1,16 @@
+# Chỉ dùng local với dữ liệu giả; tuyệt đối không bật trên môi trường có dữ liệu thật.
+# Không dùng sqlSingleLine: comment -- đầu file phải kết thúc ở đúng dấu xuống dòng.
+decorator:
+  datasource:
+    enabled: true
+    p6spy:
+      enable-logging: true
+      # Appender SLF4J chuyên biệt gắn MessageFormattingStrategy ngay khi P6Spy khởi tạo.
+      # Chỉ file profile này tham chiếu lớp caller; mặc định datasource vẫn không có proxy.
+      logging: custom
+      custom-appender-class: com.carrental.shared.logging.SqlCallerLogger
+      exclude-categories: info,debug,result,resultset,commit,rollback
+
+logging:
+  level:
+    p6spy: INFO

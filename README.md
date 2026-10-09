@@ -4,12 +4,8 @@ Nền tảng cho thuê xe hơi — marketplace P2P **cộng** đội xe của ch
 
 ## Trạng thái
 
-| Hạng mục | Trạng thái |
-|---|---|
-| Nghiệp vụ giai đoạn 1 | ✅ 149 quy tắc BR đã chốt |
-| Kiến trúc | ✅ 15 ADR · 10 guideline |
-| Code | Đã có hạ tầng, khung backend, rule kiến trúc và code Task 4; chờ Tech Owner chạy nghiệm thu phần bổ sung |
-| Môi trường | Local, chưa build production |
+Số liệu dự án — số quy tắc đã chốt, module đã xong, số test — ghi **duy nhất** ở mục "Trạng thái" của
+[`CLAUDE.md`](CLAUDE.md). README không chép lại: hai nơi cùng ghi một con số thì sớm muộn sẽ lệch.
 
 ## Cấu trúc dự kiến
 
@@ -121,6 +117,102 @@ Không thêm `--volumes` nếu muốn giữ dữ liệu PostgreSQL và MinIO.
 8. Không bật **Store as project file** vì `.idea/` không được commit.
 9. Chạy lại bằng **Run** hoặc **Debug**.
 
+### Log
+
+Theo [security-guideline §3](car-rental-docs/vi/architecture/security-guideline.md#3-dữ-liệu-nhạy-cảm),
+**SQL kèm tham số chỉ được bật với dữ liệu local giả**, không ở môi trường có dữ liệu thật.
+Không chia sẻ log chưa kiểm tra thông tin nhạy cảm; môi trường thật cần chốt cấm profile `sql-log`.
+
+**Bật/tắt SQL log**
+
+Mặc định app và test không bọc datasource bằng P6Spy, không có SQL log/caller.
+Nạp biến môi trường theo hướng dẫn chạy local bên trên, rồi từ `car-rental-api/` bật riêng cho app:
+
+```bash
+./mvnw -Dspring-boot.run.profiles=sql-log spring-boot:run
+```
+
+IntelliJ: **Run → Edit Configurations → cấu hình backend → Program arguments**, thêm
+`--spring.profiles.active=sql-log`, rồi khởi động lại. Không chạy hai backend cùng cổng.
+Tắt: bỏ argument đó, hoặc dừng app dòng lệnh rồi chạy `./mvnw spring-boot:run` không kèm profile.
+**Không đặt `SPRING_PROFILES_ACTIVE=sql-log` trong shell hay `.env`**: chạy `./mvnw clean verify`
+từ shell đã nạp biến đó sẽ đưa cả bộ test qua proxy. Nếu đã export, bỏ cấu hình nguồn và
+`unset SPRING_PROFILES_ACTIVE` trước khi chạy test thông thường; khởi động lại app để đổi mode.
+
+**Tìm request bằng requestId và api**
+
+Lấy `X-Request-Id` từ response rồi tìm ID đó trong console IntelliJ. Mỗi sự kiện log của request
+có tiền tố như dưới, dù không bật `sql-log`; request không phát log thì không có dòng để tìm:
+
+```text
+[requestId=local-check-123] [api=GET /api/v1/admin/branches/CN-ABC123]
+```
+
+Server dùng lại đúng một ID client khớp `[A-Za-z0-9-]{1,64}`; thiếu/không hợp lệ thì sinh UUID.
+`api` chỉ gồm method + path, không query string, body hay header; control characters được escape.
+Nhãn MDC tối đa 512 đơn vị UTF-16 sau escape, gồm `[truncated]` nếu bị cắt; không cắt dở
+Unicode/escape, không đổi URI thật. Redispatch giữ ID/nhãn ban đầu; MDC không tự truyền sang thread tự tạo.
+Tiền tố áp cho mỗi **sự kiện**, không lặp trên từng dòng SQL/stack trace. Ngoài context, cụm rỗng được ẩn.
+
+**Đọc SQL và caller**
+
+Khi bật `sql-log`, P6Spy in SQL đã thay tham số, thời gian JDBC (không phải tổng thời gian HTTP)
+và caller trong → ngoài. Ví dụ minh họa dưới lược timestamp/PID/thread; ID, ms và số dòng có thể khác:
+
+```text
+INFO [requestId=local-check-123] [api=GET /api/v1/admin/branches/CN-ABC123] p6spy : SQL (2 ms):
+caller: branch.adapter.out.persistence.BranchReadAdapter.findByCode(BranchReadAdapter.java:75) ← branch.application.service.BranchQueryService.get(BranchQueryService.java:40) ← branch.adapter.in.rest.admin.AdminBranchController.get(AdminBranchController.java:117)
+-- Đọc chi tiết chi nhánh theo mã nghiệp vụ.
+-- Tách vị trí thành vĩ độ và kinh độ để ánh xạ sang BranchDetail.
+SELECT
+    b.id,
+    b.code,
+    b.name,
+    b.address,
+    public.ST_Y(CAST(b.location AS public.geometry)) AS latitude,
+    public.ST_X(CAST(b.location AS public.geometry)) AS longitude
+FROM branch.branch AS b
+WHERE b.code = 'CN-ABC123';
+```
+
+Caller giữ package/module, chỉ bỏ `com.carrental.`; tối đa 12 frame, dư có `← [truncated]`.
+Không có frame ứng dụng thì `caller: -`; loại proxy/CGLIB và tầng log. Hai service cùng tên
+được phân biệt bằng module. SQL giữ xuống dòng sau `--`; không dùng `sqlSingleLine`.
+Đây chỉ là hiển thị: JDBC vẫn bind tham số, không nối SQL nghiệp vụ. Giới hạn `api` không cắt SQL.
+
+**Đọc lỗi HTTP 500 và lỗi job**
+
+Mỗi lỗi có một sự kiện ERROR: `Failure summary:` đứng trước stack trace nguyên bản. Ví dụ giả lập
+lỗi kết nối (lược timestamp/PID/thread/logger; không phải lỗi hiện tại của hệ thống):
+
+```text
+ERROR [requestId=local-check-123] [api=GET /api/v1/admin/branches/CN-ABC123] Failure summary: rootType="java.net.ConnectException" rootMessage="Connection refused" source="-" method="GET" path="/api/v1/admin/branches/CN-ABC123" requestId="local-check-123" api="GET /api/v1/admin/branches/CN-ABC123"
+```
+
+`rootType/rootMessage` mô tả nguyên nhân sâu nhất; `source` là frame `com.carrental` đầu tiên của
+chính nguyên nhân đó, dạng `Class.method(File.java:dòng)`, không có thì `-`. `method/path` không có query.
+Ký tự điều khiển trong tóm tắt được escape; stack trace không đổi để IntelliJ bấm tới code.
+Response 500 chỉ có `INTERNAL_ERROR` và thông điệp chung, không lộ class, số dòng hay SQL.
+
+Job `@Scheduled` có `requestId=job-<UUID>` mới mỗi lượt và `api=Class.method` trong cả SQL lẫn log lỗi.
+Khi job lỗi, `method/path` là `-`; vẫn ghi stack trace và tiếp tục lượt định kỳ sau, không ghi lỗi hai lần:
+
+```text
+ERROR [requestId=job-7ea10e02-1f17-443a-bfa2-dc228d25d847] [api=ReservationHoldExpiryScheduler.sweep] Failure summary: rootType="java.net.ConnectException" rootMessage="Connection refused" source="-" method="-" path="-" requestId="job-7ea10e02-1f17-443a-bfa2-dc228d25d847" api="ReservationHoldExpiryScheduler.sweep"
+```
+
+**Quan sát và kiểm tra**
+
+Postman: import [SQL Caller](postman/task-sql-caller.postman_collection.json), chọn [Car Rental - Local](postman/local.postman_environment.json); collection có mô tả và `pm.test`, đối chiếu log bằng ID response.
+Kiểm profile với dữ liệu giả trong PostgreSQL Testcontainers (Docker Desktop hoạt động), từ `car-rental-api/`:
+
+```bash
+./mvnw -Dspring.profiles.active=sql-log '-Dtest=SqlLoggingIntegrationTest,SqlCallerFlowIntegrationTest,ReservationHoldExpirySchedulerTest,ReservationWriteAdapterIntegrationTest,ReservationHoldIntegrationTest,ReservationDeadlockIntegrationTest,ReservationInsertRetryTest,ReservationHoldConcurrencyIntegrationTest' test
+```
+
+Kỳ vọng `BUILD SUCCESS`, không failure/error. Ca cố tình gây lỗi có thể in ERROR/stack trace dù test xanh.
+Suite thông thường dùng `./mvnw clean verify` **không bật profile**; không cần xóa volume local.
+
 ### Gọi lịch xe từ module khác
 
 Tiêm `com.carrental.availability.api.AvailabilityDirectory` để giữ chỗ, khóa vận hành,
@@ -158,7 +250,7 @@ Không thêm biến bắt buộc vào `.env`.
 
 ## Bước tiếp theo
 
-Task 4: xem [hướng dẫn nghiệm thu shared, branch và vehicle](car-rental-docs/vi/dev-notes/task-04-shared-branch-vehicle.md).
-Code và test bổ sung chưa được Codex chạy theo yêu cầu của Tech Owner.
-
-Lát cắt dọc đầu tiên: **tìm xe → đặt xe → giữ chỗ → trả cọc** — chạm ngay vào rủi ro số một.
+Lát cắt dọc đầu tiên: **tìm xe → báo giá → đặt xe → giữ chỗ → trả cọc**. Đã xong tìm xe và cơ chế giữ
+chỗ. Thứ tự còn lại theo [ADR-0012](car-rental-docs/vi/decisions/adr-0012-vertical-slice-delivery.md)
+(mục "Làm rõ 08/10/2026"): chốt BR-218 → `pricing` → `identity` → `booking` → `payment` →
+`customer-web`.

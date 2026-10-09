@@ -1,6 +1,7 @@
 package com.carrental.shared.error;
 
 import com.carrental.shared.api.ApiResponse;
+import com.carrental.shared.logging.FailureSummary;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -9,6 +10,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
@@ -115,8 +117,12 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             WebRequest request
     ) {
         if (statusCode.is5xxServerError()) {
+            // getRequestURI không chứa query string; không dùng getDescription hoặc dump request.
+            ServletWebRequest servletRequest = request instanceof ServletWebRequest value ? value : null;
             logger.error(
-                    "API request failed with status " + statusCode.value() + ".",
+                    FailureSummary.format(exception,
+                            servletRequest == null ? "-" : servletRequest.getRequest().getMethod(),
+                            servletRequest == null ? "-" : servletRequest.getRequest().getRequestURI()),
                     exception
             );
         }

@@ -13,6 +13,8 @@
 
 ## Endpoint
 
+Mọi endpoint áp dụng [header truy vết X-Request-Id](http-headers.md); response JSON không đổi.
+
 | Method | Path | Thành công |
 |---|---|---|
 | POST | `/api/v1/admin/vehicles` | 201, Location trỏ tới xe mới |

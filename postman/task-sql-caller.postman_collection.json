@@ -1,0 +1,565 @@
+{
+  "info": {
+    "name": "Car Rental - SQL Caller",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Security-guideline §3: dữ liệu local giả; không đổi nghiệp vụ. Chọn Car Rental - Local. Mỗi folder độc lập, chạy 01 → 03 một iteration. Part 1 kiểm api/requestId; Part 2 quan sát thêm caller SQL. Có thể chạy lại không cần dọn CSDL. Part 3 kiểm nhãn api đúng/vượt 512 ký tự, độc lập và chỉ đọc."
+  },
+  "item": [
+    {
+      "name": "Part 1 - API context",
+      "description": "Bật sql-log với dữ liệu local giả để nhìn sự kiện SQL. Chạy 01 → 03. Ở request 02, nhãn api chỉ có GET + path, không có query marker.",
+      "item": [
+        {
+          "name": "01 - Create context fixture branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{callerRequestId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-003/BR-808 và security-guideline §3: tạo chi nhánh giả duy nhất, kiểm response ID để tìm đúng log.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \"{{callerBranchName}}\",\n  \"address\": \"SQL caller fixture address\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"callerRequestId\", \"api-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.collectionVariables.set(\"callerBranchCode\", \"\");",
+                  "pm.collectionVariables.set(\"callerBranchName\", \"SQL-CALLER-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.variables.set(\"callerExpectedApi\", \"POST /api/v1/admin/branches\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const requestId = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Safe request ID is echoed\", () => pm.expect(requestId).to.eql(pm.variables.get(\"callerRequestId\")));",
+                  "pm.test(\"Exactly one response request ID\", () => pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1));",
+                  "console.info(\"Find backend log: [requestId=\" + requestId + \"] [api=\" + pm.variables.get(\"callerExpectedApi\") + \"]\");",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Branch response is unchanged\", () => {",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    pm.expect(body.data.code).to.match(/^CN-[A-Z0-9]{6}$/);",
+                  "    pm.expect(body.data.name).to.eql(pm.collectionVariables.get(\"callerBranchName\"));",
+                  "});",
+                  "if (pm.response.code === 201 && body.success && body.data && /^CN-[A-Z0-9]{6}$/.test(body.data.code)) {",
+                  "    pm.collectionVariables.set(\"callerBranchCode\", body.data.code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Read branch without query in log context",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{callerRequestId}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches/{{callerBranchCode}}?probe=not-in-api-context",
+            "description": "BR-003/BR-808 và security-guideline §3: đọc dữ liệu vừa tạo; nhãn api của SELECT không được có ?probe=not-in-api-context."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"callerRequestId\", \"api-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const code = pm.collectionVariables.get(\"callerBranchCode\");",
+                  "if (!code) { throw new Error(\"Run request 01 successfully first.\"); }",
+                  "pm.variables.set(\"callerExpectedApi\", \"GET /api/v1/admin/branches/\" + code);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const requestId = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Safe request ID is echoed\", () => pm.expect(requestId).to.eql(pm.variables.get(\"callerRequestId\")));",
+                  "pm.test(\"Exactly one response request ID\", () => pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1));",
+                  "console.info(\"Find backend log: [requestId=\" + requestId + \"] [api=\" + pm.variables.get(\"callerExpectedApi\") + \"]\");",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Stored branch matches this run\", () => {",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"callerBranchCode\"));",
+                  "    pm.expect(body.data.name).to.eql(pm.collectionVariables.get(\"callerBranchName\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Reject missing search input without leaking details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{callerRequestId}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles",
+            "description": "Security-guideline §3: API thiếu tham số vẫn trả 400 INVALID_REQUEST và giữ X-Request-Id; không tạo log ERROR giả cho lỗi đầu vào."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"callerRequestId\", \"api-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.variables.set(\"callerExpectedApi\", \"GET /api/v1/public/vehicles\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const requestId = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Safe request ID is echoed\", () => pm.expect(requestId).to.eql(pm.variables.get(\"callerRequestId\")));",
+                  "pm.test(\"Exactly one response request ID\", () => pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1));",
+                  "console.info(\"Find backend log: [requestId=\" + requestId + \"] [api=\" + pm.variables.get(\"callerExpectedApi\") + \"]\");",
+                  "const body = pm.response.json();",
+                  "pm.test(\"API error contract is unchanged\", () => {",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 2 - SQL caller",
+      "description": "Security-guideline §3: bật sql-log với dữ liệu giả rồi chạy 01 → 03. Request 02 phải có caller BranchReadAdapter.findByCode ← BranchQueryService.get ← AdminBranchController.get, giữ module và số dòng. Tắt profile rồi khởi động lại: API vẫn đúng nhưng không còn sự kiện SQL/caller.",
+      "item": [
+        {
+          "name": "01 - Create context fixture branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{callerRequestId}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-003/BR-808: tạo chi nhánh giả riêng cho lượt kiểm caller, tự lưu mã; không cần chạy Part 1 trước.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"latitude\": 10.762622,\n  \"longitude\": 106.660172,\n  \"name\": \"{{callerBranchName}}\",\n  \"address\": \"SQL caller fixture address\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"callerRequestId\", \"api-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.collectionVariables.set(\"callerBranchCode\", \"\");",
+                  "pm.collectionVariables.set(\"callerBranchName\", \"SQL-CALLER-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.variables.set(\"callerExpectedApi\", \"POST /api/v1/admin/branches\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "const requestId = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Safe request ID is echoed\", () => pm.expect(requestId).to.eql(pm.variables.get(\"callerRequestId\")));",
+                  "pm.test(\"Exactly one response request ID\", () => pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1));",
+                  "console.info(\"Find backend log: [requestId=\" + requestId + \"] [api=\" + pm.variables.get(\"callerExpectedApi\") + \"]\");",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Branch response is unchanged\", () => {",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    pm.expect(body.data.code).to.match(/^CN-[A-Z0-9]{6}$/);",
+                  "    pm.expect(body.data.name).to.eql(pm.collectionVariables.get(\"callerBranchName\"));",
+                  "});",
+                  "if (pm.response.code === 201 && body.success && body.data && /^CN-[A-Z0-9]{6}$/.test(body.data.code)) {",
+                  "    pm.collectionVariables.set(\"callerBranchCode\", body.data.code);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Read branch without query in log context",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{callerRequestId}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches/{{callerBranchCode}}?probe=not-in-api-context",
+            "description": "Security-guideline §3: đối chiếu requestId với log SELECT thật, kiểm caller adapter ← service ← controller và không có query trong api."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"callerRequestId\", \"api-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const code = pm.collectionVariables.get(\"callerBranchCode\");",
+                  "if (!code) { throw new Error(\"Run request 01 successfully first.\"); }",
+                  "pm.variables.set(\"callerExpectedApi\", \"GET /api/v1/admin/branches/\" + code);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
+                  "const requestId = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Safe request ID is echoed\", () => pm.expect(requestId).to.eql(pm.variables.get(\"callerRequestId\")));",
+                  "pm.test(\"Exactly one response request ID\", () => pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1));",
+                  "console.info(\"Find backend log: [requestId=\" + requestId + \"] [api=\" + pm.variables.get(\"callerExpectedApi\") + \"]\");",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Stored branch matches this run\", () => {",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "    pm.expect(body.success).to.eql(true);",
+                  "    pm.expect(body.error).to.eql(null);",
+                  "    pm.expect(body.data.code).to.eql(pm.collectionVariables.get(\"callerBranchCode\"));",
+                  "    pm.expect(body.data.name).to.eql(pm.collectionVariables.get(\"callerBranchName\"));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Reject missing search input without leaking details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{callerRequestId}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/public/vehicles",
+            "description": "Security-guideline §3: API thiếu tham số vẫn trả 400 INVALID_REQUEST và giữ X-Request-Id; không tạo log ERROR giả cho lỗi đầu vào."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"callerRequestId\", \"api-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.variables.set(\"callerExpectedApi\", \"GET /api/v1/public/vehicles\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 400\", () => pm.response.to.have.status(400));",
+                  "const requestId = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Safe request ID is echoed\", () => pm.expect(requestId).to.eql(pm.variables.get(\"callerRequestId\")));",
+                  "pm.test(\"Exactly one response request ID\", () => pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1));",
+                  "console.info(\"Find backend log: [requestId=\" + requestId + \"] [api=\" + pm.variables.get(\"callerExpectedApi\") + \"]\");",
+                  "const body = pm.response.json();",
+                  "pm.test(\"API error contract is unchanged\", () => {",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"INVALID_REQUEST\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Bounded API context",
+      "description": "Security-guideline §3: chỉ chạy local với dữ liệu giả và sql-log. Hai GET mã không tồn tại không ghi CSDL; kiểm 404 BRANCH_NOT_FOUND, ID và quan sát nhãn api ở console IntelliJ. Postman không đọc log máy chủ.",
+      "item": [
+        {
+          "name": "01 - Keep exactly 512 characters",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{boundedRequestId}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches/{{boundedBranchCode}}?probe=not-in-api-context",
+            "description": "Security-guideline §3, đọc chi nhánh BR-003/BR-808: nhãn thô 512 ký tự; chỉ nhãn log bị giới hạn, mã đầu vào vẫn được tra đủ và trả BRANCH_NOT_FOUND."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"boundedRequestId\", \"bounded-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const prefix = \"GET /api/v1/admin/branches/\";",
+                  "const code = \"L\".repeat(512 - prefix.length);",
+                  "pm.variables.set(\"boundedBranchCode\", code);",
+                  "const api = prefix + code;",
+                  "pm.variables.set(\"boundedExpectedApi\", api.length <= 512 ? api : api.slice(0, 501) + \"[truncated]\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404 for unknown branch\", () => pm.response.to.have.status(404));",
+                  "const id = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Request ID is preserved\", () => pm.expect(id).to.eql(pm.variables.get(\"boundedRequestId\")));",
+                  "pm.test(\"Exactly one response request ID\", () => pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Public error contract is unchanged\", () => {",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"BRANCH_NOT_FOUND\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Response does not expose log context or SQL\", () => {",
+                  "    const text = pm.response.text();",
+                  "    pm.expect(text).not.to.include(\"[truncated]\");",
+                  "    pm.expect(text).not.to.include(\"caller:\");",
+                  "    pm.expect(text).not.to.include(pm.variables.get(\"boundedBranchCode\"));",
+                  "});",
+                  "console.info(\"Find backend log by request ID: \" + id);",
+                  "console.info(\"Expected api label (compare manually in IntelliJ): \" + pm.variables.get(\"boundedExpectedApi\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Truncate oversized API label",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{boundedRequestId}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches/{{boundedBranchCode}}?probe=not-in-api-context",
+            "description": "Security-guideline §3, đọc chi nhánh BR-003/BR-808: nhãn thô 1024 ký tự; chỉ nhãn log bị giới hạn, mã đầu vào vẫn được tra đủ và trả BRANCH_NOT_FOUND."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.set(\"boundedRequestId\", \"bounded-\" + pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "const prefix = \"GET /api/v1/admin/branches/\";",
+                  "const code = \"L\".repeat(1024 - prefix.length);",
+                  "pm.variables.set(\"boundedBranchCode\", code);",
+                  "const api = prefix + code;",
+                  "pm.variables.set(\"boundedExpectedApi\", api.length <= 512 ? api : api.slice(0, 501) + \"[truncated]\");"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404 for unknown branch\", () => pm.response.to.have.status(404));",
+                  "const id = pm.response.headers.get(\"X-Request-Id\");",
+                  "pm.test(\"Request ID is preserved\", () => pm.expect(id).to.eql(pm.variables.get(\"boundedRequestId\")));",
+                  "pm.test(\"Exactly one response request ID\", () => pm.expect(pm.response.headers.all().filter(h => h.key.toLowerCase() === \"x-request-id\")).to.have.lengthOf(1));",
+                  "const body = pm.response.json();",
+                  "pm.test(\"Public error contract is unchanged\", () => {",
+                  "    pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\");",
+                  "    pm.expect(body.success).to.eql(false);",
+                  "    pm.expect(body.data).to.eql(null);",
+                  "    pm.expect(body.error).to.have.all.keys(\"code\", \"message\");",
+                  "    pm.expect(body.error.code).to.eql(\"BRANCH_NOT_FOUND\");",
+                  "    pm.expect(body.error.message).to.be.a(\"string\").and.not.empty;",
+                  "});",
+                  "pm.test(\"Response does not expose log context or SQL\", () => {",
+                  "    const text = pm.response.text();",
+                  "    pm.expect(text).not.to.include(\"[truncated]\");",
+                  "    pm.expect(text).not.to.include(\"caller:\");",
+                  "    pm.expect(text).not.to.include(pm.variables.get(\"boundedBranchCode\"));",
+                  "});",
+                  "console.info(\"Find backend log by request ID: \" + id);",
+                  "console.info(\"Expected api label (compare manually in IntelliJ): \" + pm.variables.get(\"boundedExpectedApi\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
