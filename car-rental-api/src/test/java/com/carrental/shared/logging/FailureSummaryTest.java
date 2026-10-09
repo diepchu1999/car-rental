@@ -43,7 +43,7 @@ class FailureSummaryTest {
         assertEquals("Failure summary: rootType=\"java.lang.IllegalArgumentException\""
                 + " rootMessage=\"Root failure\""
                 + " source=\"com.carrental.vehicle.VehicleProbe.load(VehicleProbe.java:42)\""
-                + " method=\"POST\" path=\"/api/v1/admin/vehicles\" requestId=\"test-request-123\"",
+                + " method=\"POST\" path=\"/api/v1/admin/vehicles\" requestId=\"test-request-123\" api=\"-\"",
                 FailureSummary.format(failure, "POST", "/api/v1/admin/vehicles"));
         assertSame(root, failure.getCause().getCause());
         assertEquals(3, root.getStackTrace().length);
@@ -62,7 +62,7 @@ class FailureSummaryTest {
                 new StackTraceElement("com.carrental.Wrapper", "call", "Wrapper.java", 2)
         });
         assertEquals("Failure summary: rootType=\"java.lang.IllegalArgumentException\" rootMessage=\"-\""
-                + " source=\"-\" method=\"-\" path=\"-\" requestId=\"-\"",
+                + " source=\"-\" method=\"-\" path=\"-\" requestId=\"-\" api=\"-\"",
                 FailureSummary.format(failure, null, null));
     }
 
@@ -73,10 +73,12 @@ class FailureSummaryTest {
         var failure = new IllegalStateException(message);
         StackTraceElement[] originalStack = failure.getStackTrace();
         MDC.put(RequestIdFilter.MDC_KEY, "internal\ncontext");
+        MDC.put(RequestIdFilter.API_MDC_KEY, "Job\nFORGED.run");
         String summary = FailureSummary.format(failure, "GET\r", "/path\nforged");
         assertTrue(summary.contains("Bad\\r\\nFORGED\\t\\u001b[31m\\u0085\\u2028\\u2029\\u202e\\\"\\\\"));
         assertTrue(summary.contains("method=\"GET\\r\" path=\"/path\\nforged\""));
         assertTrue(summary.contains("requestId=\"internal\\ncontext\""));
+        assertTrue(summary.contains("api=\"Job\\nFORGED.run\""));
         assertFalse(summary.codePoints().anyMatch(value -> Character.isISOControl(value)
                 || Character.getType(value) == Character.LINE_SEPARATOR
                 || Character.getType(value) == Character.PARAGRAPH_SEPARATOR
@@ -93,6 +95,19 @@ class FailureSummaryTest {
         first.initCause(second);
         second.initCause(first);
         assertTrue(FailureSummary.format(first, "-", "-").contains("rootMessage=\"Second\""));
+    }
+
+    /** Tên job lấy từ ngữ cảnh, không biến mất khi nguyên nhân gốc chỉ có frame của driver. */
+    @Test
+    void includesJobIdentityWithoutApplicationRootFrame() {
+        MDC.put(RequestIdFilter.API_MDC_KEY, "ReservationHoldExpiryScheduler.sweep");
+        var failure = new IllegalStateException("Driver failure");
+        failure.setStackTrace(new StackTraceElement[] {
+                new StackTraceElement("org.example.Driver", "execute", "Driver.java", 11)
+        });
+        String summary = FailureSummary.format(failure, "-", "-");
+        assertTrue(summary.contains("source=\"-\""));
+        assertTrue(summary.contains("api=\"ReservationHoldExpiryScheduler.sweep\""));
     }
 
     /** Frame thiếu thông tin debug được mô tả rõ, không ném lỗi khi đang xử lý lỗi khác. */

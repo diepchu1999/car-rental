@@ -43,13 +43,14 @@ class RequestIdApiIntegrationTest {
     @Test
     void correlatesEveryLogEventAndPreservesResponseShape(CapturedOutput output) throws Exception {
         String requestId = "client-" + UUID.randomUUID();
-        var response = get("/test/request-id/success", requestId);
+        var response = get("/test/request-id/success?secret=query-sentinel", requestId);
         assertEquals(200, response.statusCode());
         assertEquals(requestId, response.headers().firstValue(RequestIdFilter.HEADER_NAME).orElseThrow());
         assertEquals(objectMapper.readTree("{\"success\":true,\"data\":\"ok\",\"error\":null}"),
                 objectMapper.readTree(response.body()));
         assertCorrelatedLog(output, requestId, "Request correlation probe first event");
         assertCorrelatedLog(output, requestId, "Request correlation probe second event");
+        assertFalse(output.getAll().contains("query-sentinel"));
     }
 
     /** Header không bắt buộc; ID UUID được trả về cả ở endpoint health ngoài namespace API. */
@@ -83,7 +84,9 @@ class RequestIdApiIntegrationTest {
                  "message":"An unexpected error occurred."}}
                 """), objectMapper.readTree(response.body()));
         assertTrue(output.getAll().lines().anyMatch(line -> line.contains("[requestId=" + requestId + "]")
-                && line.contains("ERROR")), "The server error event must contain the request ID.");
+                && line.contains("[api=GET /test/request-id/failure]")
+                && line.contains("api=\"GET /test/request-id/failure\"")
+                && line.contains("ERROR")), "The server error event must contain the request ID and API.");
         assertTrue(output.getAll().contains("IllegalStateException: Internal SQL probe failure"));
         assertTrue(output.getAll().lines().anyMatch(line -> line.startsWith("\tat com.carrental.")),
                 "Stack trace continuation must retain its standard format.");
@@ -104,7 +107,8 @@ class RequestIdApiIntegrationTest {
     /** Kiểm trực tiếp tiền tố đã render bởi cấu hình logging thật, không tự gắn pattern trong test. */
     private static void assertCorrelatedLog(CapturedOutput output, String requestId, String message) {
         assertTrue(output.getAll().lines().anyMatch(line -> line.contains(message)
-                && line.contains("[requestId=" + requestId + "]")),
+                && line.contains("[requestId=" + requestId + "]")
+                && line.contains("[api=GET /test/request-id/success]")),
                 "The rendered log event must include the response request ID: " + message);
     }
 

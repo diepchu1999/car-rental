@@ -35,12 +35,18 @@ class JobLoggingTaskDecoratorTest {
     @Test
     void generatesNewIdForEveryInvocationOfSameCallback() {
         var ids = new ArrayList<String>();
-        Runnable task = new JobLoggingTaskDecorator().decorate(() -> ids.add(MDC.get(RequestIdFilter.MDC_KEY)));
+        Runnable task = new JobLoggingTaskDecorator().decorate(() -> {
+            ids.add(MDC.get(RequestIdFilter.MDC_KEY));
+            assertEquals("-", MDC.get(RequestIdFilter.API_MDC_KEY));
+            MDC.put(RequestIdFilter.API_MDC_KEY, "ProbeJob.run");
+        });
         assertNull(MDC.get(RequestIdFilter.MDC_KEY));
         task.run();
         assertNull(MDC.get(RequestIdFilter.MDC_KEY));
+        assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
         task.run();
         assertNull(MDC.get(RequestIdFilter.MDC_KEY));
+        assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
         assertEquals(2, ids.size());
         ids.forEach(JobLoggingTaskDecoratorTest::assertJobId);
         assertNotEquals(ids.getFirst(), ids.getLast());
@@ -50,25 +56,35 @@ class JobLoggingTaskDecoratorTest {
     @Test
     void restoresOuterContextAfterSuccess() {
         MDC.put(RequestIdFilter.MDC_KEY, "outer-request");
+        MDC.put(RequestIdFilter.API_MDC_KEY, "GET /outer");
         MDC.put("other", "preserved");
         new JobLoggingTaskDecorator().decorate(() -> {
             assertJobId(MDC.get(RequestIdFilter.MDC_KEY));
+            assertEquals("-", MDC.get(RequestIdFilter.API_MDC_KEY));
+            MDC.put(RequestIdFilter.API_MDC_KEY, "ProbeJob.run");
             assertEquals("preserved", MDC.get("other"));
         }).run();
-        assertEquals(Map.of("requestId", "outer-request", "other", "preserved"), MDC.getCopyOfContextMap());
+        assertEquals(Map.of("requestId", "outer-request", "api", "GET /outer", "other", "preserved"),
+                MDC.getCopyOfContextMap());
     }
 
     /** Callback lỗi không bị decorator nuốt, đổi đối tượng lỗi hoặc làm rò ID job. */
     @Test
     void restoresContextAndPropagatesOriginalFailure() {
         MDC.put(RequestIdFilter.MDC_KEY, "outer-request");
+        MDC.put(RequestIdFilter.API_MDC_KEY, "GET /outer");
         var failure = new IllegalStateException("Expected failure");
-        Runnable task = new JobLoggingTaskDecorator().decorate(() -> { throw failure; });
+        Runnable task = new JobLoggingTaskDecorator().decorate(() -> {
+            MDC.put(RequestIdFilter.API_MDC_KEY, "ProbeJob.run");
+            throw failure;
+        });
         assertSame(failure, assertThrows(IllegalStateException.class, task::run));
         assertEquals("outer-request", MDC.get(RequestIdFilter.MDC_KEY));
+        assertEquals("GET /outer", MDC.get(RequestIdFilter.API_MDC_KEY));
         MDC.clear();
         assertSame(failure, assertThrows(IllegalStateException.class, task::run));
         assertNull(MDC.get(RequestIdFilter.MDC_KEY));
+        assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
     }
 
     /** Kiểm ID đúng tiền tố và UUID chuẩn. */

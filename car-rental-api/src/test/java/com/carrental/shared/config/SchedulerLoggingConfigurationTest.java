@@ -3,6 +3,7 @@ package com.carrental.shared.config;
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ThrowableProxy;
 import com.carrental.shared.logging.LogEventCapture;
+import com.carrental.shared.logging.ContextAwareTaskScheduler;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,7 +14,6 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.scheduling.TaskScheduler;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import java.time.Duration;
 import java.util.List;
@@ -43,7 +43,7 @@ class SchedulerLoggingConfigurationTest {
                     .run(context -> {
                         assertNull(context.getStartupFailure());
                         var scheduler = context.getBean(TaskScheduler.class);
-                        assertInstanceOf(ThreadPoolTaskScheduler.class, scheduler);
+                        assertInstanceOf(ContextAwareTaskScheduler.class, scheduler);
                         var future = scheduler.scheduleWithFixedDelay(() -> {
                             ids.add(MDC.get("requestId"));
                             LoggerFactory.getLogger("com.carrental.scheduler.probe").info("Scheduler probe event");
@@ -72,12 +72,28 @@ class SchedulerLoggingConfigurationTest {
                         assertEquals(SchedulerLoggingConfiguration.class.getName(), event.getLoggerName());
                         assertSame(failure, ((ThrowableProxy) event.getThrowableProxy()).getThrowable());
                         assertEquals(ids.getFirst(), event.getMDCPropertyMap().get("requestId"));
+                        assertEquals("-", event.getMDCPropertyMap().get("api"));
+                        assertTrue(event.getFormattedMessage().contains("api=\"-\""));
                         assertTrue(event.getFormattedMessage().contains("method=\"-\" path=\"-\""));
                         assertTrue(event.getFormattedMessage().contains("requestId=\"" + ids.getFirst() + "\""));
                         assertTrue(logs.events().stream().anyMatch(probe -> probe.getFormattedMessage().equals("Scheduler probe event")
                                 && ids.getFirst().equals(probe.getMDCPropertyMap().get("requestId"))));
                     });
         }
+    }
+
+    /** Scheduler mở rộng vẫn nhận kích thước pool từ builder Boot, không gán cứng lại cấu hình vận hành. */
+    @Test
+    void preservesBootPoolConfiguration() {
+        new ApplicationContextRunner()
+                .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class))
+                .withUserConfiguration(SchedulerLoggingConfiguration.class, SchedulingEnabled.class)
+                .withPropertyValues("spring.threads.virtual.enabled=false", "spring.task.scheduling.pool.size=3")
+                .run(context -> {
+                    assertNull(context.getStartupFailure());
+                    var scheduler = context.getBean(ContextAwareTaskScheduler.class);
+                    assertEquals(3, scheduler.getScheduledThreadPoolExecutor().getCorePoolSize());
+                });
     }
 
     /** Chỉ bật hạ tầng scheduler trong context test, không tạo timer hoặc dữ liệu nghiệp vụ giả. */

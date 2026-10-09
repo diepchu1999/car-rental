@@ -143,7 +143,8 @@ Khi gọi một API có truy vấn CSDL, logger `p6spy` phải in từng câu đ
 tham số thay cho dấu `?`. Ví dụ minh họa (thời gian thực tế thay đổi):
 
 ```text
-INFO ... [requestId=local-check-123] p6spy : SQL (2 ms):
+INFO ... [requestId=local-check-123] [api=GET /api/v1/admin/branches/CN-ABC123] p6spy : SQL (2 ms):
+caller: branch.adapter.out.persistence.BranchReadAdapter.findByCode(BranchReadAdapter.java:76) ← branch.application.service.BranchQueryService.get(BranchQueryService.java:40) ← branch.adapter.in.rest.admin.AdminBranchController.get(AdminBranchController.java:117)
 -- Tra tham chiếu nội bộ theo ADR-0008; không JOIN sang schema vehicle.
 SELECT
     b.id,
@@ -206,10 +207,13 @@ giả khi chỉ đổi mức log nhưng chưa bật/tắt proxy.
 
 Không cần bật profile: mọi request đi qua filter được gắn MDC `requestId`, trả về header
 `X-Request-Id`. Dùng `logging.pattern.correlation` có sẵn của Spring Boot để gắn tiền tố
-`[requestId=...]` cho **mỗi sự kiện log** trong lượt xử lý HTTP, kể cả P6Spy khi bật `sql-log`.
+`[requestId=...] [api=GET /path]` cho **mỗi sự kiện log** trong lượt xử lý HTTP, kể cả P6Spy khi bật `sql-log`.
 Không tự tạo log cho request vốn không phát sinh sự kiện nào. Không thêm tiền tố vào từng dòng
 SQL/stack trace: giữ nguyên dấu xuống dòng và định dạng IntelliJ bấm được tới code.
-Log khởi động hoặc công việc ngoài request chưa có MDC sẽ hiện `[requestId=]`.
+`api` chỉ gồm HTTP method và URI path, không có query string, body hoặc header. Ký tự điều khiển
+được escape trước khi vào MDC. Error/async redispatch giữ nhãn API ban đầu, không đổi thành `/error`.
+Cuối lượt filter khôi phục cả hai khóa MDC. Log ngoài request/job không có cả hai khóa sẽ ẩn toàn bộ
+cụm correlation bằng `%replace` có sẵn của Logback, không dùng converter tự viết.
 
 Client gửi đúng một `X-Request-Id` khớp `[A-Za-z0-9-]{1,64}` thì server dùng lại. Thiếu, quá dài,
 nhiều giá trị hoặc có ký tự cấm thì sinh UUID mới. Không trim, không log header bị loại. ID không
@@ -277,6 +281,7 @@ Các trường của dòng tóm tắt:
   `com.carrental.SomeClass.someMethod(SomeClass.java:42)`. Không có thì `-`, không lấy frame wrapper thay thế.
 - `method`, `path`: HTTP method và URI path **không có query string**.
 - `requestId`: ID đang nằm trong MDC, trùng header của response.
+- `api`: HTTP method + path, hoặc tên `Class.method` của hàm `@Scheduled`; thiếu metadata thì `-`.
 
 CR/LF, tab, ký tự điều khiển và ngắt dòng Unicode được escape **trong dòng tóm tắt**. Stack trace và
 exception không bị thay đổi. Không dump body, token hoặc các header của request. Thông điệp exception
@@ -284,10 +289,20 @@ vẫn là dữ liệu chẩn đoán nội bộ: không chia sẻ log chưa kiể
 Response 500 giữ nguyên `INTERNAL_ERROR` với thông điệp chung, không thêm class, số dòng hay SQL.
 Lỗi nghiệp vụ 4xx không được ghi thành lỗi máy chủ.
 
-Scheduler hiện tại dùng `ThreadPoolTaskScheduler` do Boot tạo. Customizer chỉ thêm decorator và
-ErrorHandler, không đổi số thread, nhịp hoặc độ trễ đầu. Mỗi lần chạy sinh `job-<UUID>` mới trong MDC;
-ID bao cả use case, SQL và ErrorHandler. Cuối lượt luôn khôi phục MDC. Không dùng ID của thời điểm
-đăng ký lịch cho mọi lần chạy.
+Scheduler hiện tại dùng `ContextAwareTaskScheduler`, kế thừa `ThreadPoolTaskScheduler` và nhận cấu hình
+từ builder của Boot. Callback `ScheduledMethodRunnable` đăng ký trực tiếp cung cấp metadata tại
+scheduler. Với `@Scheduled`, Spring bọc callback trong `Task.OutcomeTrackingRunnable` trước đó:
+`ScheduledJobObservationHandler` lấy tên từ `ScheduledTaskObservationContext` ngay khi method chạy.
+Hook dùng Observation/Actuator đã có trong ứng dụng, không cần profile `sql-log`, không thêm thư viện,
+không dò stack hoặc field riêng của framework. Không đổi số thread, nhịp hoặc độ trễ đầu.
+Mỗi lần chạy sinh `job-<UUID>` mới trong MDC, cùng `api=ReservationHoldExpiryScheduler.sweep`;
+ngữ cảnh bao cả use case, SQL và ErrorHandler. Decorator ngoài cùng khôi phục cả hai khóa sau khi xử
+lý lỗi xong. Không dùng ID của thời điểm đăng ký lịch cho mọi lần chạy. Runnable không có metadata
+method dùng `api=-`; không lấy tên job từ stack exception hoặc kế thừa nhãn của lượt trước.
+Handler chỉ cập nhật MDC trong phạm vi decorator sở hữu, không suy từ tiền tố `job-` mà client có
+thể gửi. Không dọn `api` khi observation dừng: lúc đó ErrorHandler chưa chạy; decorator ngoài cùng
+mới dọn sau bước ghi lỗi. Registry observation của scheduled task phải hoạt động; nếu thay cấu hình
+Actuator/Observation hoặc tắt observation `tasks.scheduled.execution`, phải kiểm lại nhãn job.
 
 Khi job lỗi, `method`/`path` là `-`. Lỗi vẫn đi ra khỏi proxy transaction để rollback, sau đó
 ErrorHandler ghi **một** tóm tắt kèm stack trace và giữ hành vi chạy tiếp lượt định kỳ sau của Spring.
@@ -323,10 +338,221 @@ Test PostgreSQL chạy bằng Testcontainers riêng, không làm hỏng CSDL loc
 Không thêm endpoint gây lỗi 500 hoặc sửa CSDL để phục vụ Postman. Ca 500 và lỗi job được tạo có chủ
 đích trong test. Muốn quan sát ID job ở local: bật `sql-log` với dữ liệu giả, đợi đến nhịp dọn giữ chỗ
 (mặc định 30 giây); tìm câu `UPDATE availability.reservation` có điều kiện `hold_expires_at`.
-Sự kiện đó phải có tiền tố `[requestId=job-...]`, và lượt sau có ID khác. Log in nội dung SQL,
+Sự kiện đó phải có tiền tố `[requestId=job-...] [api=ReservationHoldExpiryScheduler.sweep]`,
+và lượt sau có ID khác. Log in nội dung SQL,
 không in tên file `release_expired_holds.sql`. Tắt profile khi không cần xem SQL.
 
-### Nghiệm thu tổng thay đổi logging
+### Mở rộng SQL caller — Phần 1: ngữ cảnh API và job
+
+Phần này kiểm nhãn `api`; chuỗi caller kiểm riêng ở Phần 2 bên dưới. Thay đổi thuần kỹ thuật theo security-guideline
+§3; không sửa endpoint, JSON response, migration, SQL hoặc hành vi dọn giữ chỗ BR-103.
+
+Chạy từ `car-rental-api/`, Docker Desktop đang hoạt động. Không bật profile SQL cho lượt test này:
+
+```bash
+./mvnw '-Dtest=RequestIdFilterTest,RequestLoggingConfigurationTest,RequestIdApiIntegrationTest,FailureSummaryTest,ApiFailureLoggingTest,ApiExceptionHandlerTest,JobLoggingTaskDecoratorTest,ContextAwareTaskSchedulerTest,ScheduledJobObservationHandlerTest,CorrelationPatternTest,SchedulerLoggingConfigurationTest,ReservationHoldExpirySchedulerTest,ArchitectureRulesTest' test
+```
+
+Kết quả đúng: `BUILD SUCCESS`, `Failures: 0, Errors: 0`. Các test chủ đích gây lỗi 500/job vẫn in
+ERROR/stack trace: đó là dữ liệu kiểm chứng, không đồng nghĩa test thất bại. Không dùng CSDL local
+để gây lỗi và không cần xóa volume. Các test mới hoặc được mở rộng:
+
+| Lớp.test | Điều được chứng minh |
+|---|---|
+| RequestIdFilterTest.includesOnlyMethodAndPathInApiContext | Không đưa query chứa tọa độ, body hoặc token vào `api` |
+| RequestIdFilterTest.escapesControlCharactersBeforePuttingApiInMdc | CR/LF, tab, ANSI và Unicode điều khiển không chèn được dòng giả |
+| RequestIdFilterTest.restoresPreviousContextAfterSuccess | Khôi phục cả ID/API và khóa khác sau thành công |
+| RequestIdFilterTest.clearsIdAndPreservesExceptionWhenChainFails | Lỗi chain giữ nguyên đối tượng, dọn cả ID/API |
+| RequestIdFilterTest.restoresPreviousIdWhenChainFails | Lỗi không phá MDC của ngữ cảnh bao ngoài |
+| RequestIdFilterTest.preservesIdAcrossRedispatch | Error/async trên thread khác giữ ID và API gốc |
+| RequestIdFilterTest.preservesIdDuringNestedErrorDispatch | Error dispatch lồng nhau không đổi API gốc thành `/error` |
+| RequestIdFilterTest.isolatesConcurrentRequests | Hai request cùng chạy không lẫn ID hoặc API trước/sau điểm đồng bộ |
+| RequestIdApiIntegrationTest.correlatesEveryLogEventAndPreservesResponseShape | HTTP thật render ID/API qua hai logger, không log query marker, JSON không đổi |
+| RequestIdApiIntegrationTest.correlatesUnexpectedFailureWithoutLeakingInternalDetails | 500 có ID/API, stack trace chuẩn, JSON không lộ nội bộ |
+| FailureSummaryTest.selectsRootCauseAndItsFirstApplicationFrame | Định dạng mở rộng giữ nguyên root/frame và ghi API thiếu bằng `-` |
+| FailureSummaryTest.marksMissingRootFrameMessageAndContextExplicitly | Context rỗng không tạo dữ liệu chẩn đoán giả |
+| FailureSummaryTest.escapesControlCharactersWithoutMutatingThrowable | Cả API trong tóm tắt được escape, throwable không bị sửa |
+| FailureSummaryTest.includesJobIdentityWithoutApplicationRootFrame | Tên job vẫn có dù root exception không có frame ứng dụng |
+| ApiFailureLoggingTest.logsOneSummaryWithOriginalThrowableAndNoRequestPayload | Một sự kiện lỗi chứa ID/API, không có query/body/token/header trong summary hoặc MDC |
+| JobLoggingTaskDecoratorTest.generatesNewIdForEveryInvocationOfSameCallback | Mỗi lượt có ID mới và không kế thừa API lượt trước |
+| JobLoggingTaskDecoratorTest.restoresOuterContextAfterSuccess | Khôi phục cả hai khóa sau job thành công |
+| JobLoggingTaskDecoratorTest.restoresContextAndPropagatesOriginalFailure | Khôi phục cả hai khóa khi lỗi, không nuốt exception |
+| ContextAwareTaskSchedulerTest.carriesMethodContextThroughErrorHandler | Sáu overload lịch với proxy CGLIB đều giữ đúng tên method tới ErrorHandler |
+| ContextAwareTaskSchedulerTest.carriesWrappedMethodContextThroughErrorHandler | Cùng sáu overload nhưng qua wrapper `Task` thật của Spring; tên job còn cả trong callback và ErrorHandler |
+| ScheduledJobObservationHandlerTest.supportsOnlyScheduledMethodContext | Không nhận nhầm observation HTTP/JDBC thành job |
+| ScheduledJobObservationHandlerTest.ignoresMethodObservationOutsideManagedJob | ID client có tiền tố `job-` không làm mất nhãn HTTP |
+| ScheduledJobObservationHandlerTest.retainsIdentityUntilDecoratorRestoresContextOnFailure | Observation dừng vẫn giữ tên cho log lỗi, decorator khôi phục context và dọn marker |
+| ScheduledJobObservationHandlerTest.restoresNestedJobScopeAfterSuccess | Job lồng nhau khôi phục đúng phạm vi ngoài, không rò MDC/ThreadLocal sau hoàn tất |
+| CorrelationPatternTest.rendersOnlyUsefulCorrelationContext | YAML thật ẩn cụm khi cả hai khóa trống; còn một khóa thì vẫn hiển thị |
+| SchedulerLoggingConfigurationTest.bootSchedulerLogsFailureOnceAndContinuesWithNewId | Callback không có metadata dùng `api=-`, không ghi trùng lỗi và lượt sau vẫn chạy |
+| SchedulerLoggingConfigurationTest.preservesBootPoolConfiguration | Kích thước pool vẫn do cấu hình Boot quyết định |
+| ReservationHoldExpirySchedulerTest.realSchedulerContinuesAfterFailedInvocation | Job `@Scheduled` thật có tên `ReservationHoldExpiryScheduler.sweep` trong MDC và summary, lượt sau tiếp tục |
+
+Context nhỏ của `ReservationHoldExpirySchedulerTest` nạp cả `ObservationAutoConfiguration` và
+`ScheduledTasksObservationAutoConfiguration`, giống wiring Actuator của app thật; không gán tên job
+bằng tay trong test. Giữ nguyên assertion của ca từng đỏ `api=-`, không hạ kỳ vọng hoặc bỏ test.
+
+Kiểm local bằng Postman:
+
+1. Khởi động lại backend với profile `sql-log`, chỉ dùng dữ liệu giả (cách bật ở mục trên).
+2. Import `postman/task-sql-caller.postman_collection.json`; dùng lại environment
+   `postman/local.postman_environment.json`, chọn **Car Rental - Local**.
+3. Chạy folder **Part 1 - API context**, một iteration, theo thứ tự 01 → 03. Request 01 tạo chi nhánh
+   giả duy nhất và tự lưu mã. Request 02 đọc lại kèm query marker. Request 03 cố tình thiếu đầu vào:
+   phải là **400 / INVALID_REQUEST**, không phải 500. Mọi `pm.test` phải xanh.
+4. Lấy `X-Request-Id` trong response 02 rồi tìm chính ID đó ở console IntelliJ. Sự kiện SELECT phải có
+   `[api=GET /api/v1/admin/branches/CN-…]`; **không có** `?probe=not-in-api-context` trong nhãn.
+   Postman Console cũng in chuỗi nhãn cần tìm, không dump dữ liệu request. Request 03 có thể không
+   phát sinh log vì lỗi đầu vào không bị ghi ERROR — không yêu cầu tạo sự kiện chỉ để quan sát.
+5. Đợi một nhịp job (mặc định 30 giây), tìm SQL `UPDATE availability.reservation`: phải có
+   `[api=ReservationHoldExpiryScheduler.sweep]` và `requestId=job-…` mới mỗi lượt.
+6. Tắt profile và khởi động lại: không còn SQL log. Các sự kiện HTTP/job khác nếu có vẫn mang nhãn;
+   log khởi động chưa có context không in `[requestId=] [api=]` rỗng.
+
+Postman chỉ kiểm response/header, không đọc được log máy chủ; test tự động phía trên kiểm nội dung
+MDC và pattern. Nếu không thấy SQL, kiểm profile rồi khởi động lại đúng tiến trình cổng 8081; nếu
+`{{baseUrl}}` đỏ thì chọn environment. Chuỗi `caller` được bổ sung từ Phần 2.
+
+File của Phần 1 (đường dẫn từ gốc repo):
+
+| Trạng thái | File |
+|---|---|
+| Tạo | `car-rental-api/src/main/java/com/carrental/shared/logging/ContextAwareTaskScheduler.java` |
+| Tạo | `car-rental-api/src/main/java/com/carrental/shared/logging/ScheduledJobObservationHandler.java` |
+| Tạo | `car-rental-api/src/main/java/com/carrental/shared/logging/LogValueSanitizer.java` |
+| Sửa | `car-rental-api/src/main/java/com/carrental/shared/logging/RequestIdFilter.java` |
+| Sửa | `car-rental-api/src/main/java/com/carrental/shared/logging/JobLoggingTaskDecorator.java` |
+| Sửa | `car-rental-api/src/main/java/com/carrental/shared/logging/FailureSummary.java` |
+| Sửa | `car-rental-api/src/main/java/com/carrental/shared/config/SchedulerLoggingConfiguration.java` |
+| Sửa | `car-rental-api/src/main/resources/application.yml` |
+| Tạo | `car-rental-api/src/test/java/com/carrental/shared/logging/ContextAwareTaskSchedulerTest.java` |
+| Tạo | `car-rental-api/src/test/java/com/carrental/shared/logging/ScheduledJobObservationHandlerTest.java` |
+| Tạo | `car-rental-api/src/test/java/com/carrental/shared/logging/CorrelationPatternTest.java` |
+| Sửa | `car-rental-api/src/test/java/com/carrental/shared/logging/RequestIdFilterTest.java` |
+| Sửa | `car-rental-api/src/test/java/com/carrental/shared/logging/RequestIdApiIntegrationTest.java` |
+| Sửa | `car-rental-api/src/test/java/com/carrental/shared/logging/FailureSummaryTest.java` |
+| Sửa | `car-rental-api/src/test/java/com/carrental/shared/logging/JobLoggingTaskDecoratorTest.java` |
+| Sửa | `car-rental-api/src/test/java/com/carrental/shared/error/ApiFailureLoggingTest.java` |
+| Sửa | `car-rental-api/src/test/java/com/carrental/shared/config/SchedulerLoggingConfigurationTest.java` |
+| Sửa | `car-rental-api/src/test/java/com/carrental/availability/adapter/in/scheduler/ReservationHoldExpirySchedulerTest.java` |
+| Tạo | `postman/task-sql-caller.postman_collection.json` |
+| Sửa | `README.md` |
+
+Environment Postman dùng lại, không thêm biến hoặc secret. Chỉ tầng logging dùng chung thay đổi ở
+production; `availability` chỉ mở rộng test wiring scheduler, không đổi service/SQL/transaction.
+
+### Mở rộng SQL caller — Phần 2: nơi gọi từng câu SQL
+
+Chỉ profile `sql-log` chọn `SqlCallerLogger`, appender kế thừa SLF4J của P6Spy và gắn
+`SqlCallerFormatter` (`MessageFormattingStrategy`) ngay trong constructor. P6Spy gán lại strategy
+sau khi tạo appender nên setter cũng giữ formatter này, không để formatter mặc định làm mất caller
+hoặc xuống dòng. Không đăng ký hai lớp này thành Spring bean; không tự đặt system property toàn cục.
+Không bật profile: datasource decorator vẫn tắt hẳn, cấu hình không tham chiếu hai lớp caller.
+
+Mỗi sự kiện SQL có dạng `SQL (<ms> ms):`, xuống dòng `caller: ...`, rồi nguyên câu SQL đã thay tham số.
+StackWalker chỉ chạy khi formatter nhận SQL không rỗng. Chuỗi caller:
+
+- Theo thứ tự **trong → ngoài**: adapter ← service ← controller; không đảo thứ tự stack.
+- Chỉ bỏ tiền tố `com.carrental.`, giữ module/package để hai `VehicleSearchQueryService` không trùng nhãn.
+- Bỏ frame framework, proxy/CGLIB và tầng logging; tối đa **12 frame hợp lệ**, thêm `[truncated]` nếu còn.
+- Không có frame ứng dụng thì `-`; thiếu debug metadata thì ghi rõ `Unknown Source` hoặc tên file,
+  không bịa số dòng. Số dòng thực tế phụ thuộc phiên bản code, ví dụ ở trên chỉ minh họa.
+- Không thêm query/body/header/URL JDBC. SQL có tham số vẫn chỉ được bật với dữ liệu local giả theo
+  security-guideline §3. Không sửa response, không bật `%L`/`%M`, không viết lại SQL nghiệp vụ.
+
+Kiểm tự động từ `car-rental-api/`, Docker Desktop đang hoạt động:
+
+```bash
+./mvnw '-Dtest=SqlCallerFormatterTest,SqlCallerLoggerTest,SqlCallerProfileTest,SqlLoggingIntegrationTest,ArchitectureRulesTest' test
+./mvnw -Dspring.profiles.active=sql-log -Dtest=SqlLoggingIntegrationTest test
+```
+
+Cả hai lượt phải `BUILD SUCCESS`, không failure/error. Lượt đầu không đặt `SPRING_PROFILES_ACTIVE`
+ở terminal: integration phải đi qua Hikari trực tiếp và không sinh log SQL. Các unit test formatter
+có chủ đích phát hai sự kiện giả không có nghĩa datasource đã bật proxy. Lượt thứ hai phải log SQL
+thật có caller, tham số và ms; rollback trong test vẫn thật. Không cần xóa volume hoặc gõ SQL tay.
+
+| Test | Điều được chứng minh |
+|---|---|
+| SqlCallerFormatterTest.preservesModulePathsAndInsideOutOrder | Giữ module và thứ tự adapter-service-controller, phân biệt hai tên class giống nhau trên metadata mẫu |
+| SqlCallerFormatterTest.filtersInfrastructureAndGeneratedProxyFrames | Không đưa framework/proxy/tầng log vào caller |
+| SqlCallerFormatterTest.capsAtTwelveAcceptedFramesAndMarksTruncation | Lọc trước, giới hạn 12 frame sau, có dấu cắt khi vượt |
+| SqlCallerFormatterTest.keepsExactlyTwelveFramesWithoutTruncationMarker | Đúng 12 không báo cắt giả và không che frame đệ quy |
+| SqlCallerFormatterTest.usesDashWhenNoApplicationFrameExists | Không có nguồn gọi ứng dụng thì hiện `-` |
+| SqlCallerFormatterTest.handlesMissingSourceMetadata | Thiếu số dòng/file hoặc native không làm formatter lỗi |
+| SqlCallerFormatterTest.preservesExpandedMultilineSqlAndElapsedTime | Giữ ms, SQL đã thay tham số và comment nhiều dòng; bỏ URL JDBC/prepared riêng |
+| SqlCallerFormatterTest.ignoresEmptySql | SQL rỗng không có caller |
+| SqlCallerLoggerTest.retainsCallerFormatterWhenP6SpySetsDefaultStrategy | Cố gán SingleLineFormat không làm mất caller hoặc xuống dòng |
+| SqlCallerProfileTest.defaultConfigurationNeverLoadsCallerOrDecoratesDataSource | Cấu hình YAML mặc định không proxy, vẫn khởi tạo khi classloader cấm hai lớp caller |
+| SqlCallerProfileTest.sqlLogProfileSelectsCallerAppenderExplicitly | Chỉ YAML profile chọn đúng appender, không còn log-format cũ |
+| SqlLoggingIntegrationTest.logsEveryExecutionWithExpandedValuesAndPreservedNewlinesOnlyWhenEnabled | SQL PostgreSQL thật có caller với source line khi bật profile, không có sự kiện khi tắt |
+| SqlLoggingIntegrationTest.preservesApplicationTransactionAndRollback | Bọc formatter/appender không thay đổi rollback nghiệp vụ |
+
+Test metadata mẫu **không thay thế** test luồng tìm xe thật phân biệt hai service. Luồng đó, HTTP/job
+SQL và đồng thời request được kiểm ở Phần 3 bên dưới.
+
+Postman: import lại `postman/task-sql-caller.postman_collection.json`, chọn **Car Rental - Local**.
+Khởi động lại app với `--spring.profiles.active=sql-log` trong Program arguments của IntelliJ.
+Chạy folder **Part 2 - SQL caller**, 01 → 03, một iteration; kết quả 201/200/400 và mọi `pm.test` xanh.
+Lấy ID response 02 để tìm sự kiện SELECT trong console: phải có `api=GET /api/v1/admin/branches/CN-…`
+không có query, và caller gồm `BranchReadAdapter.findByCode` ← `BranchQueryService.get` ←
+`AdminBranchController.get`, giữ đường dẫn module cùng `File.java:dòng`. Không có tên lớp tầng log
+hoặc `$$SpringCGLIB$$`. Tắt profile, khởi động lại và chạy lại folder: API vẫn đúng, không có SQL/caller.
+
+File tạo ở Phần 2: `shared/logging/SqlCallerFormatter.java`, `shared/logging/SqlCallerLogger.java`
+trong `car-rental-api/src/main/java/com/carrental/`; ba lớp test tương ứng `SqlCallerFormatterTest`,
+`SqlCallerLoggerTest`, `SqlCallerProfileTest` trong `car-rental-api/src/test/java/com/carrental/shared/logging/`.
+File sửa: `car-rental-api/src/main/resources/application-sql-log.yml`,
+`car-rental-api/src/test/java/com/carrental/shared/sql/SqlLoggingIntegrationTest.java`,
+`postman/task-sql-caller.postman_collection.json` và `README.md`. Không đổi environment hoặc secret.
+
+### Mở rộng SQL caller — Phần 3: HTTP/job thật và đồng thời
+
+`SqlCallerFlowIntegrationTest` dùng server HTTP cổng ngẫu nhiên, PostgreSQL Testcontainers và use case
+thật của `branch`, `vehicle`, `search`, `availability`. Không mock service/SQL và không gọi controller
+trực tiếp. Fixture xe đi qua DRAFT → PENDING_APPROVAL → ACTIVE; model UUID cô lập từng phép thử.
+Clock của fixture tìm kiếm cố định ở 2030-01-15 để không phụ thuộc ngày chạy test.
+
+Nhịp job **chỉ trong context test này** là 250 ms; nó vẫn là method `@Scheduled` production, đi qua
+service/transaction/savepoint/SQL thật. Test tạo một HELD đã hết hạn trong transaction, đợi job nhả,
+rồi đọc lại từ CSDL. Không gọi tay `sweep()` hoặc `expireHolds()`. Một filter chỉ có ở test đặt barrier
+trước/sau hai request được chọn để chứng minh chúng thực sự cùng hoạt động; không thêm endpoint.
+
+Chạy từ `car-rental-api/`, Docker Desktop đang hoạt động:
+
+```bash
+./mvnw '-Dtest=SqlCallerFlowIntegrationTest,ApiExceptionHandlerTest,ArchitectureRulesTest' test
+./mvnw -Dspring.profiles.active=sql-log '-Dtest=SqlCallerFlowIntegrationTest,SqlLoggingIntegrationTest,ReservationWriteAdapterIntegrationTest,ReservationHoldIntegrationTest,ReservationDeadlockIntegrationTest,ReservationInsertRetryTest,ReservationHoldConcurrencyIntegrationTest' test
+```
+
+Cả hai lượt phải `BUILD SUCCESS`, không failure/error. Lượt đầu không có biến môi trường ép profile:
+HTTP và job vẫn làm việc thật, datasource phải là Hikari trực tiếp và không có SQL/caller. Lượt thứ
+hai phải có caller đúng chuỗi cùng source line dương. Các test availability kiểm lại lỗi `23P01`
+đúng tên constraint, deadlock/savepoint/retry và cuộc đua giữ chỗ qua proxy; không thay kỳ vọng của
+chúng. Không dùng lệnh xóa volume hoặc SQL gỡ constraint để kiểm phần này.
+
+| Test trong SqlCallerFlowIntegrationTest | Điều được chứng minh |
+|---|---|
+| tracesRealBranchRequestWithoutQueryInApiContext | HTTP GET thật sinh SELECT có adapter ← service ← controller cùng số dòng; API không chứa query marker |
+| distinguishesBothVehicleSearchServicesOnRealSearchRoute | API tìm được xe ACTIVE; cùng SQL ứng viên có cả `vehicle.application.service.VehicleSearchQueryService.list` và `search.application.service.VehicleSearchQueryService.search`, đúng thứ tự và số dòng |
+| concurrentHttpRequestsKeepSeparateApiAndRequestIds | Hai request đọc chi nhánh/tìm xe vượt barrier trước và sau xử lý; log/SQL không lẫn API hoặc ID |
+| rejectsInvalidSearchWithoutSqlOrInternalDetails | Thiếu tham số trả 400 INVALID_REQUEST trước SQL, giữ header và hợp đồng lỗi, không lộ caller/class |
+| scheduledSweepUsesRealSqlAndCorrectJobIdentity | Job định kỳ thật chuyển HELD thành RELEASED; khi bật profile, các lượt UPDATE có job-UUID riêng, tên job và caller adapter-service-scheduler |
+
+Nhánh không có profile không chỉ kiểm response: mỗi test thành công khẳng định bộ thu P6Spy không
+có sự kiện nào, kể cả SQL nền của job. Nhánh bật profile kiểm log thực tế, không tự dựng chuỗi caller
+để so với một chuỗi giả khác. Regex chỉ kiểm số dòng dương, không ghim số dòng dễ đổi khi sửa code.
+
+File tạo: `car-rental-api/src/test/java/com/carrental/shared/logging/SqlCallerFlowIntegrationTest.java`.
+File sửa: `README.md`. Không đổi production, migration, endpoint hoặc collection ở phần kiểm chứng
+này; Postman dùng lại folder **Part 2 - SQL caller**. Kiểm đồng thời/job cần test tự động, không thể
+chứng minh bằng chạy tuần tự Collection Runner.
+
+### Mở rộng SQL caller — Phần 4: nghiệm thu tổng
+
+Phần cuối chỉ hoàn thiện hướng dẫn; không đổi production, schema, endpoint hoặc hành vi nghiệp vụ.
+Tóm tắt từng test và danh sách file nằm ngay cuối các Phần 1–3 phía trên. Hai lượt test Phần 3
+(mặc định và `sql-log`) phải đạt trước lượt toàn bộ suite dưới đây.
 
 Sau khi các phần riêng đã xanh, chạy toàn bộ suite từ `car-rental-api/`:
 
@@ -342,6 +568,16 @@ tổng từ Maven để bàn giao review. Không coi dòng ERROR do test cố t�
 
 Checklist bằng mắt (không cần làm lại phần đã kiểm và không thay đổi):
 
+- Collection của task này: `postman/task-sql-caller.postman_collection.json`, dùng environment
+  `postman/local.postman_environment.json`, chọn **Car Rental - Local**. Import collection và chạy
+  **Part 1 - API context**, rồi **Part 2 - SQL caller**, mỗi folder 01 → 03, một iteration.
+  Mỗi folder tự tạo dữ liệu giả duy nhất, không cần chép mã hoặc dọn dữ liệu. Kỳ vọng lần lượt
+  201/200/400 và mọi `pm.test` xanh; 400 phải là `INVALID_REQUEST`.
+- Ở response 02 của Part 2, lấy `X-Request-Id`, tìm chính ID đó trong console IntelliJ: sự kiện SQL
+  có nhãn `api=GET /api/v1/admin/branches/<mã>` không chứa query; caller giữ package/module và số dòng,
+  theo thứ tự `BranchReadAdapter.findByCode` ← `BranchQueryService.get` ← `AdminBranchController.get`.
+  Job có `api=ReservationHoldExpiryScheduler.sweep`; không cần dữ liệu giữ chỗ thật để thấy câu UPDATE.
+  Postman không đọc được log máy chủ; test Phần 3 kiểm nội dung caller, tên job và cách ly request.
 - Collection `postman/task-logging.postman_collection.json`, environment `Car Rental - Local`:
   **Part 1 - SQL logging** có hai request, **Part 2 - Request ID** có bốn request; mọi `pm.test` xanh.
 - Bật profile với dữ liệu giả: SQL nhiều dòng có giá trị tham số, ms và ID trùng response header;
@@ -349,6 +585,11 @@ Checklist bằng mắt (không cần làm lại phần đã kiểm và không th
 - Tắt profile rồi khởi động lại: API vẫn đúng, không còn sự kiện SQL từ P6Spy; requestId vẫn hoạt động.
 - Lỗi 500, CR/LF thật và job lỗi đã được kiểm bằng test; không thêm endpoint lỗi hoặc phá CSDL để thử.
 - `git status --short` không đưa `.env`, `.DS_Store`, log trong `target/` hoặc dữ liệu cá nhân vào commit.
+
+Gửi phần `Results` (số test, failures/errors/skipped) và `Total time` sau `clean verify` để chốt
+nghiệm thu; không suy số test hoặc thời gian từ lượt chạy cũ. Commit message đề xuất:
+`Bổ sung ngữ cảnh API, job và chuỗi caller cho log SQL`. Tech Owner tự commit rồi nhờ Chief Architect
+review; không thêm secret, log thực tế hoặc dữ liệu Testcontainers vào commit.
 
 Giới hạn đã biết: log SQL chỉ dành cho local giả; trước môi trường có dữ liệu thật phải có chốt triển
 khai cấm profile này. MDC của HTTP không tự truyền sang thread tùy ý; scheduler custom/virtual cần

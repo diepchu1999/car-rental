@@ -26,7 +26,8 @@ public final class FailureSummary {
                 + "\" source=\"" + escape(applicationFrame(root))
                 + "\" method=\"" + escape(method)
                 + "\" path=\"" + escape(path)
-                + "\" requestId=\"" + escape(MDC.get(RequestIdFilter.MDC_KEY)) + "\"";
+                + "\" requestId=\"" + escape(MDC.get(RequestIdFilter.MDC_KEY))
+                + "\" api=\"" + escape(MDC.get(RequestIdFilter.API_MDC_KEY)) + "\"";
     }
 
     /** Duyệt bằng danh tính đối tượng để chuỗi cause bất thường có vòng lặp không treo handler. */
@@ -55,29 +56,6 @@ public final class FailureSummary {
 
     /** Escape dấu phân cách, ký tự điều khiển, định dạng và ngắt dòng Unicode để giữ đúng một dòng. */
     private static String escape(@Nullable String value) {
-        if (value == null) {
-            return "-";
-        }
-        StringBuilder result = new StringBuilder();
-        value.codePoints().forEach(codePoint -> {
-            switch (codePoint) {
-                case '\\' -> result.append("\\\\");
-                case '"' -> result.append("\\\"");
-                case '\r' -> result.append("\\r");
-                case '\n' -> result.append("\\n");
-                case '\t' -> result.append("\\t");
-                default -> {
-                    int type = Character.getType(codePoint);
-                    if (Character.isISOControl(codePoint) || type == Character.FORMAT
-                            || type == Character.LINE_SEPARATOR || type == Character.PARAGRAPH_SEPARATOR) {
-                        result.append(codePoint <= 0xffff ? "\\u%04x".formatted(codePoint)
-                                : "\\U%08x".formatted(codePoint));
-                    } else {
-                        result.appendCodePoint(codePoint);
-                    }
-                }
-            }
-        });
-        return result.toString();
+        return LogValueSanitizer.escape(value);
     }
 }

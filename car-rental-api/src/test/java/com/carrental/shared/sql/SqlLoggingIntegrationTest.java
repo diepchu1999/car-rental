@@ -87,6 +87,10 @@ class SqlLoggingIntegrationTest {
             String message = messages.get(index);
             String quotedLabel = "'" + labels.get(index).replace("'", "''") + "'";
             assertTrue(message.matches("(?s)^SQL \\(\\d+ ms\\):\\n.*"), message);
+            assertTrue(message.contains("\ncaller: shared.sql.SqlLoggingIntegrationTest."
+                    + "logsEveryExecutionWithExpandedValuesAndPreservedNewlinesOnlyWhenEnabled"
+                    + "(SqlLoggingIntegrationTest.java:"), message);
+            assertFalse(message.contains("caller: com.carrental."), message);
             assertTrue(message.contains("-- Kiểm tương thích SQL log: dữ liệu giả, giữ nguyên dấu xuống dòng.\nSELECT"),
                     "The leading SQL comment must end before SELECT: " + message);
             assertTrue(message.contains("CAST(" + quotedLabel + " AS text)"), message);

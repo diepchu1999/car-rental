@@ -5,8 +5,10 @@ decorator:
     enabled: true
     p6spy:
       enable-logging: true
-      logging: slf4j
-      log-format: "SQL (%(executionTime) ms):\n%(sql)"
+      # Appender SLF4J chuyên biệt gắn MessageFormattingStrategy ngay khi P6Spy khởi tạo.
+      # Chỉ file profile này tham chiếu lớp caller; mặc định datasource vẫn không có proxy.
+      logging: custom
+      custom-appender-class: com.carrental.shared.logging.SqlCallerLogger
       exclude-categories: info,debug,result,resultset,commit,rollback
 
 logging:

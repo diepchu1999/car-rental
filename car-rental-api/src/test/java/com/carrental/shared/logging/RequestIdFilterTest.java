@@ -108,13 +108,16 @@ class RequestIdFilterTest {
     @Test
     void restoresPreviousContextAfterSuccess() throws Exception {
         MDC.put(RequestIdFilter.MDC_KEY, "outer-id");
+        MDC.put(RequestIdFilter.API_MDC_KEY, "OuterJob.run");
         MDC.put("otherContext", "preserved");
         var response = new MockHttpServletResponse();
         filter.doFilter(new MockHttpServletRequest(), response, (request, result) -> {
             assertNotEquals("outer-id", MDC.get(RequestIdFilter.MDC_KEY));
+            assertNotEquals("OuterJob.run", MDC.get(RequestIdFilter.API_MDC_KEY));
             assertEquals("preserved", MDC.get("otherContext"));
         });
-        assertEquals(Map.of("requestId", "outer-id", "otherContext", "preserved"), MDC.getCopyOfContextMap());
+        assertEquals(Map.of("requestId", "outer-id", "api", "OuterJob.run", "otherContext", "preserved"),
+                MDC.getCopyOfContextMap());
     }
 
     /** Lỗi chain được ném lại nguyên đối tượng và không để lại requestId trên thread. */
@@ -129,18 +132,21 @@ class RequestIdFilterTest {
                 })));
         assertGeneratedId(response.getHeader(RequestIdFilter.HEADER_NAME));
         assertNull(MDC.get(RequestIdFilter.MDC_KEY));
+        assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
     }
 
     /** Nhánh lỗi cũng khôi phục giá trị MDC có từ trước, không chỉ xóa sạch. */
     @Test
     void restoresPreviousIdWhenChainFails() {
         MDC.put(RequestIdFilter.MDC_KEY, "outer-id");
+        MDC.put(RequestIdFilter.API_MDC_KEY, "OuterJob.run");
         MDC.put("otherContext", "preserved");
         RuntimeException failure = new IllegalStateException("Test runtime failure");
         assertSame(failure, assertThrows(RuntimeException.class, () ->
                 filter.doFilter(new MockHttpServletRequest(), new MockHttpServletResponse(),
                         (request, response) -> { throw failure; })));
-        assertEquals(Map.of("requestId", "outer-id", "otherContext", "preserved"), MDC.getCopyOfContextMap());
+        assertEquals(Map.of("requestId", "outer-id", "api", "OuterJob.run", "otherContext", "preserved"),
+                MDC.getCopyOfContextMap());
     }
 
     /** Hai request nối tiếp trên cùng thread không kế thừa ID đã sinh của nhau. */
@@ -158,11 +164,13 @@ class RequestIdFilterTest {
     @ParameterizedTest
     @EnumSource(value = DispatcherType.class, names = {"ERROR", "ASYNC"})
     void preservesIdAcrossRedispatch(DispatcherType dispatcherType) throws Exception {
-        var request = new MockHttpServletRequest();
+        var request = new MockHttpServletRequest("GET", "/test/original");
+        request.setQueryString("secret=query-sentinel");
         var initialResponse = new MockHttpServletResponse();
         filter.doFilter(request, initialResponse, (ignoredRequest, ignoredResponse) -> {});
         String expectedId = initialResponse.getHeader(RequestIdFilter.HEADER_NAME);
         request.setDispatcherType(dispatcherType);
+        request.setRequestURI("/error");
         if (dispatcherType == DispatcherType.ERROR) {
             request.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, "/test/original");
         }
@@ -170,9 +178,12 @@ class RequestIdFilterTest {
         try (var executor = Executors.newSingleThreadExecutor()) {
             executor.submit(() -> {
                 try {
-                    filter.doFilter(request, nextResponse, (ignoredRequest, ignoredResponse) ->
-                            assertEquals(expectedId, MDC.get(RequestIdFilter.MDC_KEY)));
+                    filter.doFilter(request, nextResponse, (ignoredRequest, ignoredResponse) -> {
+                        assertEquals(expectedId, MDC.get(RequestIdFilter.MDC_KEY));
+                        assertEquals("GET /test/original", MDC.get(RequestIdFilter.API_MDC_KEY));
+                    });
                     assertNull(MDC.get(RequestIdFilter.MDC_KEY));
+                    assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
                     return null;
                 } finally {
                     MDC.clear();
@@ -185,20 +196,46 @@ class RequestIdFilterTest {
     /** Error dispatch lồng nhau khôi phục header đã reset mà không phá MDC của lượt bên ngoài. */
     @Test
     void preservesIdDuringNestedErrorDispatch() throws Exception {
-        var request = new MockHttpServletRequest();
+        var request = new MockHttpServletRequest("POST", "/test/original");
         var response = new MockHttpServletResponse();
         filter.doFilter(request, response, (ignoredRequest, ignoredResponse) -> {
             String expectedId = MDC.get(RequestIdFilter.MDC_KEY);
             response.reset();
             request.setDispatcherType(DispatcherType.ERROR);
+            request.setRequestURI("/error");
             request.setAttribute(RequestDispatcher.ERROR_REQUEST_URI, "/test/original");
             filter.doFilter(request, response, (nestedRequest, nestedResponse) -> {
                 assertEquals(expectedId, MDC.get(RequestIdFilter.MDC_KEY));
                 assertEquals(expectedId, response.getHeader(RequestIdFilter.HEADER_NAME));
+                assertEquals("POST /test/original", MDC.get(RequestIdFilter.API_MDC_KEY));
             });
             assertEquals(expectedId, MDC.get(RequestIdFilter.MDC_KEY));
+            assertEquals("POST /test/original", MDC.get(RequestIdFilter.API_MDC_KEY));
         });
         assertNull(MDC.get(RequestIdFilter.MDC_KEY));
+        assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
+    }
+
+    /** Nhãn chỉ chứa method/path, không kéo theo query, body hoặc header tùy ý. */
+    @Test
+    void includesOnlyMethodAndPathInApiContext() throws Exception {
+        var request = new MockHttpServletRequest("GET", "/api/v1/public/vehicles");
+        request.setQueryString("latitude=10.76&longitude=106.66&secret=query-sentinel");
+        request.addHeader("Authorization", "Bearer token-sentinel");
+        request.setContent("body-sentinel".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        filter.doFilter(request, new MockHttpServletResponse(), (ignoredRequest, ignoredResponse) ->
+                assertEquals("GET /api/v1/public/vehicles", MDC.get(RequestIdFilter.API_MDC_KEY)));
+        assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
+    }
+
+    /** Mock cho phép ký tự HTTP thật sẽ từ chối; lớp phòng vệ vẫn không để chèn dòng log giả. */
+    @Test
+    void escapesControlCharactersBeforePuttingApiInMdc() throws Exception {
+        var request = new MockHttpServletRequest("GET\r", "/probe\nFORGED\t\u001b\u2028\u202e");
+        filter.doFilter(request, new MockHttpServletResponse(), (ignoredRequest, ignoredResponse) ->
+                assertEquals("GET\\r /probe\\nFORGED\\t\\u001b\\u2028\\u202e",
+                        MDC.get(RequestIdFilter.API_MDC_KEY)));
+        assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
     }
 
     /** Hai chain thực sự cùng hoạt động vẫn thấy ID riêng trước và sau điểm đồng bộ. */
@@ -219,13 +256,15 @@ class RequestIdFilterTest {
 
     /** Chạy một request trên worker, kiểm MDC trong chain và sau khi filter trả về. */
     private String runConcurrentRequest(String requestId, CountDownLatch entered) throws Exception {
-        var request = new MockHttpServletRequest();
+        var request = new MockHttpServletRequest("GET", "/test/" + requestId);
+        request.setQueryString("secret=" + requestId);
         request.addHeader(RequestIdFilter.HEADER_NAME, requestId);
         var response = new MockHttpServletResponse();
         try {
             assertNull(MDC.get(RequestIdFilter.MDC_KEY));
             filter.doFilter(request, response, (ignoredRequest, ignoredResponse) -> {
                 assertEquals(requestId, MDC.get(RequestIdFilter.MDC_KEY));
+                assertEquals("GET /test/" + requestId, MDC.get(RequestIdFilter.API_MDC_KEY));
                 entered.countDown();
                 try {
                     assertTrue(entered.await(5, TimeUnit.SECONDS), "Both requests must enter concurrently.");
@@ -234,8 +273,10 @@ class RequestIdFilterTest {
                     throw new IOException("Interrupted while coordinating requests.", exception);
                 }
                 assertEquals(requestId, MDC.get(RequestIdFilter.MDC_KEY));
+                assertEquals("GET /test/" + requestId, MDC.get(RequestIdFilter.API_MDC_KEY));
             });
             assertNull(MDC.get(RequestIdFilter.MDC_KEY));
+            assertNull(MDC.get(RequestIdFilter.API_MDC_KEY));
             return response.getHeader(RequestIdFilter.HEADER_NAME);
         } finally {
             MDC.clear();

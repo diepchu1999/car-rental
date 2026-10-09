@@ -4,7 +4,7 @@ server:
 logging:
   pattern:
     # Một tiền tố cho mỗi sự kiện; giữ nguyên dòng tiếp nối của SQL và stack trace.
-    correlation: "[requestId=%X{requestId:-}] "
+    correlation: "%replace([requestId=%X{requestId:-}] [api=%X{api:-}] ){'\\[requestId=\\] \\[api=\\] ',''}"
 
 # Security guideline §3: mặc định không bọc datasource, kể cả trên test classpath.
 # Chỉ profile sql-log dành cho dữ liệu local giả mới bật decorator.

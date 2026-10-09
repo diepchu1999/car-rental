@@ -20,8 +20,10 @@ import java.util.regex.Pattern;
 public final class RequestIdFilter extends OncePerRequestFilter {
     public static final String HEADER_NAME = "X-Request-Id";
     public static final String MDC_KEY = "requestId";
+    public static final String API_MDC_KEY = "api";
 
     private static final String REQUEST_ATTRIBUTE = RequestIdFilter.class.getName() + ".requestId";
+    private static final String API_ATTRIBUTE = RequestIdFilter.class.getName() + ".api";
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9-]{1,64}");
 
     /** Tạo filter không giữ trạng thái riêng của bất kỳ request nào. */
@@ -33,8 +35,11 @@ public final class RequestIdFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         String requestId = resolveRequestId(request);
+        String api = resolveApi(request);
         String previousId = MDC.get(MDC_KEY);
+        String previousApi = MDC.get(API_MDC_KEY);
         MDC.put(MDC_KEY, requestId);
+        MDC.put(API_MDC_KEY, api);
         try {
             if (!response.isCommitted()) {
                 response.setHeader(HEADER_NAME, requestId);
@@ -45,6 +50,11 @@ public final class RequestIdFilter extends OncePerRequestFilter {
                 MDC.remove(MDC_KEY);
             } else {
                 MDC.put(MDC_KEY, previousId);
+            }
+            if (previousApi == null) {
+                MDC.remove(API_MDC_KEY);
+            } else {
+                MDC.put(API_MDC_KEY, previousApi);
             }
         }
     }
@@ -66,6 +76,18 @@ public final class RequestIdFilter extends OncePerRequestFilter {
     protected void doFilterNestedErrorDispatch(HttpServletRequest request, HttpServletResponse response,
                                                FilterChain filterChain) throws ServletException, IOException {
         doFilterInternal(request, response, filterChain);
+    }
+
+    /** Giữ method/path ban đầu qua redispatch; không đọc query, body hay header để tạo nhãn API. */
+    private String resolveApi(HttpServletRequest request) {
+        Object existing = request.getAttribute(API_ATTRIBUTE);
+        if (existing instanceof String api) {
+            return api;
+        }
+        String api = LogValueSanitizer.escape(request.getMethod()) + " "
+                + LogValueSanitizer.escape(request.getRequestURI());
+        request.setAttribute(API_ATTRIBUTE, api);
+        return api;
     }
 
     /** Ưu tiên ID đã chọn trên request; chỉ nhận đúng một header có toàn bộ ký tự hợp lệ. */

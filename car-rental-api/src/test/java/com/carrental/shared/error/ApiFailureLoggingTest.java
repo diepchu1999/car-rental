@@ -49,11 +49,14 @@ class ApiFailureLoggingTest {
             assertEquals("Failure summary: rootType=\"java.lang.IllegalArgumentException\""
                     + " rootMessage=\"Root\\r\\nFORGED\\tmessage\""
                     + " source=\"com.carrental.vehicle.Probe.save(Probe.java:42)\""
-                    + " method=\"POST\" path=\"/test/failure-log\" requestId=\"client-failure-123\"", summary);
+                    + " method=\"POST\" path=\"/test/failure-log\" requestId=\"client-failure-123\""
+                    + " api=\"POST /test/failure-log\"", summary);
             assertEquals("client-failure-123", event.getMDCPropertyMap().get("requestId"));
+            assertEquals("POST /test/failure-log", event.getMDCPropertyMap().get("api"));
             assertSame(failure, ((ThrowableProxy) event.getThrowableProxy()).getThrowable());
             for (String secret : new String[] {"query-sentinel", "token-sentinel", "header-sentinel", "body-sentinel"}) {
                 assertFalse(summary.contains(secret));
+                assertFalse(event.getMDCPropertyMap().toString().contains(secret));
             }
             assertEquals("Root\r\nFORGED\tmessage", root.getMessage());
         }
