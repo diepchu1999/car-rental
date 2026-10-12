@@ -22,6 +22,7 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;     -- hash số định danh
 
 | Aggregate | Mẫu mã | Ví dụ |
 |---|---|---|
+| Tài khoản | `TK-<6>` | `TK-4QW8ZP` |
 | Chi nhánh | `CN-<6>` | `CN-3TR7WK` |
 | Xe | `XE-<6>` | `XE-8KQ4M2` |
 | Khoá lịch | `KL-<6>` | `KL-5HV2QN` |

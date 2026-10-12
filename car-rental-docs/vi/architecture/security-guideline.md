@@ -39,8 +39,9 @@ Keycloak giữ vai thô (12 vai, BR-801). Phân quyền theo dữ liệu nằm �
 - Vai nhân viên chỉ `ADMIN` gán; một tài khoản giữ được `CUSTOMER` cùng một vai nhân viên (BR-809).
 
 ### Ranh giới chi nhánh — BR-802, BR-803
-Người dùng thuộc một chi nhánh **không xem, không sửa** dữ liệu của chi nhánh khác. Chỉ `ADMIN`
-xuyên chi nhánh. Đây là kiểm tra ở **use case**, không phải bộ lọc ở giao diện.
+Người dùng thuộc một chi nhánh **không xem, không sửa** dữ liệu của chi nhánh khác. `ADMIN` có toàn
+quyền; `OPERATIONS_MANAGER` và `ACCOUNTANT` là vai cấp công ty, xem được mọi chi nhánh **chỉ trong việc
+của vai đó** (BR-803). Đây là kiểm tra ở **use case**, không phải bộ lọc ở giao diện.
 
 ### Chống truy cập chéo — rủi ro số một của hệ thống này
 

@@ -344,6 +344,10 @@ Cách này giữ đăng ký nhẹ để không mất khách ở bước đầu, 
 mới tạo được tài khoản. Hệ thống lưu **phiên bản** điều khoản khách đã đồng ý và **thời điểm** đồng ý.
 Lý do: hệ thống giữ CCCD, GPLX, và giữ bằng chứng cả sau khi khách xoá tài khoản (BR-123) — khách phải
 được biết trước. Nội dung điều khoản do Tech Owner soạn, không phải việc của code.
+
+**Đổi phiên bản điều khoản chỉ áp cho người đăng ký mới.** Người đã đồng ý giữ nguyên bằng chứng của
+phiên bản họ đã đồng ý; muốn bắt đồng ý lại thì phải chốt thành quy tắc riêng. Ở local dùng **văn bản
+điều khoản thử, ghi rõ là thử** — như phí bảo hiểm (BR-231), không phải điều khoản thật.
 *Nguồn: Tech Owner chốt 24/08/2026. Đồng ý điều khoản: Tech Owner duyệt 12/10/2026.*
 
 ### BR-121 — Giới hạn thời điểm đặt xe ✅ GĐ1
@@ -483,13 +487,24 @@ Nhân viên đăng nhập bằng **mật khẩu cộng OTP** (BR-809).
 | Gửi lại | Sau ít nhất 60 giây |
 | Số lần gửi theo số điện thoại | Tối đa 5 lần/giờ và 10 lần/ngày |
 | Số lần gửi theo IP | Tối đa 20 lần/giờ |
+| Số lần nhập sai theo IP | Tối đa 100 lần/giờ |
+
+"Giờ" và "ngày" là **cửa sổ trượt** 60 phút và 24 giờ, không phải giờ tròn — không gửi dồn được ở hai
+phía ranh giới. Giới hạn gửi theo IP vốn đã chặn khoảng 20 × 5 = 100 lần sai mỗi giờ; giới hạn nhập sai
+theo IP là lớp bảo vệ thêm.
+
+**Chỉ nhận số di động Việt Nam (+84).** Lưu một dạng chuẩn duy nhất, nên `0912…` và `+84912…` là một
+tài khoản. Khách phải có CCCD mới đặt được xe (BR-120) — người không có CCCD đằng nào cũng không đặt
+được; SMS quốc tế còn đắt hơn, đúng cửa bị tấn công gây tốn tiền.
 
 Các giá trị **không đóng cứng trong code**. Chúng là tham số vận hành — như nhịp dọn giữ chỗ ở BR-225 —
 nằm ở cấu hình, **không** có hiệu lực theo thời gian, vì không ảnh hưởng tiền hay đơn đã tạo.
 
 Lý do có giới hạn: mỗi SMS tốn tiền thật, nên cửa gửi OTP là chỗ bị tấn công để gây tốn tiền; giới hạn
 nhập sai chống dò mã.
-*Nguồn: Tech Owner duyệt 12/10/2026 — trước đó security-guideline chỉ ghi "hạn ngắn", "có giới hạn".*
+*Nguồn: Tech Owner duyệt 12/10/2026 — trước đó security-guideline chỉ ghi "hạn ngắn", "có giới hạn".
+Cùng ngày thêm giới hạn nhập sai theo IP, cửa sổ trượt và chỉ nhận số Việt Nam — kế hoạch Task 8a phát
+hiện còn thiếu.*
 
 ---
 
@@ -1421,11 +1436,16 @@ hiện cho tới hôm khách đứng chờ.
 ### BR-807 — Mỗi chi nhánh có một quản lý ✅ GĐ1
 Mỗi chi nhánh có **đúng một** `BRANCH_MANAGER` chịu trách nhiệm.
 
+**Ngoại lệ lúc thiết lập:** chi nhánh mới tạo được **tạm chưa có quản lý** cho tới khi `ADMIN` gán.
+Trong lúc đó, việc của quản lý do `ADMIN` làm (BR-810). CSDL ép **tối đa một** quản lý mỗi chi nhánh —
+`UNIQUE` chỉ ép được "tối đa", không ép được "ít nhất".
+
 Vai này là chủ thể của nhiều quyết định trong hệ thống: duyệt xe lên sàn (BR-010), duyệt huỷ đơn
 (BR-303), yêu cầu điều chuyển xe (BR-006), xác nhận thanh toán thay (BR-217), và nhận cảnh báo giấy
 tờ sắp hết hạn (BR-017). Không có người này thì các luồng đó không có ai đứng tên.
 *Nguồn: Tech Owner chốt 23/08/2026 (phân tích §3); tách thành quy tắc riêng 07/09/2026 —
-trước đó bị gán nhầm vào BR-003.*
+trước đó bị gán nhầm vào BR-003. Ngoại lệ lúc thiết lập: Tech Owner duyệt 12/10/2026, kế hoạch Task 8a
+phát hiện.*
 
 ### BR-808 — Chi nhánh có tên và địa chỉ hiển thị cho khách ✅ GĐ1
 Mỗi chi nhánh có **tên** và **địa chỉ** — bắt buộc, hiển thị trong kết quả tìm kiếm và khi đặt xe.
@@ -1439,6 +1459,9 @@ Kết quả tìm kiếm chỉ ghi "cách 3,2 km" thì khách không biết đó 
   xác nhận tiền; chỉ một mã SMS thì kẻ chiếm được SIM là vào được tài khoản.
 - **Một tài khoản giữ được cả vai `CUSTOMER` lẫn một vai nhân viên.** Mỗi số điện thoại một tài khoản
   (BR-120), nên nhân viên muốn thuê xe dùng chính tài khoản đó.
+- **Mật khẩu nhân viên:** tối thiểu **12 ký tự** · **không** bắt đổi định kỳ · không dùng lại **5** mật
+  khẩu gần nhất · mật khẩu tạm do `ADMIN` cấp **phải đổi** ở lần đăng nhập đầu. Bắt đổi định kỳ đẩy người
+  dùng tới mật khẩu dễ đoán theo mẫu; mật khẩu dài cộng OTP mới là chỗ bảo vệ.
 *Nguồn: Tech Owner duyệt 12/10/2026.*
 
 ### BR-810 — Quyền trên chi nhánh và danh mục xe ✅ GĐ1
@@ -1448,8 +1471,11 @@ Kết quả tìm kiếm chỉ ghi "cách 3,2 km" thì khách không biết đó 
 | Tạo xe, gửi duyệt xe | `BRANCH_STAFF`, `BRANCH_MANAGER` **của chính chi nhánh đó** · `ADMIN` |
 | Duyệt xe lên sàn (BR-010) | `BRANCH_MANAGER` **của chính chi nhánh có xe** (BR-807) · `ADMIN` |
 | Đổi giá ngày (BR-234) | `BRANCH_MANAGER` **của chính chi nhánh có xe** · `ADMIN` |
+| Nhập giá ngay lúc tạo xe | Như đổi giá ngày. `BRANCH_STAFF` gửi kèm giá thì **từ chối (403)** — không âm thầm bỏ giá |
+| Xem chi nhánh và xe ở `/admin` | `BRANCH_STAFF`, `BRANCH_MANAGER` xem **chi nhánh của mình** · `ADMIN` xem tất cả · vai khác chưa được xem, vì chưa có nghiệp vụ cần |
 
 Kiểm "của chính chi nhánh đó" ở use case, không ở controller hay giao diện (BR-802, security-guideline §2).
+Đường tạo xe phải ép đúng quyền nhập giá — nếu không, BR-234 bị lách qua API tạo xe.
 *Nguồn: Tech Owner duyệt 12/10/2026 — trước đó chưa BR nào nói ai được gọi các thao tác này.*
 
 ### BR-806 — Đóng chi nhánh ✅ GĐ1

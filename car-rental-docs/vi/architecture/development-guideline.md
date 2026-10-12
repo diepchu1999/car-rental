@@ -66,7 +66,8 @@ car-rental/
 │           ├── architecture/             # ArchitectureRulesTest
 │           └── <module>/                 # gương với main
 ├── car-rental-keycloak/                  # mở rộng Keycloak (Java SPI): OTP qua SMS — ADR-0006
-│   └── pom.xml · src/                    # build ra .jar, nạp vào container Keycloak
+│   └── pom.xml · src/                    # build ra .jar, nạp vào container Keycloak; bytecode Java 21
+│                                         # theo Java của image Keycloak, không theo Java của backend
 ├── customer-web/ · admin-web/            # React + TypeScript
 └── mobile/                               # React Native
 ```

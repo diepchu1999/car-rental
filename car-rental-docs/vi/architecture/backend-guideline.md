@@ -117,6 +117,16 @@ Mã lỗi là **hợp đồng ổn định** — mobile bản cũ hiển thị t
 | `QUOTE_RENTAL_TYPE_NOT_SUPPORTED` | 422 | Gói tháng chưa hỗ trợ báo giá ở lát cắt hiện tại (BR-125, ADR-0012) |
 | `QUOTE_DRIVE_MODE_NOT_SUPPORTED` | 422 | Có tài xế chưa hỗ trợ báo giá ở lát cắt hiện tại (BR-125, ADR-0012) |
 | `QUOTE_PICKUP_METHOD_NOT_SUPPORTED` | 422 | Giao tận nơi chưa hỗ trợ báo giá ở lát cắt hiện tại (BR-125, ADR-0012) |
+| `UNAUTHENTICATED` | 401 | Thiếu token, hoặc token sai chữ ký, `issuer`, `audience`, hết hạn |
+| `ACCESS_DENIED` | 403 | Sai vai, sai phạm vi chi nhánh, thiếu xác thực hai lớp của nhân viên, hoặc `BRANCH_STAFF` gửi kèm giá khi tạo xe (BR-803, BR-809, BR-810) |
+| `STAFF_BRANCH_REQUIRED` | 403 | Nhân viên thuộc vai cấp chi nhánh nhưng chưa được gán chi nhánh (BR-803, ADR-0006) |
+| `STAFF_ROLE_MISMATCH` | 403 | Vai trong token không khớp vai ghi lúc gán chi nhánh — từ chối, không tự nâng vai hay đổi chi nhánh |
+| `ACCOUNT_IDENTITY_MISMATCH` | 403 | Người dùng Keycloak đã có tài khoản nhưng token mang số điện thoại khác (đổi số là BR-124, chưa làm) |
+| `ACCOUNT_IDENTITY_CONFLICT` | 409 | Người dùng Keycloak mới nhưng số điện thoại đã thuộc tài khoản khác (BR-120) |
+| `ACCOUNT_NOT_FOUND` | 404 | Không tìm thấy tài khoản theo mã `TK-<6>` |
+| `BRANCH_MANAGER_ALREADY_ASSIGNED` | 409 | Chi nhánh đã có quản lý khác (BR-807) |
+| `STAFF_ROLE_NOT_BRANCH_SCOPED` | 422 | Gán chi nhánh cho vai cấp công ty hoặc toàn quyền (BR-803) |
+| `CONSENT_REQUIRED` | 403 | Token có vai `CUSTOMER` nhưng thiếu bằng chứng đồng ý điều khoản hợp lệ (BR-120) |
 | `HOLIDAY_CALENDAR_NOT_DECLARED` | 422 | Khoảng thuê kéo qua ngày cuối đã khai báo lịch lễ — từ chối báo giá và tìm kiếm (BR-218) |
 | `VEHICLE_HAS_ACTIVE_BOOKINGS` | 409 | Thanh lý xe còn đơn hiệu lực (BR-014) |
 | `CONTRACT_OVERDUE` | 403 | Hợp đồng có kỳ quá hạn, chặn nghiệp vụ khác (BR-224) |
