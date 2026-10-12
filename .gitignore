@@ -23,3 +23,6 @@ coverage/
 
 # Logs
 *.log
+
+# Báo cáo cuối task của codex — tạm thời, đường dẫn tuyệt đối, cũ ngay sau commit; lịch sử nằm ở git log
+.ai/reports/

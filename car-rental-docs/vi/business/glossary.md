@@ -29,6 +29,7 @@
 |---|---|---|---|
 | Giá ngày | `daily_rate` | Giá thuê **một ngày thường** của từng xe; mọi khoản theo giá ngày đều tính từ đây | BR-234 |
 | Loại ngày | `day_type` | `WEEKDAY` \| `WEEKEND` \| `HOLIDAY` — gắn cho từng khối 24 giờ của khoảng thuê | BR-218 |
+| Mức tăng giá | `uplift` | Tỷ lệ cộng thêm trên giá ngày theo loại ngày, dạng thập phân: `0.2` là +20%. Ngày thường là `0` | BR-218, BR-225 |
 | Kỳ nghỉ lễ | `holiday_period` | Chuỗi ngày nghỉ liên tục chứa ít nhất một ngày lễ, **gồm cả Thứ Bảy, Chủ nhật trong chuỗi** — mọi ngày trong đó là `HOLIDAY` | BR-218 |
 | Lịch lễ | `holiday_calendar` | Danh sách ngày lễ đã khai báo, kèm **ngày cuối cùng đã khai báo** (`declared_through`); khoảng thuê vượt qua ngày đó thì không báo giá | BR-218 |
 | Tiền thuê | `rental_amount` | Tổng các dòng tiền thuê xe của một khoảng thuê — **chưa gồm** bảo hiểm và các phí khác; là giá hiển thị trong tìm kiếm | BR-126, BR-236 |
@@ -88,7 +89,7 @@
 |---|---|---|
 | Đơn thuê | `Booking` | Một lần thuê xe, từ lúc đặt tới lúc hoàn tất |
 | Báo giá | `Quote` | Kết quả tính giá, bất biến, có hạn dùng |
-| Dòng báo giá | `QuoteLine` | Một dòng tiền trên báo giá, làm tròn riêng tới 1.000đ (BR-236); loại dòng ở bốn dòng dưới và phí bảo hiểm |
+| Dòng báo giá | `QuoteLine` | Một dòng **tiền thuê** trên báo giá, làm tròn riêng tới 1.000đ (BR-236); loại dòng ở bốn dòng dưới. Phí bảo hiểm **không** phải `QuoteLine` — là khoản riêng `insurance_fee`, vẫn hiện thành một dòng riêng (BR-231) |
 | Khối ngày | `DAY_BLOCK` | Một khối 24 giờ tính từ giờ nhận xe, mang loại ngày của giờ bắt đầu khối (BR-218, BR-235) |
 | Phần giờ lẻ | `REMAINDER_HOURS` | Số giờ sau khối 24 giờ cuối, ≤ 4 giờ, mỗi giờ 20% giá ngày (BR-235) |
 | Gói 4 giờ | `HOURLY_PACKAGE` | Phần đầu của gói giờ, 50% giá ngày (BR-114) |

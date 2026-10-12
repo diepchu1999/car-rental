@@ -144,7 +144,7 @@ Các cổng chính:
 | `search` lọc xe đang bận | `availability` | `AvailabilityDirectory.findBusyVehicleIds(...)` |
 | `search` tìm chi nhánh trong bán kính | `branch` | `BranchDirectory` — PostGIS, trả cả khoảng cách |
 | `search` lấy xe hiển thị được | `vehicle` | `VehicleSearchDirectory` → `VehicleSearchView` |
-| `search` và `booking` kiểm điều kiện thuê | `booking` | `RentalTermsDirectory` — đệm, tối thiểu, giờ chi nhánh, cửa sổ đặt |
+| `search`, `pricing` và `booking` kiểm điều kiện thuê | `booking` | `RentalTermsDirectory` — đệm, tối thiểu, giờ chi nhánh, cửa sổ đặt |
 | `pricing` lấy giá ngày của xe | `vehicle` | cổng riêng trong `vehicle.api` — chỉ thứ cần để tính giá, không có `ownershipType` |
 | `search` hiện tiền thuê, lọc và xếp theo giá | `pricing` | `pricing.api` — **cùng một cách tính** với báo giá (BR-126) |
 | `booking` lấy báo giá đã đóng băng | `pricing` | `pricing.api` — làm cùng `booking` |
@@ -168,3 +168,10 @@ Các cổng chính:
 > Điều kiện thuê thuộc `booking` vì đó là điều kiện của một lượt đặt; `search` áp lại đúng chúng để
 > không hiện xe mà bước đặt sẽ từ chối (BR-125). `booking` có `api` và policy từ Task 6, vòng đời đơn
 > từ Task 9.
+>
+> ⚠️ **Vòng phụ thuộc `pricing` ⇄ `booking` — chấp nhận tạm, quyết khi làm `booking`.** Từ Task 7, báo
+> giá kiểm điều kiện thuê qua `booking.api` (BR-125, nhất quán với lúc đặt). Khi `booking` đọc báo giá
+> qua `pricing.api`, hai module sẽ phụ thuộc vòng. Hiện vô hại: hai chiều đều qua `api`, bean tách nhau,
+> và vòng ở mức bean thì Spring báo lỗi ngay lúc khởi động. Khi soạn prompt `booking` phải chọn: chuyển
+> điều kiện thuê xuống một chỗ thấp hơn mà cả ba module cùng đọc, hoặc giữ vòng và ghi lý do. Lỗi thiết
+> kế nằm ở prompt Task 7 của Chief Architect, không phải ở code — review Task 7 phát hiện.
