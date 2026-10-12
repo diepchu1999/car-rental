@@ -75,6 +75,9 @@ tắc khác cũng chỉ là gợi ý.
 - Phân loại rõ: **lỗi thật** · **cần Tech Owner quyết** · **ghi nhận, chưa cần sửa**.
 - **Nếu phát hiện của mình sai sau khi đo, nói thẳng là mình nhầm.** Đừng lờ đi, và đừng giữ lại
   một cảnh báo đã biết là sai.
+- **Ghi nhận model codex đã dùng** (hỏi Tech Owner nếu chưa biết) cạnh số lỗi thật tìm được. Lỗi
+  thật về ranh giới hay quy tắc lặp lại với một model thì đề xuất nâng model cho loại task đó
+  (`task.md`, Bước 3).
 - Kết thúc bằng một câu hỏi rõ: gộp vào task sau hay tách task dọn riêng.
 
 ## 7. Đọc toàn bộ code — vì không còn ai khác đọc

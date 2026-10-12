@@ -103,3 +103,24 @@ phình thành ba.
   (`implement.md`, mục "Postman").
 - Danh sách file đã tạo hoặc sửa trong cả task.
 - Đề xuất commit message (Tech Owner tự chạy lệnh).
+
+## Bước 3 — Gợi ý model cho Tech Owner (ngoài khối prompt)
+
+Sau khối prompt, ghi **một dòng**: chọn model nào, mức suy luận nào trong Codex, và **vì sao — gắn với
+nội dung task này**. Không ghi vào trong khối prompt — đó là lựa chọn của Tech Owner, không phải việc
+của codex.
+
+Danh sách model đổi theo thời gian (có model bị gỡ). Trước khi gợi ý, đọc
+`~/.codex/models_cache.json` để chắc model còn trong danh sách. Không tự đánh giá model nào giỏi hơn
+khi không có căn cứ — dựa vào mô tả của Codex và vào kết quả review vòng 2.
+
+Tiêu chí (Tech Owner duyệt 11/10/2026):
+
+| Loại task | Model · mức suy luận |
+|---|---|
+| Chạm tài nguyên tranh chấp hoặc tiền — giữ chỗ, xác nhận đơn, đổi xe giữ cọc, thanh toán, hạn mức mã giảm giá, phân công người | Mạnh nhất (hiện là **Astra**) · `high` |
+| Task thường — module mới không tranh chấp, đọc nhiều, tính toán thuần | Model chính (hiện là **Sol** mới nhất) · `high` |
+| Việc nhỏ Tech Owner gõ bằng `$task` — sửa lỗi, đổi tên, cập nhật collection | Model chính · `medium` |
+
+Không dùng mức `low` cho prompt task: prompt dài, nhiều ràng buộc đan nhau (BR, R1–R12, ADR), mức thấp
+dễ bỏ sót đúng những thứ đó.
