@@ -339,7 +339,12 @@ Lịch xe không cho đặt lượt có giờ nhận hoặc giờ trả nằm ng
 - Nhưng **bắt buộc phải có và đã xác minh mới đặt được xe** (BR-106).
 
 Cách này giữ đăng ký nhẹ để không mất khách ở bước đầu, mà vẫn chặn đúng chỗ cần chặn.
-*Nguồn: Tech Owner chốt 24/08/2026.*
+
+**Đồng ý điều khoản khi đăng ký.** Khách phải đồng ý điều khoản sử dụng và chính sách dữ liệu cá nhân
+mới tạo được tài khoản. Hệ thống lưu **phiên bản** điều khoản khách đã đồng ý và **thời điểm** đồng ý.
+Lý do: hệ thống giữ CCCD, GPLX, và giữ bằng chứng cả sau khi khách xoá tài khoản (BR-123) — khách phải
+được biết trước. Nội dung điều khoản do Tech Owner soạn, không phải việc của code.
+*Nguồn: Tech Owner chốt 24/08/2026. Đồng ý điều khoản: Tech Owner duyệt 12/10/2026.*
 
 ### BR-121 — Giới hạn thời điểm đặt xe ✅ GĐ1
 | Giới hạn | Nhận tại chi nhánh | Giao tận nơi |
@@ -441,6 +446,50 @@ con số đó sai ngay khi khoảng thuê có cuối tuần hay ngày lễ. Lọ
 1. **Ưu tiên đổi sang xe khác** bằng cơ chế BR-305 — nhân viên liên hệ khách, chuyển cọc.
 2. Không có xe thay thế → coi như **công ty huỷ** theo BR-303: hoàn 100%, cần `BRANCH_MANAGER` duyệt.
 *Nguồn: Chief Architect phát hiện khi vẽ máy trạng thái, Tech Owner duyệt 24/08/2026.*
+
+### BR-128 — Hạng GPLX phải phù hợp với xe ✅ GĐ1
+Khách tự lái chỉ đặt được xe mà **hạng giấy phép lái xe của mình được phép điều khiển**. Kiểm hai lần,
+cùng chỗ với BR-106b: **lúc tạo đơn** và **lúc bàn giao** (BR-107).
+
+Hai điều kiện:
+1. **Hạng phải cho phép số chỗ của xe** (BR-018).
+2. GPLX **hạn chế "chỉ được điều khiển xe ô tô số tự động"** — hạng B1 số tự động cấp trước 2025, hoặc
+   hạng B đổi từ nó — **không thuê được xe số sàn**.
+
+Bảng đối chiếu khởi điểm, theo Luật Trật tự, an toàn giao thông đường bộ 2024 (Điều 57); GPLX cấp
+trước 01/01/2025 vẫn dùng theo phạm vi và thời hạn ghi trên giấy:
+
+| Xe | Hạng mới được thuê | Hạng cũ (cấp trước 2025) được thuê |
+|---|---|---|
+| 4, 5, 7 chỗ | B, C1, C, D1, D2, D | B1, B2, C, D, E |
+| 16 chỗ | D1, D2, D | D, E |
+
+Bảng là **dữ liệu**, không viết cứng trong code — luật đổi thì sửa dữ liệu. ⚠️ Bảng cần người hiểu luật
+xác nhận trước khi chạy với khách thật (mục "chưa chốt" cuối file).
+
+Lý do: hệ thống có cả xe 16 chỗ và xe số sàn. Cho khách bằng B thuê xe 16 chỗ là để khách lái trái luật,
+và khi có sự cố thì bảo hiểm có thể từ chối bồi thường — đúng lý do của BR-106b.
+*Nguồn: Chief Architect phát hiện khi đối chiếu BR cho `identity`, Tech Owner duyệt 12/10/2026.*
+
+### BR-129 — Đăng nhập bằng OTP qua SMS ✅ GĐ1
+Khách đăng nhập bằng mã OTP gửi qua SMS tới số điện thoại của tài khoản (BR-120, ADR-0006).
+Nhân viên đăng nhập bằng **mật khẩu cộng OTP** (BR-809).
+
+| Tham số | Giá trị khởi điểm |
+|---|---|
+| Độ dài mã | 6 chữ số |
+| Hiệu lực mã | 5 phút, **dùng một lần** |
+| Nhập sai | 5 lần thì **huỷ mã**, phải xin mã mới |
+| Gửi lại | Sau ít nhất 60 giây |
+| Số lần gửi theo số điện thoại | Tối đa 5 lần/giờ và 10 lần/ngày |
+| Số lần gửi theo IP | Tối đa 20 lần/giờ |
+
+Các giá trị **không đóng cứng trong code**. Chúng là tham số vận hành — như nhịp dọn giữ chỗ ở BR-225 —
+nằm ở cấu hình, **không** có hiệu lực theo thời gian, vì không ảnh hưởng tiền hay đơn đã tạo.
+
+Lý do có giới hạn: mỗi SMS tốn tiền thật, nên cửa gửi OTP là chỗ bị tấn công để gây tốn tiền; giới hạn
+nhập sai chống dò mã.
+*Nguồn: Tech Owner duyệt 12/10/2026 — trước đó security-guideline chỉ ghi "hạn ngắn", "có giới hạn".*
 
 ---
 
@@ -696,9 +745,9 @@ xảy ra do một thao tác nhầm ở chi nhánh.
 *Nguồn: Chief Architect phát hiện khi vẽ máy trạng thái, Tech Owner duyệt 24/08/2026.*
 
 ### BR-234 — Mỗi xe có giá ngày riêng ✅ GĐ1
-Mỗi xe có một **giá ngày** — giá thuê một ngày thường — do admin nhập. Mọi khoản tính theo giá ngày đều
-lấy giá của **chính chiếc xe đó**: tăng giá cuối tuần và lễ tết (BR-218), gói giờ (BR-114), phí trả trễ
-(BR-408), phân khúc thế chấp (BR-210).
+Mỗi xe có một **giá ngày** — giá thuê một ngày thường — do `BRANCH_MANAGER` của chi nhánh có xe hoặc
+`ADMIN` nhập (BR-810). Mọi khoản tính theo giá ngày đều lấy giá của **chính chiếc xe đó**: tăng giá
+cuối tuần và lễ tết (BR-218), gói giờ (BR-114), phí trả trễ (BR-408), phân khúc thế chấp (BR-210).
 
 **Bắt buộc có giá ngày trước khi duyệt xe** (BR-010): xe chưa có giá thì không lên sàn, vì khách tìm
 thấy một chiếc xe không báo được giá là hứa suông (BR-125). Đổi giá sau đó không ảnh hưởng đơn đã tạo
@@ -1265,8 +1314,7 @@ cập nhật, nhưng bắt được phần đã có.
 
 ### BR-707 — Ghi vi phạm vào hồ sơ khách ✅ GĐ1
 Mọi vi phạm giao thông và sự cố hư hỏng do khách gây ra được ghi vào hồ sơ khách. Khách tái phạm
-nhiều lần bị hạn chế thuê.
-⚠️ Ngưỡng "nhiều lần" và mức hạn chế chưa chốt.
+nhiều lần bị hạn chế thuê — ngưỡng và mức hạn chế ở BR-708.
 *Nguồn: Tech Owner duyệt 24/08/2026.*
 
 ---
@@ -1297,8 +1345,18 @@ Người dùng thuộc một chi nhánh **không được xem hay can thiệp** 
 *Nguồn: §3.*
 
 ### BR-803 — Ngoại lệ xuyên chi nhánh ✅ GĐ1
-Chỉ `ADMIN` được xem và xử lý dữ liệu xuyên chi nhánh.
-*Nguồn: §3.*
+Ba mức phạm vi:
+
+| Vai | Phạm vi |
+|---|---|
+| `ADMIN` | Toàn quyền, mọi chi nhánh |
+| `OPERATIONS_MANAGER`, `ACCOUNTANT` | **Cấp công ty** — xem được mọi chi nhánh, nhưng **chỉ trong việc của vai đó** |
+| `BRANCH_STAFF`, `BRANCH_MANAGER`, `DELIVERY_STAFF`, `DRIVER` | Thuộc **đúng một** chi nhánh, chỉ thấy chi nhánh của mình (BR-802) |
+
+`OPERATIONS_MANAGER` duyệt điều chuyển **giữa hai chi nhánh** (BR-006); `OPERATIONS_MANAGER` cùng
+`ACCOUNTANT` xem bằng chứng tranh chấp ở bậc 3 (BR-426). Hai việc đó tự bản chất là xuyên chi nhánh.
+*Nguồn: §3. Làm rõ 12/10/2026 — trước đó ghi "chỉ `ADMIN` xuyên chi nhánh", mâu thuẫn với BR-006 và
+BR-426.*
 
 ### BR-804 — Yêu cầu hỗ trợ giữa chi nhánh ✅ GĐ1
 Chi nhánh được gửi **yêu cầu hỗ trợ** tới chi nhánh khác (ví dụ nhờ hỗ trợ bảo dưỡng). Yêu cầu này
@@ -1318,6 +1376,7 @@ phần của mình.
 | Danh mục giấy tờ bắt buộc khi duyệt xe đối tác (BR-009) | GĐ2 |
 | Vai nào thực hiện duyệt KYC đối tác | GĐ2 |
 | Khoảng đệm có khác nhau giữa nhận tại chi nhánh và giao tận nơi không | |
+| Bảng đối chiếu hạng GPLX với xe (BR-128) cần người hiểu luật xác nhận | Chặn trước khi chạy với khách thật, không chặn code — bảng là dữ liệu |
 | Khoá vận hành (bảo dưỡng, điều chuyển, chủ xe tự khoá) xong sớm hoặc tạo nhầm: có được nhả phần còn lại hoặc huỷ không | Hiện tại hoàn tất vẫn chặn tới hết khoảng đã đặt, và không có cách huỷ — status-flow §2. Chưa ai gọi nên chưa gấp |
 
 ---
@@ -1373,6 +1432,25 @@ Mỗi chi nhánh có **tên** và **địa chỉ** — bắt buộc, hiển th�
 Toạ độ (BR-003) cho hệ thống biết khoảng cách; tên và địa chỉ cho khách biết phải tới đâu nhận xe.
 Kết quả tìm kiếm chỉ ghi "cách 3,2 km" thì khách không biết đó là ở đâu.
 *Nguồn: Tech Owner duyệt 04/10/2026.*
+
+### BR-809 — Tài khoản nhân viên ✅ GĐ1
+- **Chỉ `ADMIN` tạo tài khoản nhân viên, gán vai và gán chi nhánh.** Không ai tự đăng ký làm nhân viên.
+- Nhân viên đăng nhập bằng **mật khẩu cộng OTP qua SMS** — hai lớp. Nhân viên đọc được ảnh CCCD, GPLX và
+  xác nhận tiền; chỉ một mã SMS thì kẻ chiếm được SIM là vào được tài khoản.
+- **Một tài khoản giữ được cả vai `CUSTOMER` lẫn một vai nhân viên.** Mỗi số điện thoại một tài khoản
+  (BR-120), nên nhân viên muốn thuê xe dùng chính tài khoản đó.
+*Nguồn: Tech Owner duyệt 12/10/2026.*
+
+### BR-810 — Quyền trên chi nhánh và danh mục xe ✅ GĐ1
+| Thao tác | Vai được phép |
+|---|---|
+| Tạo chi nhánh | `ADMIN` |
+| Tạo xe, gửi duyệt xe | `BRANCH_STAFF`, `BRANCH_MANAGER` **của chính chi nhánh đó** · `ADMIN` |
+| Duyệt xe lên sàn (BR-010) | `BRANCH_MANAGER` **của chính chi nhánh có xe** (BR-807) · `ADMIN` |
+| Đổi giá ngày (BR-234) | `BRANCH_MANAGER` **của chính chi nhánh có xe** · `ADMIN` |
+
+Kiểm "của chính chi nhánh đó" ở use case, không ở controller hay giao diện (BR-802, security-guideline §2).
+*Nguồn: Tech Owner duyệt 12/10/2026 — trước đó chưa BR nào nói ai được gọi các thao tác này.*
 
 ### BR-806 — Đóng chi nhánh ✅ GĐ1
 Chặn đóng chi nhánh khi còn xe hoặc còn đơn hiệu lực. Phải điều chuyển xe đi (BR-006) và xử lý đơn

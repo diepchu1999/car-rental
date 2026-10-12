@@ -19,6 +19,9 @@ và làm mất khả năng bật xác thực nhiều lớp sau này.
 Keycloak không hỗ trợ sẵn — phải viết Authenticator SPI bằng Java (ADR-0006). Yêu cầu:
 - Mã OTP có hạn ngắn, dùng một lần, **tiêu thụ nguyên tử** (không cho dùng lại kể cả khi gửi song song).
 - Giới hạn số lần gửi và số lần thử sai theo số điện thoại và theo IP.
+- Các con số — độ dài, hiệu lực, số lần sai, nhịp gửi lại, giới hạn gửi — ở **BR-129**. Là tham số cấu
+  hình, không đóng cứng.
+- **Nhân viên: mật khẩu cộng OTP** (BR-809). Khách chỉ OTP (BR-129).
 - Ở local, adapter gửi SMS là mock — in mã ra log, **không** gửi thật.
 
 ### Token trên mobile
@@ -30,6 +33,10 @@ Keycloak không hỗ trợ sẵn — phải viết Authenticator SPI bằng Java
 ## 2. Phân quyền
 
 Keycloak giữ vai thô (12 vai, BR-801). Phân quyền theo dữ liệu nằm ở tầng ứng dụng.
+
+- Phạm vi của từng vai — một chi nhánh, cấp công ty, hay toàn quyền: **BR-803**.
+- Ai được gọi thao tác nào trên chi nhánh và danh mục xe: **BR-810**.
+- Vai nhân viên chỉ `ADMIN` gán; một tài khoản giữ được `CUSTOMER` cùng một vai nhân viên (BR-809).
 
 ### Ranh giới chi nhánh — BR-802, BR-803
 Người dùng thuộc một chi nhánh **không xem, không sửa** dữ liệu của chi nhánh khác. Chỉ `ADMIN`

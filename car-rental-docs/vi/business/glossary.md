@@ -148,6 +148,13 @@
 | `BUSINESS_PARTNER_STAFF` | Tài khoản con của đối tác doanh nghiệp | 3 |
 | `FREELANCE_DRIVER` | Tài xế tự do | 3 |
 
+| Tiếng Việt | Trong code | Nghĩa | Quy tắc |
+|---|---|---|---|
+| Tài khoản | `Account` | Một số điện thoại một tài khoản; giữ được `CUSTOMER` cùng một vai nhân viên | BR-120, BR-809 |
+| Đồng ý điều khoản | `consent` | Phiên bản điều khoản khách đã đồng ý (`terms_version`) và thời điểm (`consented_at`) | BR-120 |
+| Hạng GPLX | `license_class` | Hạng ghi trên giấy phép lái xe, quyết định xe nào khách được thuê | BR-128 |
+| Chỉ số tự động | `automatic_only` | GPLX có hạn chế chỉ lái xe số tự động — không thuê được xe số sàn | BR-128 |
+
 > **"Chủ xe" là vai nghiệp vụ, không phải vai hệ thống.** Với xe đối tác, chủ xe là `HOST` hoặc
 > `BUSINESS_PARTNER`. Với xe công ty, người đóng vai "chủ xe" trong các thao tác bàn giao và xác nhận
 > tiền là `BRANCH_STAFF` hoặc `DELIVERY_STAFF`. Xem BR-204.
