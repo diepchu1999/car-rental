@@ -38,6 +38,50 @@ management:
 
 car-rental:
   time-zone: ${CAR_RENTAL_TIME_ZONE:Asia/Ho_Chi_Minh}
+  pricing:
+    # BR-218/225: tỷ lệ thập phân, 0.2 nghĩa là tăng 20%.
+    weekend-days: ${CAR_RENTAL_PRICING_WEEKEND_DAYS:SATURDAY,SUNDAY}
+    weekend-uplift: ${CAR_RENTAL_PRICING_WEEKEND_UPLIFT:0.2}
+    holiday-uplift: ${CAR_RENTAL_PRICING_HOLIDAY_UPLIFT:0.5}
+    # BR-122/225: hạn dùng báo giá, không tự thay giá trị sai bằng mặc định.
+    quote-validity: ${CAR_RENTAL_QUOTE_VALIDITY:PT15M}
+    insurance:
+      # BR-231: bắt buộc khai báo, chưa có giá trị khởi điểm.
+      calculation: ${CAR_RENTAL_INSURANCE_CALCULATION}
+      value: ${CAR_RENTAL_INSURANCE_VALUE}
+    holiday-calendar:
+      declared-through: ${CAR_RENTAL_HOLIDAY_DECLARED_THROUGH:2027-12-31}
+      dates:
+        # Ngày Văn hóa Việt Nam — NQ 28/2026/QH16; năm 2026 nghỉ đúng ngày, không hoán đổi
+        - 2026-11-24
+        # Tết Dương lịch 2027 và cuối tuần liền kề — BLLĐ 2019 Điều 112
+        - 2027-01-01
+        - 2027-01-02
+        - 2027-01-03
+        # Tết Đinh Mùi, 28 Chạp → mùng 5 — Văn bản 10065/VPCP-KGVX ngày 02/10/2026, lịch khu vực công
+        - 2027-02-04
+        - 2027-02-05
+        - 2027-02-06
+        - 2027-02-07
+        - 2027-02-08
+        - 2027-02-09
+        - 2027-02-10
+        # Giỗ Tổ Hùng Vương (10/3 âm lịch) và cuối tuần — BLLĐ 2019 Điều 112
+        - 2027-04-16
+        - 2027-04-17
+        - 2027-04-18
+        # 30/4, 1/5 (Thứ Bảy, nghỉ bù Thứ Hai 3/5) — BLLĐ 2019 Điều 111 khoản 3, Điều 112
+        - 2027-04-30
+        - 2027-05-01
+        - 2027-05-02
+        - 2027-05-03
+        # Quốc khánh: 2/9, 3/9 và cuối tuần — Văn bản 10065/VPCP-KGVX
+        - 2027-09-02
+        - 2027-09-03
+        - 2027-09-04
+        - 2027-09-05
+        # Ngày Văn hóa Việt Nam — NQ 28/2026/QH16
+        - 2027-11-24
   search:
     # BR-125: bán kính tính bằng km, thay đổi qua cấu hình ứng dụng.
     default-radius-km: 10

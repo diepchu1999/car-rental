@@ -13,7 +13,8 @@ INSERT INTO vehicle.vehicle (
     seats,
     transmission,
     make,
-    model
+    model,
+    daily_rate
 )
 VALUES (
            :code,
@@ -27,5 +28,6 @@ VALUES (
            :seats,
            :transmission,
            :make,
-           :model
+           :model,
+           :dailyRate
        );

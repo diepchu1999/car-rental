@@ -25,12 +25,12 @@ class VehicleSearchDirectoryTest {
             assertEquals("Everest", query.model());
             assertEquals(Boolean.TRUE, query.collateralFree());
             return List.of(new VehicleSearchSummary(7, "XE-DIR001", 42,
-                    7, "MANUAL", "DIESEL", "Ford", "Everest", true));
+                    7, "MANUAL", "DIESEL", "Ford", "Everest", true, 855_000L));
         });
         var result = directory.list(List.of(42L), RentalType.DAILY,
                 7, "MANUAL", "DIESEL", " Ford ", " Everest ", true);
         assertEquals(List.of(new VehicleSearchView(7, "XE-DIR001", 42,
-                7, "MANUAL", "DIESEL", "Ford", "Everest", true)), result);
+                7, "MANUAL", "DIESEL", "Ford", "Everest", true, 855_000L)), result);
         assertThrows(UnsupportedOperationException.class, result::clear);
     }
 

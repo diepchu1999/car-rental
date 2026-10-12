@@ -21,6 +21,19 @@ class SearchPositionTest {
         assertEquals(0, first.compareTo(new SearchPosition(10, "XE-000001")));
     }
 
+    /** BR-126: giá ưu tiên hơn khoảng cách; hai khóa bằng nhau mới so mã, không dùng ID. */
+    @Test
+    void ordersPriceBeforeDistanceAndCode() {
+        var cheap = new SearchPosition(SearchSort.PRICE_ASC, 1_000_000, 500, "XE-ZZZZZZ");
+        var near = new SearchPosition(SearchSort.PRICE_ASC, 2_000_000, 10, "XE-ZZZZZZ");
+        var far = new SearchPosition(SearchSort.PRICE_ASC, 2_000_000, 20, "XE-AAAAAA");
+        var tie = new SearchPosition(SearchSort.PRICE_ASC, 2_000_000, 10, "XE-AAAAAA");
+        assertTrue(cheap.compareTo(near) < 0);
+        assertTrue(near.compareTo(far) < 0);
+        assertTrue(tie.compareTo(near) < 0);
+        assertThrowsExactly(IllegalArgumentException.class, () -> cheap.compareTo(new SearchPosition(500, "XE-ZZZZZZ")));
+    }
+
     /** Âm không và dương không là cùng một vị trí, tránh hai cách mã hóa cùng khoảng cách. */
     @Test
     void normalizesNegativeZero() {

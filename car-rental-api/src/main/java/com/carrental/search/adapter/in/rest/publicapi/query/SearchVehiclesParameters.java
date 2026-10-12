@@ -21,7 +21,8 @@ import java.util.function.Function;
 public final class SearchVehiclesParameters {
     private static final Set<String> FIELDS = Set.of("latitude", "longitude", "startInclusive",
             "endExclusive", "rentalType", "driveMode", "pickupMethod", "radiusKm", "seats",
-            "transmission", "fuelType", "make", "model", "collateralFree", "sort", "limit", "cursor");
+            "transmission", "fuelType", "make", "model", "collateralFree", "sort", "limit", "cursor",
+            "minRentalAmount", "maxRentalAmount");
 
     /** Lớp tiện ích chỉ dùng ở REST adapter. */
     private SearchVehiclesParameters() {
@@ -49,7 +50,9 @@ public final class SearchVehiclesParameters {
                 new VehicleSearchFilters(parse(parameters, "seats", Integer::valueOf),
                         parameters.getFirst("transmission"), parameters.getFirst("fuelType"),
                         parameters.getFirst("make"), parameters.getFirst("model"),
-                        parse(parameters, "collateralFree", SearchVehiclesParameters::parseBoolean)),
+                        parse(parameters, "collateralFree", SearchVehiclesParameters::parseBoolean),
+                        parse(parameters, "minRentalAmount", Long::valueOf),
+                        parse(parameters, "maxRentalAmount", Long::valueOf)),
                 parse(parameters, "sort", SearchSort::valueOf),
                 parse(parameters, "limit", Integer::valueOf), parameters.getFirst("cursor"));
     }

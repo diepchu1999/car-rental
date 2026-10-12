@@ -35,6 +35,10 @@ public record SearchVehiclesQuery(Double latitude, Double longitude,
         if (!endExclusive.isAfter(startInclusive)) {
             throw DomainException.invalidInput("endExclusive must be after startInclusive.");
         }
+        // Cùng độ chính xác với báo giá/timestamptz, không làm tròn gây lệch BR-125/237.
+        if (startInclusive.getNano() % 1_000 != 0 || endExclusive.getNano() % 1_000 != 0) {
+            throw DomainException.invalidInput("Rental timestamps support at most microsecond precision.");
+        }
         rentalType = Validations.required(rentalType, "rentalType");
         driveMode = Validations.required(driveMode, "driveMode");
         pickupMethod = pickupMethod == null ? PickupMethod.BRANCH : pickupMethod;

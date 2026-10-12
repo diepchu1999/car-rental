@@ -43,7 +43,7 @@ class CreateVehicleCommandTest {
     void mapsAllSpecificationFields() {
         CreateVehicleCommand command = CreateVehicleCommand.from("SPEC-01", OwnershipType.COMPANY,
                 FuelType.DIESEL, "CN-ABC123", null, null, 16,
-                Transmission.MANUAL, "Ford", "Transit");
+                Transmission.MANUAL, "Ford", "Transit", java.math.BigDecimal.valueOf(1_000_000L));
         assertEquals(new VehicleSpecifications(16,
                 Transmission.MANUAL, "Ford", "Transit"), command.specifications());
     }
@@ -52,23 +52,23 @@ class CreateVehicleCommandTest {
     @Test
     void rejectsMissingSpecificationsObject() {
         assertInvalidInput(() -> new CreateVehicleCommand(PLATE_NUMBER, OwnershipType.COMPANY,
-                FuelType.PETROL, BRANCH_CODE, DOCUMENTS, null), "specifications is required.");
+                FuelType.PETROL, BRANCH_CODE, DOCUMENTS, null, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE), "specifications is required.");
     }
 
     /** Factory kiểm đủ cả bốn trường trước khi cho command vào use case. */
     @Test
     void factoryRequiresEverySpecificationField() {
         assertInvalidInput(() -> CreateVehicleCommand.from(PLATE_NUMBER, OwnershipType.COMPANY,
-                FuelType.PETROL, BRANCH_CODE, null, null, null, SPECIFICATIONS.transmission(), "Toyota", "Vios"),
+                FuelType.PETROL, BRANCH_CODE, null, null, null, SPECIFICATIONS.transmission(), "Toyota", "Vios", java.math.BigDecimal.valueOf(1_000_000L)),
                 "seats is required.");
         assertInvalidInput(() -> CreateVehicleCommand.from(PLATE_NUMBER, OwnershipType.COMPANY,
-                FuelType.PETROL, BRANCH_CODE, null, null, 5, null, "Toyota", "Vios"),
+                FuelType.PETROL, BRANCH_CODE, null, null, 5, null, "Toyota", "Vios", java.math.BigDecimal.valueOf(1_000_000L)),
                 "transmission is required.");
         assertInvalidInput(() -> CreateVehicleCommand.from(PLATE_NUMBER, OwnershipType.COMPANY,
-                FuelType.PETROL, BRANCH_CODE, null, null, 5, SPECIFICATIONS.transmission(), null, "Vios"),
+                FuelType.PETROL, BRANCH_CODE, null, null, 5, SPECIFICATIONS.transmission(), null, "Vios", java.math.BigDecimal.valueOf(1_000_000L)),
                 "make is required.");
         assertInvalidInput(() -> CreateVehicleCommand.from(PLATE_NUMBER, OwnershipType.COMPANY,
-                FuelType.PETROL, BRANCH_CODE, null, null, 5, SPECIFICATIONS.transmission(), "Toyota", null),
+                FuelType.PETROL, BRANCH_CODE, null, null, 5, SPECIFICATIONS.transmission(), "Toyota", null, java.math.BigDecimal.valueOf(1_000_000L)),
                 "model is required.");
     }
 
@@ -111,7 +111,7 @@ class CreateVehicleCommandTest {
                 INSPECTION_DATE,
                 INSURANCE_DATE,
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model()
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), java.math.BigDecimal.valueOf(1_000_000L)
         );
 
         CreateVehicleCommand fromConstructor = new CreateVehicleCommand(
@@ -119,7 +119,7 @@ class CreateVehicleCommandTest {
                 OwnershipType.COMPANY,
                 fuelType,
                 branchCode,
-                DOCUMENTS, SPECIFICATIONS
+                DOCUMENTS, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
 
         assertEquals(plateNumber, fromFactory.plateNumber());
@@ -152,7 +152,7 @@ class CreateVehicleCommandTest {
                 INSPECTION_DATE,
                 INSURANCE_DATE,
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model()
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), java.math.BigDecimal.valueOf(1_000_000L)
         );
 
         assertEquals(ownershipType, command.ownershipType());
@@ -205,7 +205,7 @@ class CreateVehicleCommandTest {
                 inspectionExpiresOn,
                 liabilityInsuranceExpiresOn,
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model()
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), java.math.BigDecimal.valueOf(1_000_000L)
         );
 
         CreateVehicleCommand fromConstructor = new CreateVehicleCommand(
@@ -213,7 +213,7 @@ class CreateVehicleCommandTest {
                 OwnershipType.COMPANY,
                 FuelType.PETROL,
                 BRANCH_CODE,
-                expectedDocuments, SPECIFICATIONS
+                expectedDocuments, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
 
         assertNotNull(fromFactory.documents());
@@ -314,7 +314,7 @@ class CreateVehicleCommandTest {
                         OwnershipType.COMPANY,
                         FuelType.PETROL,
                         BRANCH_CODE,
-                        null, SPECIFICATIONS
+                        null, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
                 ),
                 "documents is required."
         );
@@ -348,7 +348,7 @@ class CreateVehicleCommandTest {
                         INSPECTION_DATE,
                         INSURANCE_DATE,
                         SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                        SPECIFICATIONS.make(), SPECIFICATIONS.model()
+                        SPECIFICATIONS.make(), SPECIFICATIONS.model(), java.math.BigDecimal.valueOf(1_000_000L)
                 ),
                 expectedMessage
         );
@@ -359,7 +359,7 @@ class CreateVehicleCommandTest {
                         ownershipType,
                         fuelType,
                         branchCode,
-                        DOCUMENTS, SPECIFICATIONS
+                        DOCUMENTS, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
                 ),
                 expectedMessage
         );

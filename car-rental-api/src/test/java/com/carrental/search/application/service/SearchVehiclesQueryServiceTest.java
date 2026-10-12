@@ -6,6 +6,9 @@ import com.carrental.booking.api.RentalTerms;
 import com.carrental.booking.api.RentalTermsDirectory;
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchSearchView;
+import com.carrental.pricing.api.RentalPricingDirectory;
+import com.carrental.pricing.api.RentalPricePlan;
+import com.carrental.pricing.api.VehicleDailyRate;
 import com.carrental.search.domain.*;
 import com.carrental.search.application.view.SearchVehicleListItem;
 import com.carrental.shared.error.DomainException;
@@ -35,6 +38,8 @@ class SearchVehiclesQueryServiceTest {
     private VehicleSearchDirectory vehicles;
     private AvailabilityDirectory availability;
     private VehicleSearchQueryService service;
+    private RentalPricingDirectory pricing;
+    private RentalPricePlan pricePlan;
 
     /** Mỗi test có directory giả riêng; policy của search vẫn dùng implementation thật. */
     @BeforeEach
@@ -43,8 +48,16 @@ class SearchVehiclesQueryServiceTest {
         branches = mock(BranchDirectory.class);
         vehicles = mock(VehicleSearchDirectory.class);
         availability = mock(AvailabilityDirectory.class);
+        pricing = mock(RentalPricingDirectory.class);
+        pricePlan = mock(RentalPricePlan.class);
+        when(pricing.prepare(any(), any(), any())).thenReturn(pricePlan);
+        when(pricePlan.rentalAmounts(anyList())).thenAnswer(invocation -> {
+            List<VehicleDailyRate> rates = invocation.getArgument(0);
+            return rates.stream().collect(java.util.stream.Collectors.toMap(
+                    VehicleDailyRate::vehicleCode, VehicleDailyRate::dailyRate));
+        });
         service = new VehicleSearchQueryService(terms, branches, vehicles, availability,
-                new SearchRadiusSettings(10, 30), new SearchSupportPolicyResolver());
+                new SearchRadiusSettings(10, 30), new SearchSupportPolicyResolver(), pricing);
         when(terms.getTerms(any(), any(), any(), any())).thenReturn(rentalTerms(2));
         when(branches.findWithinRadius(anyDouble(), anyDouble(), anyDouble())).thenReturn(List.of(
                 branch(1, 100), branch(2, 200)));
@@ -73,16 +86,20 @@ class SearchVehiclesQueryServiceTest {
         assertEquals("Branch 1", first.branch().name());
         assertEquals("Address 1", first.branch().address());
         assertEquals(100.0, first.distanceMeters());
+        assertEquals(1_000_000L, first.rentalAmount());
         assertNull(page.nextCursor());
         assertThrows(UnsupportedOperationException.class, () -> page.items().clear());
 
-        var order = inOrder(terms, branches, vehicles, availability);
+        var order = inOrder(terms, pricing, branches, vehicles, availability, pricePlan);
         order.verify(terms).getTerms(RentalType.DAILY, PickupMethod.BRANCH, query.startInclusive(), query.endExclusive());
+        order.verify(pricing).prepare(RentalType.DAILY, query.startInclusive(), query.endExclusive());
         order.verify(branches).findWithinRadius(query.latitude(), query.longitude(), 10_000.0);
         order.verify(vehicles).list(List.of(1L, 2L), RentalType.DAILY, 5, "AUTOMATIC", "PETROL", "Toyota", "Vios", true);
         order.verify(availability).findBusyVehicleIds(new Period(query.startInclusive(), query.endExclusive()),
                 Duration.ofHours(2), List.of(3L, 2L, 1L));
-        verifyNoMoreInteractions(terms, branches, vehicles, availability);
+        order.verify(pricePlan).rentalAmounts(List.of(new VehicleDailyRate("XE-000003", 1_000_000),
+                new VehicleDailyRate("XE-000001", 1_000_000)));
+        verifyNoMoreInteractions(terms, pricing, branches, vehicles, availability, pricePlan);
     }
 
     /** Từng gói nhận đệm từ booking và truyền riêng; search không tự cộng hay viết cứng đệm. */
@@ -138,13 +155,56 @@ class SearchVehiclesQueryServiceTest {
         assertNull(page.nextCursor());
     }
 
+    /** BR-218: kiểm lịch ngay cả trước khi tìm thấy chi nhánh, không âm thầm trả trang rỗng. */
+    @Test
+    void rejectsUndeclaredCalendarBeforeReadingCandidates() {
+        var failure = DomainException.ruleViolation(ErrorCode.HOLIDAY_CALENDAR_NOT_DECLARED);
+        when(pricing.prepare(any(), any(), any())).thenThrow(failure);
+        assertSame(failure, assertThrowsExactly(DomainException.class, () -> service.search(input().build())));
+        verify(terms).getTerms(any(), any(), any(), any());
+        verifyNoInteractions(branches, vehicles, availability, pricePlan);
+    }
+
+    /** BR-126: lọc tiền thuê trước phân trang; giá, khoảng cách rồi mã là thứ tự toàn phần. */
+    @Test
+    void sortsByPriceThenDistanceThenCodeAndFiltersBeforePaging() {
+        when(availability.findBusyVehicleIds(any(), any(), anyCollection())).thenReturn(Set.of());
+        when(vehicles.list(anyList(), any(), any(), any(), any(), any(), any(), any()))
+                .thenReturn(List.of(vehicle(4, 1), vehicle(3, 1), vehicle(2, 1), vehicle(1, 2)));
+        when(pricePlan.rentalAmounts(anyList())).thenReturn(java.util.Map.of(
+                "XE-000001", 600_000L, "XE-000002", 1_000_000L,
+                "XE-000003", 1_000_000L, "XE-000004", 2_000_000L));
+        var values = input();
+        values.sort = SearchSort.PRICE_ASC;
+        values.limit = 2;
+        values.filters = new VehicleSearchFilters(null, null, null, null, null, null, 600_000L, 1_000_000L);
+        var first = service.search(values.build());
+        assertIds(first.items(), 1L, 2L); // Xe rẻ hơn thắng dù xa hơn; cùng giá/khoảng cách theo mã.
+        assertEquals(List.of(600_000L, 1_000_000L), first.items().stream().map(SearchVehicleListItem::rentalAmount).toList());
+        values.cursor = first.nextCursor();
+        assertNotNull(values.cursor);
+        var second = service.search(values.build());
+        assertIds(second.items(), 3L);
+        assertNull(second.nextCursor());
+        values.filters = new VehicleSearchFilters(null, null, null, null, null, null, 601_000L, 1_000_000L);
+        assertEquals(ErrorCode.INVALID_REQUEST, assertThrowsExactly(DomainException.class,
+                () -> service.search(values.build())).errorCode());
+    }
+
+    /** Nguồn giá bỏ sót xe là lỗi nội bộ, không tự cho 0 hoặc loại xe âm thầm. */
+    @Test
+    void failsIfPricingBatchOmitsVehicle() {
+        when(pricePlan.rentalAmounts(anyList())).thenReturn(java.util.Map.of());
+        assertThrowsExactly(IllegalStateException.class, () -> service.search(input().build()));
+    }
+
     /** Lựa chọn chưa hỗ trợ bị chặn trước cả điều kiện thuê và dữ liệu, không mặc định về lựa chọn khác. */
     @ParameterizedTest
     @CsvSource({
             "MONTHLY,SELF_DRIVE,BRANCH,NEAREST,SEARCH_RENTAL_TYPE_NOT_SUPPORTED",
             "DAILY,WITH_DRIVER,BRANCH,NEAREST,SEARCH_DRIVE_MODE_NOT_SUPPORTED",
             "DAILY,SELF_DRIVE,DELIVERY,NEAREST,SEARCH_PICKUP_METHOD_NOT_SUPPORTED",
-            "DAILY,SELF_DRIVE,BRANCH,PRICE_ASC,SEARCH_SORT_NOT_SUPPORTED"
+            "DAILY,SELF_DRIVE,BRANCH,RATING_DESC,SEARCH_SORT_NOT_SUPPORTED"
     })
     void rejectsUnsupportedOptionsBeforeDirectories(RentalType type, DriveMode drive,
             PickupMethod pickup, SearchSort sort, ErrorCode expected) {
@@ -176,7 +236,7 @@ class SearchVehiclesQueryServiceTest {
     @Test
     void usesConfiguredAndExplicitRadius() {
         service = new VehicleSearchQueryService(terms, branches, vehicles, availability,
-                new SearchRadiusSettings(5, 30), new SearchSupportPolicyResolver());
+                new SearchRadiusSettings(5, 30), new SearchSupportPolicyResolver(), pricing);
         var values = input();
         service.search(values.build());
         verify(branches).findWithinRadius(values.latitude, values.longitude, 5_000.0);
@@ -306,7 +366,7 @@ class SearchVehiclesQueryServiceTest {
     /** Cho phép mã độc lập ID để test không vô tình chứng minh cả thứ tự cũ lẫn mới đều đúng. */
     private VehicleSearchView vehicle(long id, String code, long branchId) {
         return new VehicleSearchView(id, code, branchId,
-                5, "AUTOMATIC", "PETROL", "Toyota", "Vios", true);
+                5, "AUTOMATIC", "PETROL", "Toyota", "Vios", true, 1_000_000L);
     }
 
     /** So sánh cả thứ tự và tập ID, không chỉ đếm số kết quả. */

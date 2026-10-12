@@ -15,10 +15,10 @@ VALUES
 
 INSERT INTO vehicle.vehicle (
     code, plate_number, ownership_type, fuel_type, branch_id, status,
-    inspection_expires_on, liability_insurance_expires_on, seats, transmission, make, model
+    inspection_expires_on, liability_insurance_expires_on, seats, transmission, make, model, daily_rate
 )
 SELECT f.code, f.plate_number, 'COMPANY', f.fuel_type, b.id, f.status,
-       CURRENT_DATE + 365, CURRENT_DATE + 365, f.seats, f.transmission, f.make, f.model
+       CURRENT_DATE + 365, CURRENT_DATE + 365, f.seats, f.transmission, f.make, f.model, 1000000
 FROM (VALUES
     ('XE-T6S001', 'T06-P42-001', 'CN-T6S001', 'ACTIVE', 'PETROL', 5, 'AUTOMATIC', ' Toyota ', ' Vios '),
     ('XE-T6S002', 'T06-P42-002', 'CN-T6S001', 'DRAFT', 'PETROL', 5, 'AUTOMATIC', 'Toyota', 'Vios'),

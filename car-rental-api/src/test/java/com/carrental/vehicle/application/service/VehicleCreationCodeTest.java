@@ -53,7 +53,7 @@ class VehicleCreationCodeTest {
                     null,
                     null,
                     SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                    SPECIFICATIONS.make(), SPECIFICATIONS.model()
+                    SPECIFICATIONS.make(), SPECIFICATIONS.model(), java.math.BigDecimal.valueOf(1_000_000L)
             );
 
     private static final List<String> GENERATED_CODES = List.of(
@@ -259,7 +259,7 @@ class VehicleCreationCodeTest {
                 COMMAND.documents().inspectionExpiresOn(),
                 COMMAND.documents().liabilityInsuranceExpiresOn(),
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null, 1_000_000L
         );
     }
 
@@ -272,6 +272,12 @@ class VehicleCreationCodeTest {
             implements WriteVehiclePort {
 
         private final Predicate<Vehicle> insertBehavior;
+
+        /** Luồng tạo không được gọi thao tác đổi giá của xe đã tồn tại. */
+        @Override
+        public boolean updateDailyRate(String code, com.carrental.vehicle.domain.DailyRate dailyRate) {
+            throw new AssertionError("Daily rate update must not be called during vehicle creation.");
+        }
 
         /**
          * Nhận hành vi chèn do từng kịch bản kiểm thử cung cấp.

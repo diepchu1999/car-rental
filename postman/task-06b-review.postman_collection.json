@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Car Rental - Task 06b - Review fixes",
-    "description": "Task 6b, Phần 1: cursor v2 dùng mã xe (BR-112/126, database-guideline §2). Chọn Car Rental - Local và chạy cả thư mục theo thứ tự. Tự tạo hai chi nhánh, ba xe ACTIVE và thời gian hợp lệ, mỗi lượt một model/biển số riêng; không xóa fixture, không dùng SQL. Hai xe cùng chi nhánh sắp theo mã, xe xa hơn đứng sau. Cursor v1/hỏng/sai điều kiện phải trả 400 INVALID_REQUEST. Biến b1* chỉ thuộc collection này. Phần 3 kiểm branchCode trên tất cả response admin xe; chạy từng thư mục độc lập.",
+    "description": "Task 6b, Phần 1: cursor v3 dùng mã xe (BR-112/126, database-guideline §2). Chọn Car Rental - Local và chạy cả thư mục theo thứ tự. Tự tạo hai chi nhánh, ba xe ACTIVE và thời gian hợp lệ, mỗi lượt một model/biển số riêng; không xóa fixture, không dùng SQL. Hai xe cùng chi nhánh sắp theo mã, xe xa hơn đứng sau. Cursor v1/hỏng/sai điều kiện phải trả 400 INVALID_REQUEST. Biến b1* chỉ thuộc collection này. Phần 3 kiểm branchCode trên tất cả response admin xe; chạy từng thư mục độc lập.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -151,7 +151,7 @@
             "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{b1Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{b1NearBranch}}\",\n  \"inspectionExpiresOn\": \"{{b1Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{b1Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{b1Model}}\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{b1Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{b1NearBranch}}\",\n  \"inspectionExpiresOn\": \"{{b1Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{b1Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{b1Model}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -283,7 +283,7 @@
             "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{b1Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{b1OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{b1Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{b1Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{b1Model}}\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{b1Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{b1OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{b1Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{b1Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{b1Model}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -415,7 +415,7 @@
             "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{b1Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{b1OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{b1Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{b1Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{b1Model}}\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{b1Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{b1OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{b1Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{b1Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{b1Model}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -540,7 +540,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{b1Start}}&endExclusive={{b1End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{b1Model}}&limit=1",
-            "description": "BR-112/126, database-guideline §2: trang đầu theo mã; giải mã toàn bộ cursor v2 để chứng minh chỉ có mã xe, không có trường ID số."
+            "description": "BR-112/126, database-guideline §2: trang đầu theo mã; giải mã toàn bộ cursor v3 để chứng minh chỉ có mã xe, không có trường ID số."
           },
           "event": [
             {
@@ -565,7 +565,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
@@ -573,14 +573,15 @@
                   "pm.test(\"Exact vehicles in order\", () => pm.expect(body.data.items.map(x => x.code)).to.eql([\"b1OriginA\",\"b1OriginB\"].map(key => pm.collectionVariables.get(key)).sort().slice(0, 1)));",
                   "pm.test(\"Next cursor exists\", () => pm.expect(body.data.nextCursor).to.be.a(\"string\").and.not.empty);",
                   "if (pm.response.code === 200 && body.success) pm.collectionVariables.set(\"b1Cursor\", body.data.nextCursor);",
-                  "pm.test(\"Cursor v2 contains only fingerprint, distance and vehicle code\", () => {",
+                  "pm.test(\"Cursor v3 contains only fingerprint, price sentinel, distance and vehicle code\", () => {",
                   "  const Buffer = require(\"buffer\").Buffer;",
                   "  const token = body.data.nextCursor;",
-                  "  pm.expect(token).to.match(/^[A-Za-z0-9_-]{67}$/);",
+                  "  pm.expect(token).to.match(/^[A-Za-z0-9_-]{78}$/);",
                   "  const payload = Buffer.from(token.replace(/-/g, \"+\").replace(/_/g, \"/\"), \"base64\");",
-                  "  pm.expect(payload.length).to.eql(50); pm.expect(payload[0]).to.eql(2);",
-                  "  pm.expect(payload.readDoubleBE(33)).to.eql(body.data.items[0].distanceMeters);",
-                  "  pm.expect(payload.slice(41).toString(\"ascii\")).to.eql(body.data.items[0].code);",
+                  "  pm.expect(payload.length).to.eql(58); pm.expect(payload[0]).to.eql(3);",
+                  "  pm.expect(Array.from(payload.slice(33,41)).every(value => value === 0)).to.eql(true);",
+                  "  pm.expect(payload.readDoubleBE(41)).to.eql(body.data.items[0].distanceMeters);",
+                  "  pm.expect(payload.slice(49).toString(\"ascii\")).to.eql(body.data.items[0].code);",
                   "});"
                 ]
               }
@@ -631,7 +632,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
@@ -675,7 +676,7 @@
                   "const Buffer = require(\"buffer\").Buffer;",
                   "const current = Buffer.from(token.replace(/-/g, \"+\").replace(/_/g, \"/\"), \"base64\");",
                   "// Giữ nguyên hash và khoảng cách, thay mã xe bằng một ID số theo cấu trúc v1.",
-                  "const legacy = Buffer.alloc(49); current.copy(legacy, 0, 0, 41); legacy[0] = 1;",
+                  "const legacy = Buffer.alloc(49); current.copy(legacy, 0, 0, 33); current.copy(legacy, 33, 41, 49); legacy[0] = 1;",
                   "legacy.writeUInt32BE(123456789, 45);",
                   "pm.collectionVariables.set(\"b1LegacyCursor\", legacy.toString(\"base64\").replace(/\\+/g, \"-\").replace(/\\//g, \"_\").replace(/=+$/, \"\"));"
                 ]
@@ -881,7 +882,7 @@
             "description": "BR-018, BR-001: tạo xe đủ bốn thuộc tính, kiểm COMPANY/DRAFT và tự lưu mã xe. BR-003, ADR-0008/R12: branchCode khớp chi nhánh đã tạo, không có id hoặc branchId.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{b3BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{b3DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{b3DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{b3BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{b3DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{b3DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -918,7 +919,7 @@
                   "pm.test(\"Vehicle created with all submitted attributes\", function () {",
                   "    pm.expect(body.success).to.eql(true);",
                   "    pm.expect(body.error).to.eql(null);",
-                  "    pm.expect(body.data).to.have.all.keys(\"code\", \"plateNumber\", \"ownershipType\", \"fuelType\", \"branchCode\", \"status\", \"inspectionExpiresOn\", \"liabilityInsuranceExpiresOn\", \"seats\", \"transmission\", \"make\", \"model\");",
+                  "    pm.expect(body.data).to.have.all.keys(\"dailyRate\", \"code\", \"plateNumber\", \"ownershipType\", \"fuelType\", \"branchCode\", \"status\", \"inspectionExpiresOn\", \"liabilityInsuranceExpiresOn\", \"seats\", \"transmission\", \"make\", \"model\");",
                   "    pm.expect(body.data.code).to.match(/^XE-[A-Z0-9]{6}$/);",
                   "    pm.expect(body.data.status).to.eql(\"DRAFT\");",
                   "    pm.expect(body.data.ownershipType).to.eql(\"COMPANY\");",

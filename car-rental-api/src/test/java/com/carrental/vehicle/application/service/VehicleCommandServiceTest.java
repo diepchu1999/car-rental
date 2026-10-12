@@ -61,6 +61,42 @@ class VehicleCommandServiceTest {
     private BranchDirectory branches;
     private VehicleCommandService service;
 
+    /** Xe không còn tồn tại khi UPDATE giá trả false phải báo 404, không đọc lại view. */
+    @Test
+    void rejectsMissingVehicleDuringRateUpdate() {
+        when(read.loadAggregate(CODE)).thenReturn(Optional.of(aggregate(VehicleStatus.DRAFT, null, null)));
+        var rate = new com.carrental.vehicle.domain.DailyRate(855_000);
+        when(write.updateDailyRate(CODE, rate)).thenReturn(false);
+        var failure = assertThrows(DomainException.class, () -> service.changeDailyRate(
+                new com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand(CODE, rate)));
+        assertEquals(ErrorCode.VEHICLE_NOT_FOUND, failure.errorCode());
+        verify(read, never()).findByCode(anyString());
+        verify(write).updateDailyRate(CODE, rate);
+        verifyNoMoreInteractions(write);
+    }
+
+    /** Xe thiếu ngay từ đầu không được gọi cổng ghi giá. */
+    @Test
+    void rejectsMissingVehicleBeforeRateUpdate() {
+        var failure = assertThrows(DomainException.class, () -> service.changeDailyRate(
+                new com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand(
+                        CODE, new com.carrental.vehicle.domain.DailyRate(855_000))));
+        assertEquals(ErrorCode.VEHICLE_NOT_FOUND, failure.errorCode());
+        verifyNoInteractions(write, branches);
+    }
+
+    /** Domain chặn thiếu giá trước khi service gọi UPDATE trạng thái. */
+    @Test
+    void rejectsApprovalWithoutRateBeforeWriting() {
+        var pending = Vehicle.restore(CODE, "RATE-TEST", OwnershipType.COMPANY, FuelType.PETROL,
+                42L, VehicleStatus.PENDING_APPROVAL,
+                new VehicleDocuments(TODAY.plusDays(1), TODAY.plusDays(1)), SPECIFICATIONS, null);
+        when(read.loadAggregate(CODE)).thenReturn(Optional.of(pending));
+        assertEquals(ErrorCode.VEHICLE_DAILY_RATE_REQUIRED, assertThrows(DomainException.class,
+                () -> service.approve(ApproveVehicleCommand.from(CODE))).errorCode());
+        verifyNoInteractions(write, branches);
+    }
+
     /** Tạo bộ phụ thuộc mới để mỗi test độc lập với lịch sử gọi của test khác. */
     @BeforeEach
     void setUp() {
@@ -590,7 +626,7 @@ class VehicleCommandServiceTest {
                 null,
                 null,
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model()
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), java.math.BigDecimal.valueOf(1_000_000L)
         );
     }
 
@@ -614,7 +650,7 @@ class VehicleCommandServiceTest {
                 FuelType.PETROL,
                 42L,
                 status,
-                new VehicleDocuments(inspection, insurance), SPECIFICATIONS
+                new VehicleDocuments(inspection, insurance), SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
     }
 
@@ -642,7 +678,7 @@ class VehicleCommandServiceTest {
                 inspection,
                 insurance,
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null, 1_000_000L
         );
     }
 

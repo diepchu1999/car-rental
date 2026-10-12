@@ -1,6 +1,7 @@
 package com.carrental.vehicle.application.port.out;
 
 import com.carrental.vehicle.domain.Vehicle;
+import com.carrental.vehicle.domain.DailyRate;
 import com.carrental.vehicle.domain.VehicleStatus;
 
 /**
@@ -16,6 +17,9 @@ import com.carrental.vehicle.domain.VehicleStatus;
  * Phần hiện thực cổng không tự commit hoặc mở giao dịch độc lập.
  */
 public interface WriteVehiclePort {
+
+    /** BR-234: chỉ cập nhật giá theo mã; false khi không còn xe, không đổi trạng thái. */
+    boolean updateDailyRate(String code, DailyRate dailyRate);
 
     /**
      * Chèn một xe mới với mã nghiệp vụ đã được application sinh.

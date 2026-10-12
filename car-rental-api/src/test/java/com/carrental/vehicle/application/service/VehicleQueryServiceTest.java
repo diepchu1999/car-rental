@@ -57,7 +57,7 @@ class VehicleQueryServiceTest {
                 LocalDate.of(2030, 5, 10),
                 null,
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null, 1_000_000L
         );
 
         List<String> requestedCodes = new ArrayList<>();

@@ -6,6 +6,8 @@ import com.carrental.shared.code.BusinessCodeGenerator;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
 import com.carrental.vehicle.application.command.CreateVehicleCommand;
+import com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand;
+import com.carrental.vehicle.application.port.in.ChangeVehicleDailyRateUseCase;
 import com.carrental.vehicle.application.command.ApproveVehicleCommand;
 import com.carrental.vehicle.application.command.SubmitVehicleForApprovalCommand;
 import com.carrental.vehicle.application.port.in.ApproveVehicleUseCase;
@@ -36,7 +38,7 @@ import java.time.LocalDate;
  */
 @Service
 class VehicleCommandService implements CreateVehicleUseCase,
-        SubmitVehicleForApprovalUseCase, ApproveVehicleUseCase {
+        SubmitVehicleForApprovalUseCase, ApproveVehicleUseCase, ChangeVehicleDailyRateUseCase {
 
     private static final String CODE_PREFIX = "XE";
 
@@ -128,7 +130,8 @@ class VehicleCommandService implements CreateVehicleUseCase,
                     command.fuelType(),
                     branch.id(),
                     command.documents(),
-                    command.specifications()
+                    command.specifications(),
+                    command.dailyRate()
             );
 
             boolean inserted;
@@ -207,6 +210,20 @@ class VehicleCommandService implements CreateVehicleUseCase,
         return readVehiclePort.loadAggregate(code)
                 .orElseThrow(() ->
                         DomainException.notFound(ErrorCode.VEHICLE_NOT_FOUND));
+    }
+
+    /** BR-234: gọi domain rồi chỉ ghi cột giá; reload lỗi làm rollback toàn bộ thay đổi. */
+    @Override
+    @Transactional
+    public VehicleDetail changeDailyRate(ChangeVehicleDailyRateCommand command) {
+        Vehicle changed = loadVehicle(command.code()).changeDailyRate(command.dailyRate());
+        if (!writeVehiclePort.updateDailyRate(changed.code(), changed.dailyRate())) {
+            throw DomainException.notFound(ErrorCode.VEHICLE_NOT_FOUND);
+        }
+        return readVehiclePort.findByCode(changed.code())
+                .map(detail -> VehicleDetailEnricher.enrich(detail, branchDirectory))
+                .orElseThrow(() -> new IllegalStateException(
+                        "Updated vehicle could not be reloaded: " + changed.code()));
     }
 
     /**

@@ -13,7 +13,8 @@ package com.carrental.vehicle.api;
  * @param make hãng xe giữ nguyên cách viết đã lưu
  * @param model dòng xe giữ nguyên cách viết đã lưu
  * @param collateralFree có miễn thế chấp cho gói thuê đang xét không
+ * @param dailyRate giá ngày hiện tại BR-234 để bên gọi gửi pricing theo lô
  */
 public record VehicleSearchView(long id, String code, long branchId, int seats,
-        String transmission, String fuelType, String make, String model, boolean collateralFree) {
+        String transmission, String fuelType, String make, String model, boolean collateralFree, long dailyRate) {
 }

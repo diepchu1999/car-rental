@@ -38,7 +38,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Mỗi test rollback fixture; không mock directory, không đọc hoặc sửa database local.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "car-rental.availability.hold-duration=PT1H")
+        properties = {"car-rental.availability.hold-duration=PT1H",
+                "car-rental.pricing.holiday-calendar.declared-through=2031-12-31"}) // Chỉ dữ liệu thử cho Clock 2030.
 @Import({PostgresTestConfiguration.class, SearchIntegrationTestConfiguration.class})
 @Transactional
 class SearchVehiclesIntegrationTest {

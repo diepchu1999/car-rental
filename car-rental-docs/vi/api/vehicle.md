@@ -1,6 +1,6 @@
 # API xe — admin
 
-## Phạm vi Task 4, Task 6 và Task 6b
+## Phạm vi
 
 - BR-001: lưu loại sở hữu, bất biến sau khi tạo; API GĐ1 chỉ tạo `COMPANY`.
 - BR-003: tra cứu chi nhánh đã tồn tại qua `branch.api.BranchDirectory` trước khi tạo xe.
@@ -8,6 +8,7 @@
 - BR-010 và status-flow §4: `DRAFT → PENDING_APPROVAL → ACTIVE`.
 - BR-410: `PETROL`, `DIESEL`, `ELECTRIC`, `HYBRID`.
 - BR-018: bắt buộc số chỗ, hộp số, hãng và dòng xe ngay khi tạo.
+- BR-234: giá ngày nguyên VND, lớn hơn 0 và chia hết cho 1.000; bắt buộc khi duyệt, đổi được ở mọi trạng thái.
 - Không xác thực/phân quyền trong task này. Namespace admin không tự bảo vệ API.
 - Không xử lý availability, partner onboarding, điều chuyển, sửa giấy tờ hoặc thanh lý.
 
@@ -21,6 +22,7 @@ Mọi endpoint áp dụng [header truy vết X-Request-Id](http-headers.md); res
 | GET | `/api/v1/admin/vehicles/{code}` | 200 |
 | POST | `/api/v1/admin/vehicles/{code}/submit-for-approval` | 200, PENDING_APPROVAL |
 | POST | `/api/v1/admin/vehicles/{code}/approve` | 200, ACTIVE |
+| PUT | `/api/v1/admin/vehicles/{code}/daily-rate` | 200, chi tiết xe với giá mới |
 
 URL luôn dùng mã `XE-<6>`, không dùng khóa chính số.
 Tra cứu giữ nguyên mã đầu vào, không cắt khoảng trắng hoặc đổi kiểu chữ.
@@ -39,7 +41,8 @@ Content-Type: `application/json`.
   "model": "Vios",
   "branchCode": "CN-3TR7WK",
   "inspectionExpiresOn": "2030-12-31",
-  "liabilityInsuranceExpiresOn": "2030-12-31"
+  "liabilityInsuranceExpiresOn": "2030-12-31",
+  "dailyRate": 1000000
 }
 ```
 
@@ -59,6 +62,11 @@ Request cũ thiếu bốn trường mới không còn hợp lệ. Không tự su
 Không tự chuẩn hóa biển số; chưa có quy tắc định dạng biển số được chốt.
 Hai ngày theo `YYYY-MM-DD`, có thể bỏ qua hoặc gửi null ở bước tạo bản nháp.
 Giấy tờ đã hết hạn cũng không ngăn tạo DRAFT; chúng ngăn bước duyệt.
+
+`dailyRate` không bắt buộc khi tạo: bỏ qua hoặc gửi null thì lưu null, không có giá mặc định.
+Nếu cung cấp, giá phải là số nguyên VND > 0, chia hết cho 1.000 và biểu diễn được bằng `BIGINT`.
+Giá 0, âm, 1.500, số có phần lẻ khác 0 hoặc vượt giới hạn số nguyên 64 bit trả
+422 `VEHICLE_INVALID_DAILY_RATE`, không tự làm tròn hoặc cắt phần lẻ.
 
 Các trường ngoài hợp đồng bị bỏ qua. Gửi `ownershipType`, `status`, `code`, `id`,
 `branchId` không làm thay đổi COMPANY/DRAFT hoặc định danh do server quyết định.
@@ -80,17 +88,19 @@ Response 201, ví dụ `Location: /api/v1/admin/vehicles/XE-8KQ4M2`:
     "branchCode": "CN-3TR7WK",
     "status": "DRAFT",
     "inspectionExpiresOn": "2030-12-31",
-    "liabilityInsuranceExpiresOn": "2030-12-31"
+    "liabilityInsuranceExpiresOn": "2030-12-31",
+    "dailyRate": 1000000
   },
   "error": null
 }
 ```
 
-Từ Task 6b, cả bốn endpoint trả **`branchCode`**, không còn `branchId` và không trả `id` của xe (R12).
+Cả năm endpoint trả **`branchCode`**, không có `branchId` và không trả `id` của xe (R12).
+Chi tiết xe luôn có `dailyRate`, bằng null khi chưa nhập giá.
 Đây là thay đổi trước phát hành, sửa thẳng `v1` theo api-guideline, không tạo `v2`.
 Mã chi nhánh được application lấy qua `branch.api`; CSDL vẫn chỉ lưu `branch_id`,
 không thêm cột `branch_code`, không suy mã từ ID và không JOIN chéo schema (ADR-0008).
-Luồng tạo xe tái sử dụng mã chi nhánh đã tra trước khi chèn; luồng đọc/gửi duyệt/duyệt tra bằng ID đã lưu.
+Luồng tạo xe tái sử dụng mã chi nhánh đã tra trước khi chèn; luồng đọc/gửi duyệt/duyệt/đổi giá tra bằng ID đã lưu.
 `branchCode` có thể null nếu hồ sơ không có liên kết chi nhánh; luồng tạo COMPANY ở GĐ1 luôn có mã.
 Có ID tham chiếu nhưng chi nhánh không tồn tại là lỗi toàn vẹn nội bộ (500 `INTERNAL_ERROR`),
 không trả mã giả/null hoặc biến thành lỗi 404 của mã xe. Lỗi sau ghi làm rollback giao dịch.
@@ -101,14 +111,16 @@ Endpoint chưa hỗ trợ Idempotency-Key; gửi lại cùng biển số sẽ nh
 ## Đọc, gửi duyệt và phê duyệt
 
 GET trả cùng hình dạng dữ liệu như POST tạo xe, kể cả giấy tờ null hoặc đã hết hạn.
-Gửi duyệt và phê duyệt giữ nguyên cả bốn thuộc tính BR-018.
+Gửi duyệt và phê duyệt giữ nguyên cả bốn thuộc tính BR-018 và giá ngày đã nhập.
 
 Hai POST chuyển trạng thái không cần body. Body không được dùng để chọn trạng thái,
 ngày duyệt hoặc sửa thông tin giấy tờ.
 
-1. Gửi duyệt chỉ nhận DRAFT và trả PENDING_APPROVAL; chưa kiểm đủ giấy tờ.
+1. Gửi duyệt chỉ nhận DRAFT và trả PENDING_APPROVAL; chưa kiểm đủ giấy tờ hoặc giá ngày.
 2. Duyệt chỉ nhận PENDING_APPROVAL. Cả đăng kiểm và TNDS phải có ngày hết hạn
    **sau ngày duyệt**; ngày hết hạn bằng ngày duyệt cũng bị từ chối.
+   Kiểm lỗi theo thứ tự: trạng thái → giấy tờ thiếu/hết hạn → giá ngày thiếu.
+   Sau khi giấy tờ hợp lệ, thiếu giá trả 422 `VEHICLE_DAILY_RATE_REQUIRED` (BR-234).
 3. Ngày duyệt là ngày server theo `Asia/Ho_Chi_Minh`, không phụ thuộc timezone mặc định của JVM.
    Đây là quy ước kỹ thuật của Task 4 cho triển khai tại Việt Nam.
 4. Cập nhật dùng `WHERE code = :code AND status = :expectedStatus`; không ghi đè trạng thái mới hơn.
@@ -117,6 +129,28 @@ ngày duyệt hoặc sửa thông tin giấy tờ.
 Không có endpoint sửa giấy tờ trong Task 4. Hồ sơ chưa đủ giấy tờ được dùng để chứng minh cổng
 duyệt chặn đúng; đừng thêm endpoint sửa chỉ để hoàn thành ví dụ này.
 
+## Đổi giá ngày
+
+`PUT /api/v1/admin/vehicles/{code}/daily-rate`, Content-Type `application/json`:
+
+```json
+{
+  "dailyRate": 855000
+}
+```
+
+- BR-234: không giới hạn trạng thái; DRAFT, PENDING_APPROVAL, ACTIVE, INACTIVE, REJECTED và RETIRED đều đổi được.
+- `dailyRate` bắt buộc, không cho xóa giá: thiếu/null hoặc số không hợp lệ trả 422 `VEHICLE_INVALID_DAILY_RATE`.
+  JSON không đọc được hoặc giá không chuyển được thành số trả 400 `INVALID_REQUEST`.
+- Kiểm đầu vào trước khi tra xe. Đầu vào hợp lệ nhưng mã xe không tồn tại trả 404 `VEHICLE_NOT_FOUND`.
+- Chỉ cập nhật `daily_rate`, không đổi trạng thái, giấy tờ, thuộc tính hay chi nhánh.
+  Response 200 cùng hình dạng GET, mang giá mới. Ghi và đọc lại trong một transaction;
+  lỗi khi đọc lại hoặc tra chi nhánh làm rollback.
+- Gửi lại cùng giá giữ nguyên kết quả; không dùng `Idempotency-Key` vì đây là đặt giá niêm yết,
+  không phải thu tiền. Không có đường xóa giá và không tính lại báo giá/đơn đã tạo (BR-234, ADR-0014).
+- V008 bảo vệ ở CSDL: `chk_vehicle_daily_rate` kiểm giá; `chk_vehicle_approved_has_daily_rate`
+  bắt buộc giá ở ACTIVE, INACTIVE và RETIRED. Không backfill giá phỏng đoán cho dữ liệu cũ.
+
 ## Mã lỗi
 
 | HTTP | error.code | Khi nào |
@@ -124,13 +158,15 @@ duyệt chặn đúng; đừng thêm endpoint sửa chỉ để hoàn thành ví
 | 400 | INVALID_REQUEST | Thiếu trường, chuỗi trắng, enum/ngày/JSON không hợp lệ |
 | 422 | VEHICLE_INVALID_SEATS | Số chỗ ngoài tập `4`, `5`, `7`, `16` theo BR-018 |
 | 404 | BRANCH_NOT_FOUND | Mã chi nhánh không tồn tại khi tạo |
-| 404 | VEHICLE_NOT_FOUND | Xe không tồn tại khi đọc/gửi duyệt/duyệt |
+| 404 | VEHICLE_NOT_FOUND | Xe không tồn tại khi đọc/gửi duyệt/duyệt/đổi giá |
 | 409 | VEHICLE_PLATE_ALREADY_EXISTS | PostgreSQL từ chối do trùng biển số |
 | 422 | VEHICLE_INVALID_STATUS_TRANSITION | Trạng thái đã sai ngay khi tải xe |
 | 409 | VEHICLE_INVALID_STATUS_TRANSITION | Trạng thái hợp lệ khi đọc nhưng không còn khớp lúc ghi |
 | 422 | VEHICLE_DOCUMENT_MISSING | Thiếu một hoặc cả hai ngày giấy tờ khi duyệt |
 | 422 | VEHICLE_DOCUMENT_EXPIRED | Một hoặc cả hai giấy tờ hết hạn khi duyệt |
-| 415 | INVALID_REQUEST | Content-Type tạo xe không được hỗ trợ |
+| 422 | VEHICLE_DAILY_RATE_REQUIRED | Giấy tờ hợp lệ nhưng xe chưa có giá khi duyệt |
+| 422 | VEHICLE_INVALID_DAILY_RATE | Giá sai khi tạo/đổi, hoặc thiếu/null khi đổi giá |
+| 415 | INVALID_REQUEST | Content-Type tạo xe hoặc đổi giá không được hỗ trợ |
 | 500 | INTERNAL_ERROR | Lỗi bất ngờ, hết lượt thử mã hoặc không đọc lại được bản ghi vừa ghi |
 
 Hai request chuyển trạng thái cùng lúc: request đến sau có thể nhận 422 nếu đọc sau commit,
@@ -152,6 +188,25 @@ Ví dụ lỗi:
 Thông báo code là tiếng Anh; giao diện Việt hóa sau dựa trên `error.code`.
 Không trả SQL, stack trace hoặc chi tiết kết nối ra HTTP.
 
+## Collection Postman — giá ngày
+
+Import [collection Task 7](../../../postman/task-07-pricing.postman_collection.json)
+và [environment local](../../../postman/local.postman_environment.json), chọn **Car Rental - Local**.
+Khởi động backend với Flyway đã áp dụng V008, dùng Collection Runner chạy thư mục
+**Part 1 - Vehicle daily rate (BR-234)** theo thứ tự 01–24. Mỗi request có `pm.test`;
+các response 4xx có chủ đích phải vẫn có test xanh khi đúng mã lỗi.
+
+Collection tạo bộ dữ liệu mẫu riêng với tên/biển số ngẫu nhiên, tự truyền mã xe/chi nhánh;
+chạy lại không cần dọn dữ liệu hoặc chép biến. Giá 855.000 và 1.000.000 chỉ là dữ liệu thử.
+Chưa cần biến bảo hiểm cho phần giá ngày của xe. Các collection Task 6/6b dùng giá mẫu
+tường minh cho những xe cần duyệt.
+
+Kiểm trực tiếp cả hai CHECK bằng IntelliJ SQL Console với file
+`car-rental-api/src/test/resources/sql/vehicle/verify_daily_rate_constraints_manual.sql`:
+chạy toàn bộ file trong một session riêng, không có transaction công việc khác.
+Kết quả đúng: 8 thông báo `PASS`, các vi phạm có SQLSTATE `23514` và đúng tên constraint;
+`remaining_fixture_count = 0` sau `ROLLBACK`. Nếu lỗi ngoài dự kiến, chạy `ROLLBACK` trước khi thử lại.
+
 ## Collection Postman — Task 6b, Phần 3
 
 Import `postman/task-06b-review.postman_collection.json`, chọn **Car Rental - Local**,
@@ -171,7 +226,7 @@ Không cần chạy Phần 1 trước, không cần SQL hoặc chép biến gi�
   và [environment local](../../../postman/local.postman_environment.json).
 - Chọn environment `Car Rental - Local`; `baseUrl` mặc định `http://localhost:8081`.
   Nếu cổng backend local khác, chỉ đổi `baseUrl` trong Postman.
-- Backend phải đang chạy và Flyway đã áp dụng V007; request tạo chi nhánh đã bổ sung tên/địa chỉ theo BR-808.
+- Backend phải đang chạy và Flyway đã áp dụng V008; request tạo chi nhánh có tên/địa chỉ theo BR-808.
 - Dùng Collection Runner chạy toàn bộ thư mục `Part 1 - Vehicle attributes (BR-018)`
   theo thứ tự 01–18. Không cần token hoặc copy mã giữa các request.
 - Request 01 tự tạo chi nhánh và lưu mã; request 02 sinh biển số ngẫu nhiên, tạo xe

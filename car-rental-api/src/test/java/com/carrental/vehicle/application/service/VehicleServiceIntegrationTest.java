@@ -74,6 +74,39 @@ class VehicleServiceIntegrationTest {
     @Autowired @Qualifier("vehicleReadAdapter") private ReadVehiclePort actualRead;
     @Autowired private Clock clock;
     @Autowired private VehicleSearchDirectory searchDirectory;
+    @Autowired private com.carrental.vehicle.application.port.in.ChangeVehicleDailyRateUseCase changeRate;
+
+    /** BR-234: đổi giá commit thật và giữ nguyên trạng thái, chi nhánh và các thuộc tính khác. */
+    @Test
+    void commitsDailyRateChange() {
+        var original = create.create(command());
+        probe.reset();
+        var changed = changeRate.changeDailyRate(
+                com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand.from(
+                        original.code(), java.math.BigDecimal.valueOf(855_000)));
+        assertEquals(855_000L, changed.dailyRate());
+        assertEquals(original.status(), changed.status());
+        assertEquals(original.branchCode(), changed.branchCode());
+        assertEquals(original.plateNumber(), changed.plateNumber());
+        assertTrue(probe.transactionActive);
+        assertFalse(probe.transactionReadOnly);
+        assertEquals(Optional.of(changed.withBranchCode(null)), actualRead.findByCode(original.code()));
+    }
+
+    /** Đọc lại sau UPDATE lỗi phải rollback giá mới; không có transaction bao ngoài của test. */
+    @Test
+    void rollsBackDailyRateChangeWhenReloadFails() {
+        var original = create.create(command());
+        probe.reset();
+        probe.failAtRead = 2;
+        assertThrowsExactly(IllegalStateException.class, () -> changeRate.changeDailyRate(
+                com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand.from(
+                        original.code(), java.math.BigDecimal.valueOf(855_000))));
+        assertEquals(855_000L, probe.lastResult.orElseThrow().dailyRate());
+        assertTrue(probe.transactionActive);
+        assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+        assertEquals(Optional.of(original.withBranchCode(null)), actualRead.findByCode(original.code()));
+    }
 
 
 
@@ -212,7 +245,7 @@ class VehicleServiceIntegrationTest {
         return CreateVehicleCommand.from("TEST-" + UUID.randomUUID(), OwnershipType.COMPANY,
                 FuelType.HYBRID, branchCode, expiry, expiry.plusDays(1),
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model());
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), java.math.BigDecimal.valueOf(1_000_000L));
     }
 
     /**
@@ -226,7 +259,7 @@ class VehicleServiceIntegrationTest {
                 before.fuelType(), before.branchId(), status, before.inspectionExpiresOn(),
                 before.liabilityInsuranceExpiresOn(),
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model(), before.branchCode()), after);
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), before.branchCode(), 1_000_000L), after);
     }
 
     /** Đăng ký probe chỉ trong context kiểm transaction của xe. */

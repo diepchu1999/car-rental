@@ -67,9 +67,9 @@ class VehicleSpecificationsTest {
     void aggregateRequiresSpecificationsOnBothPaths() {
         VehicleDocuments documents = new VehicleDocuments(null, null);
         assertInvalid(() -> Vehicle.createDraft("XE-SPEC01", "SPEC-01", OwnershipType.COMPANY,
-                FuelType.PETROL, 1L, documents, null));
+                FuelType.PETROL, 1L, documents, null, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE));
         assertInvalid(() -> Vehicle.restore("XE-SPEC01", "SPEC-01", OwnershipType.COMPANY,
-                FuelType.PETROL, 1L, VehicleStatus.DRAFT, documents, null));
+                FuelType.PETROL, 1L, VehicleStatus.DRAFT, documents, null, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE));
     }
 
     /** Dữ liệu khác fixture mặc định phải sống qua tạo, gửi duyệt, duyệt và khôi phục. */
@@ -79,11 +79,11 @@ class VehicleSpecificationsTest {
         VehicleDocuments documents = new VehicleDocuments(today.plusDays(1), today.plusDays(2));
         VehicleSpecifications specs = new VehicleSpecifications(16, Transmission.MANUAL, "Ford", "Transit");
         Vehicle draft = Vehicle.createDraft("XE-SPEC01", "SPEC-01", OwnershipType.COMPANY,
-                FuelType.DIESEL, 1L, documents, specs);
+                FuelType.DIESEL, 1L, documents, specs, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE);
         Vehicle pending = draft.submitForApproval();
         Vehicle active = pending.approve(today);
         Vehicle restored = Vehicle.restore(active.code(), active.plateNumber(), active.ownershipType(),
-                active.fuelType(), active.branchId(), active.status(), active.documents(), specs);
+                active.fuelType(), active.branchId(), active.status(), active.documents(), specs, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE);
         for (Vehicle vehicle : new Vehicle[]{draft, pending, active, restored}) {
             assertSame(specs, vehicle.specifications());
         }

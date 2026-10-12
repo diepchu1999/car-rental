@@ -74,6 +74,19 @@ class SearchVehiclesQueryTest {
         assertInvalid(values::build);
     }
 
+    /** BR-125/237: không làm tròn nano gây lệch báo giá; nhận nguyên micro giây. */
+    @Test
+    void alignsTimestampPrecisionWithQuotes() {
+        var values = input();
+        values.start = values.start.plusNanos(1);
+        assertInvalid(values::build);
+        values.start = values.start.minusNanos(1);
+        values.end = values.end.plusNanos(999);
+        assertInvalid(values::build);
+        values.end = values.end.plusNanos(1);
+        assertEquals(values.end, values.build().endExclusive());
+    }
+
     /** Không tự cắt 101 về 100; đây là lỗi đầu vào. */
     @ParameterizedTest
     @ValueSource(ints = {-1, 0, 101, Integer.MAX_VALUE})

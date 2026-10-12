@@ -151,7 +151,7 @@ class VehicleReadAdapterIntegrationTest {
                 inspectionExpiresOn,
                 liabilityInsuranceExpiresOn,
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null, 1_000_000L
         );
 
         assertEquals(expected, result.orElseThrow());
@@ -430,6 +430,7 @@ class VehicleReadAdapterIntegrationTest {
             LocalDate liabilityInsuranceExpiresOn
     ) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("dailyRate", 1_000_000L, Types.BIGINT)
                 .addValue("code", code, Types.VARCHAR)
                 .addValue("plateNumber", plateNumber, Types.VARCHAR)
                 .addValue("seats", 5, Types.INTEGER)

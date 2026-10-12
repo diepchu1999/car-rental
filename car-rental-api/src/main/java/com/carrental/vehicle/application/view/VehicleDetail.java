@@ -45,6 +45,7 @@ import java.time.LocalDate;
  * @param make hãng xe có nội dung
  * @param model dòng xe có nội dung
  * @param branchCode mã chi nhánh do application bổ sung; null trước tra cứu hoặc khi không có liên kết
+ * @param dailyRate giá ngày nguyên VND theo BR-234, null nếu chưa nhập giá
  */
 public record VehicleDetail(
         long id,
@@ -60,11 +61,12 @@ public record VehicleDetail(
         Transmission transmission,
         String make,
         String model,
-        String branchCode
+        String branchCode,
+        Long dailyRate
 ) {
     /** Tạo view đã bổ sung mã cho response, không đổi dữ liệu xe hoặc ghi mã vào CSDL. */
     public VehicleDetail withBranchCode(String code) {
         return new VehicleDetail(id, this.code, plateNumber, ownershipType, fuelType, branchId,
-                status, inspectionExpiresOn, liabilityInsuranceExpiresOn, seats, transmission, make, model, code);
+                status, inspectionExpiresOn, liabilityInsuranceExpiresOn, seats, transmission, make, model, code, dailyRate);
     }
 }

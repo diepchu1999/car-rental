@@ -14,6 +14,7 @@ SELECT
     v.seats,
     v.transmission,
     v.make,
-    v.model
+    v.model,
+    v.daily_rate
 FROM vehicle.vehicle AS v
 WHERE v.code = :code;

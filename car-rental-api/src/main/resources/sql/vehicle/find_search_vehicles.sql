@@ -1,6 +1,6 @@
 -- BR-010/126: chỉ xe đã duyệt và đúng thuộc tính; không lọc hoặc xếp hạng theo sở hữu (BR-112).
 -- Lịch trống thuộc availability; thế chấp thuộc CollateralPolicyResolver (BR-209).
-SELECT id, code, branch_id, ownership_type, seats, transmission, fuel_type, make, model
+SELECT id, code, branch_id, ownership_type, seats, transmission, fuel_type, make, model, daily_rate
 FROM vehicle.vehicle
 WHERE status = 'ACTIVE'
   AND branch_id IN (:branch_ids)

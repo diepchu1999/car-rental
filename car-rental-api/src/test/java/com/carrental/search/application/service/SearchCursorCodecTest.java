@@ -24,7 +24,7 @@ class SearchCursorCodecTest {
         var hash = SearchCursorCodec.fingerprint(input().build(), 10);
         var position = new SearchPosition(Math.nextUp(123.456789), "XE-Z9AB01");
         String token = SearchCursorCodec.encode(position, hash);
-        assertEquals(67, token.length());
+        assertEquals(78, token.length());
         assertTrue(token.matches("[A-Za-z0-9_-]+"));
         var decoded = SearchCursorCodec.decode(token, hash).orElseThrow();
         assertEquals(position, decoded);
@@ -38,12 +38,13 @@ class SearchCursorCodecTest {
         var hash = SearchCursorCodec.fingerprint(input().build(), 10);
         var position = new SearchPosition(123.5, "XE-ABC123");
         byte[] bytes = Base64.getUrlDecoder().decode(SearchCursorCodec.encode(position, hash));
-        assertEquals(50, bytes.length);
+        assertEquals(58, bytes.length);
         var payload = ByteBuffer.wrap(bytes);
-        assertEquals(2, payload.get());
+        assertEquals(3, payload.get());
         byte[] storedHash = new byte[32];
         payload.get(storedHash);
         assertArrayEquals(hash, storedHash);
+        assertEquals(0L, payload.getLong());
         assertEquals(position.distanceMeters(), payload.getDouble());
         byte[] code = new byte[9];
         payload.get(code);
@@ -58,6 +59,36 @@ class SearchCursorCodecTest {
         byte[] legacy = ByteBuffer.allocate(49).put((byte) 1).put(hash)
                 .putDouble(0).putLong(123456789L).array();
         assertInvalid(() -> SearchCursorCodec.decode(encode(legacy), hash));
+    }
+
+    /** Cursor v2 mã xe đúng vẫn bị từ chối sau khi thêm khóa giá, không diễn giải nhầm payload cũ. */
+    @Test
+    void rejectsLegacyVersionTwoWithBusinessCode() {
+        var hash = SearchCursorCodec.fingerprint(input().build(), 10);
+        byte[] legacy = ByteBuffer.allocate(50).put((byte) 2).put(hash).putDouble(1.0)
+                .put("XE-ABC123".getBytes(StandardCharsets.US_ASCII)).array();
+        assertInvalid(() -> SearchCursorCodec.decode(encode(legacy), hash));
+    }
+
+    /** PRICE_ASC lưu đúng tổng tiền thuê BIGINT, không đánh tráo số này với ID xe. */
+    @Test
+    void roundTripsPricePositionAndRejectsInvalidPrice() {
+        var values = input();
+        values.sort = SearchSort.PRICE_ASC;
+        var hash = SearchCursorCodec.fingerprint(values.build(), 10);
+        var position = new SearchPosition(SearchSort.PRICE_ASC, 3_849_000, 12.5, "XE-ABC123");
+        String token = SearchCursorCodec.encode(position, hash);
+        assertEquals(position, SearchCursorCodec.decode(token, hash, SearchSort.PRICE_ASC).orElseThrow());
+        var payload = ByteBuffer.wrap(Base64.getUrlDecoder().decode(token));
+        assertEquals(3_849_000L, payload.getLong(33));
+        assertEquals(12.5, payload.getDouble(41));
+        assertEquals("XE-ABC123", new String(payload.array(), 49, 9, StandardCharsets.US_ASCII));
+        for (long invalid : new long[]{-1, 0, 1_500}) {
+            payload.putLong(33, invalid);
+            assertInvalid(() -> SearchCursorCodec.decode(encode(payload.array()), hash, SearchSort.PRICE_ASC));
+        }
+        payload.putLong(33, 1_000);
+        assertInvalid(() -> SearchCursorCodec.decode(encode(payload.array()), hash, SearchSort.NEAREST));
     }
 
     /** Null biểu diễn trang đầu, không cần phát một token giả. */
@@ -80,7 +111,7 @@ class SearchCursorCodecTest {
         var hash = SearchCursorCodec.fingerprint(input().build(), 10);
         String token = SearchCursorCodec.encode(new SearchPosition(0, "XE-000001"), hash);
         byte[] bytes = Base64.getUrlDecoder().decode(token);
-        bytes[0] = 3;
+        bytes[0] = 4;
         assertInvalid(() -> SearchCursorCodec.decode(encode(bytes), hash));
         bytes[0] = 1;
         assertInvalid(() -> SearchCursorCodec.decode(encode(bytes), hash));
@@ -93,12 +124,12 @@ class SearchCursorCodecTest {
         var hash = SearchCursorCodec.fingerprint(input().build(), 10);
         for (double distance : new double[]{Double.NaN, Double.POSITIVE_INFINITY, -1}) {
             byte[] bytes = Base64.getUrlDecoder().decode(SearchCursorCodec.encode(new SearchPosition(0, "XE-000001"), hash));
-            ByteBuffer.wrap(bytes).putDouble(33, distance);
+            ByteBuffer.wrap(bytes).putDouble(41, distance);
             assertInvalid(() -> SearchCursorCodec.decode(encode(bytes), hash));
         }
         for (String code : new String[]{"CN-000001", "XE-abc123", "XE-ABC12!", "XE-ABC12 "}) {
             byte[] bytes = Base64.getUrlDecoder().decode(SearchCursorCodec.encode(new SearchPosition(0, "XE-000001"), hash));
-            ByteBuffer.wrap(bytes).position(41).put(code.getBytes(StandardCharsets.US_ASCII));
+            ByteBuffer.wrap(bytes).position(49).put(code.getBytes(StandardCharsets.US_ASCII));
             assertInvalid(() -> SearchCursorCodec.decode(encode(bytes), hash));
         }
     }
@@ -123,7 +154,9 @@ class SearchCursorCodecTest {
                 v -> v.filters = new VehicleSearchFilters(null, null, null, "Toyota", null, null),
                 v -> v.filters = new VehicleSearchFilters(null, null, null, null, "Vios", null),
                 v -> v.filters = new VehicleSearchFilters(null, null, null, null, null, true),
-                v -> v.filters = new VehicleSearchFilters(null, null, null, null, null, false)
+                v -> v.filters = new VehicleSearchFilters(null, null, null, null, null, false),
+                v -> v.filters = new VehicleSearchFilters(null, null, null, null, null, null, 0L, null),
+                v -> v.filters = new VehicleSearchFilters(null, null, null, null, null, null, null, 2_200_000L)
         );
         for (Consumer<Input> change : changes) {
             var values = input();

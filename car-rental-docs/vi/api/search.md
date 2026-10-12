@@ -2,8 +2,8 @@
 
 ## Phạm vi
 
-Task 6, lát cắt 1: `GET /api/v1/public/vehicles`, không cần đăng nhập.
-Không tạo đường `/client`, `/mobile` hoặc endpoint giữ chỗ trong task này.
+Lát cắt 1: `GET /api/v1/public/vehicles`, không cần đăng nhập.
+Không có đường `/client`, `/mobile` hoặc endpoint giữ chỗ của search.
 
 - BR-003/808: vị trí và thông tin nơi nhận xe lấy từ chi nhánh.
 - BR-010/018/126: chỉ xe ACTIVE, lọc theo thuộc tính đã công bố.
@@ -12,8 +12,9 @@ Không tạo đường `/client`, `/mobile` hoặc endpoint giữ chỗ trong ta
 - BR-110/209: `collateralFree` do module vehicle phân giải theo gói thuê.
 - BR-112: không lọc, xếp hạng hoặc trả loại sở hữu.
 - BR-113/119/121/125: kiểm điều kiện thuê ngay khi tìm kiếm, kể cả khi không có ứng viên.
+- BR-126/218/235/236: tiền thuê đúng khoảng đã chọn, tính bằng pricing như báo giá, chưa gồm bảo hiểm.
 
-Không có giá, ảnh, đánh giá, chi tiết xe, vòng đời đơn hay hỗ trợ xe đối tác trong lát cắt này.
+Chưa có ảnh, đánh giá, chi tiết xe, vòng đời đơn hay hỗ trợ xe đối tác trong lát cắt này.
 Endpoint chỉ đọc dữ liệu công khai; không đọc thông tin khách, giấy tờ, chủ xe hoặc GPS.
 Hiện chỉ chạy local. Rate limit theo security-guideline chưa được hiện thực trong task này.
 
@@ -35,8 +36,8 @@ X-Client-Version: 0.0.1
 |---|---|---|---|
 | `latitude` | number | Bắt buộc | Hữu hạn, -90 đến 90 |
 | `longitude` | number | Bắt buộc | Hữu hạn, -180 đến 180 |
-| `startInclusive` | ISO-8601 timestamp | Bắt buộc | Giờ nhận xe, có `Z` hoặc offset |
-| `endExclusive` | ISO-8601 timestamp | Bắt buộc | Giờ trả xe, sau giờ nhận; chưa cộng đệm |
+| `startInclusive` | ISO-8601 timestamp | Bắt buộc | Giờ nhận xe, có `Z` hoặc offset; độ chính xác tối đa micro giây như báo giá |
+| `endExclusive` | ISO-8601 timestamp | Bắt buộc | Giờ trả xe, sau giờ nhận; chưa cộng đệm; tối đa micro giây |
 | `rentalType` | enum | Bắt buộc | `HOURLY`, `DAILY`; `MONTHLY` chưa hỗ trợ |
 | `driveMode` | enum | Bắt buộc | `SELF_DRIVE`; `WITH_DRIVER` chưa hỗ trợ |
 | `pickupMethod` | enum | `BRANCH` | `DELIVERY` chưa hỗ trợ |
@@ -47,13 +48,15 @@ X-Client-Version: 0.0.1
 | `make` | string | Không lọc | Khớp toàn bộ, không phân biệt hoa thường, bỏ trắng hai đầu |
 | `model` | string | Không lọc | Như `make`; không dùng tìm chuỗi con hoặc wildcard |
 | `collateralFree` | boolean | Không lọc | Đúng chuỗi `true` hoặc `false` |
-| `sort` | enum | `NEAREST` | `PRICE_ASC`, `RATING_DESC` chưa hỗ trợ |
+| `minRentalAmount` | integer VND (BIGINT) | Không lọc | ≥ 0, gồm biên; so tổng tiền thuê, không gồm bảo hiểm |
+| `maxRentalAmount` | integer VND (BIGINT) | Không lọc | ≥ 0, gồm biên; nếu có cả hai thì min ≤ max |
+| `sort` | enum | `NEAREST` | Hỗ trợ `PRICE_ASC`; `RATING_DESC` chưa hỗ trợ |
 | `limit` | integer | 20 | 1–100; vượt giới hạn trả lỗi, không tự cắt |
 | `cursor` | string | Trang đầu | Giữ nguyên token nhận từ `data.nextCursor` |
 
 Trường tùy chọn không dùng thì **bỏ khỏi URL**, không gửi giá trị rỗng, trắng hoặc `null` dạng chuỗi.
 Mỗi tham số chỉ được xuất hiện một lần. Tham số không thuộc bảng bị từ chối bằng 400
-`INVALID_REQUEST`, kể cả bộ lọc sở hữu hoặc giá chưa hỗ trợ; không âm thầm bỏ qua.
+`INVALID_REQUEST`, kể cả bộ lọc sở hữu hoặc tên giá khác bảng; không âm thầm bỏ qua.
 Enum viết đúng tên chữ hoa. Chuỗi hãng/dòng không có giới hạn độ dài nghiệp vụ tự đặt.
 URL-encode giá trị: đặc biệt dấu `+` trong offset phải là `%2B`; dùng `Z` thì không gặp trường hợp này.
 
@@ -68,6 +71,9 @@ URL-encode giá trị: đặc biệt dấu `+` trong offset phải là `%2B`; d�
 - Các trạng thái HELD, CONFIRMED, IN_USE, BLOCKED, COMPLETED chặn trong khoảng đã lưu.
   HELD quá hạn chưa được dọn vẫn chặn; RELEASED không chặn.
 - Khoảng là `[startInclusive, endExclusive)`: chạm đúng cận cuối không phải chồng lịch.
+- Không làm tròn thời gian đầu vào: phần nhỏ hơn micro giây bị trả 400 để không lệch báo giá BR-125/237.
+- Ngày lịch Việt Nam của giờ trả thực tế không được lớn hơn `declared-through` của pricing.
+  Lỗi `HOLIDAY_CALENDAR_NOT_DECLARED` kiểm trước khi tìm chi nhánh/xe, không phụ thuộc tập kết quả.
 
 ### Response 200
 
@@ -89,7 +95,8 @@ URL-encode giá trị: đặc biệt dấu `+` trong offset phải là `%2B`; d�
           "name": "Central Branch",
           "address": "123 Main Street"
         },
-        "distanceMeters": 111.2
+        "distanceMeters": 111.2,
+        "rentalAmount": 2200000
       }
     ],
     "nextCursor": null
@@ -99,28 +106,31 @@ URL-encode giá trị: đặc biệt dấu `+` trong offset phải là `%2B`; d�
 ```
 
 Khoảng cách là **mét**, tính bằng PostGIS geography, không làm tròn trước khi sắp xếp/phân trang.
-Response không có khóa chính nội bộ, biển số, loại sở hữu hoặc giá.
+`rentalAmount` là tổng tiền thuê VND cho đúng khoảng đã chọn, chưa gồm bảo hiểm; không phải giá ngày.
+Response không có khóa chính nội bộ, biển số, loại sở hữu hoặc dòng bảo hiểm.
 Không có xe phù hợp vẫn trả 200 với `items: []`, `nextCursor: null`, không trả 404.
 
 ### Cursor
 
-- Thứ tự: khoảng cách tăng dần, bằng nhau thì **mã xe tăng dần theo thứ tự từ điển ASCII**.
+- `NEAREST`: khoảng cách tăng dần, bằng nhau thì **mã xe tăng dần theo thứ tự từ điển ASCII**.
+- `PRICE_ASC`: tiền thuê tăng dần, bằng nhau theo khoảng cách rồi mã xe.
   Không dùng ID nội bộ hoặc thứ tự tạo xe làm khóa phụ.
 - Khi `nextCursor` khác null, truyền token đó vào `cursor` ở lần gọi sau và giữ nguyên điều kiện tìm.
 - Có thể đổi `limit` giữa các trang; không đổi vị trí, khoảng thuê, gói, hình thức lái/nhận,
   bán kính, sort hoặc bộ lọc. Giữ nguyên cả cách viết hãng/dòng khi tiếp tục cursor.
-- Từ Task 6b, token dùng **version 2**, chứa dấu SHA-256 của điều kiện và khóa tiếp nối
-  `(khoảng cách, mã xe)`, không chứa ID số của xe; client phải coi là opaque.
-  Đây không phải chữ ký xác thực hay quyền truy cập dữ liệu. Cursor version 1 bị từ chối bằng
+- Token dùng **version 3**, chứa dấu SHA-256 của điều kiện (gồm hai biên giá) và khóa tiếp nối
+  `(tiền thuê, khoảng cách, mã xe)`; NEAREST dùng sentinel tiền thuê 0 và không xếp theo giá.
+  Không chứa ID số của xe; client phải coi là opaque.
+  Đây không phải chữ ký xác thực hay quyền truy cập dữ liệu. Cursor version 1 và 2 bị từ chối bằng
   **400 `INVALID_REQUEST`** như cursor sai; khách bỏ cursor để tìm lại từ trang đầu.
-- Không phải snapshot: lịch/trạng thái/vị trí thay đổi giữa hai lần gọi có thể làm thay đổi tập kết quả.
+- Không phải snapshot: lịch/trạng thái/vị trí/giá hoặc cấu hình thay đổi có thể làm thay đổi tập/thứ tự.
   Kết quả search **không giữ chỗ**. BR-104 vẫn do ràng buộc PostgreSQL quyết định khi hold.
 
 ### Lỗi
 
 | HTTP | `error.code` | Trường hợp |
 |---|---|---|
-| 400 | `INVALID_REQUEST` | Thiếu bắt buộc; sai kiểu/enum; tọa độ, bán kính hoặc limit sai; khoảng không tăng; chuỗi trắng; cursor hỏng/sai phiên bản/sai điều kiện; tham số lạ/lặp |
+| 400 | `INVALID_REQUEST` | Thiếu bắt buộc; sai kiểu/enum; tọa độ, bán kính, limit hoặc biên giá sai; khoảng không tăng/không biểu diễn được tới micro giây; chuỗi trắng; cursor hỏng/sai phiên bản/sai điều kiện; tham số lạ/lặp |
 | 422 | `VEHICLE_INVALID_SEATS` | Số nguyên chỗ ngồi không thuộc 4/5/7/16 |
 | 422 | `RENTAL_DURATION_TOO_SHORT` | Gói giờ ngắn hơn bốn giờ |
 | 422 | `OUTSIDE_BRANCH_HOURS` | Nhận/trả ngoài giờ chi nhánh |
@@ -128,7 +138,8 @@ Không có xe phù hợp vẫn trả 200 với `items: []`, `nextCursor: null`, 
 | 422 | `SEARCH_RENTAL_TYPE_NOT_SUPPORTED` | Gói tháng |
 | 422 | `SEARCH_DRIVE_MODE_NOT_SUPPORTED` | Có tài xế |
 | 422 | `SEARCH_PICKUP_METHOD_NOT_SUPPORTED` | Giao tận nơi |
-| 422 | `SEARCH_SORT_NOT_SUPPORTED` | Sắp theo giá hoặc đánh giá |
+| 422 | `SEARCH_SORT_NOT_SUPPORTED` | Sắp theo đánh giá |
+| 422 | `HOLIDAY_CALENDAR_NOT_DECLARED` | Ngày giờ trả Việt Nam vượt lịch lễ đã khai báo |
 | 500 | `INTERNAL_ERROR` | Lỗi hệ thống; chi tiết chỉ có ở log máy chủ |
 
 Ví dụ:
@@ -147,6 +158,10 @@ Ví dụ:
 Không chọn một lỗi bất kỳ làm bằng chứng: input có nhiều lỗi có thể bị từ chối ở điều kiện kiểm trước.
 Ví dụ giờ nhận sau 30 phút nhưng ngoài giờ làm việc sẽ nhận lỗi giờ chi nhánh trước lỗi cửa sổ đặt.
 
+Thứ tự kiểm: cấu trúc/kiểu/biên giá → hỗ trợ (MONTHLY, WITH_DRIVER, DELIVERY, RATING_DESC)
+→ bán kính/cursor → điều kiện thuê (tối thiểu, giờ chi nhánh, cửa sổ đặt) → lịch lễ → chi nhánh/xe/lịch bận.
+Không hỗ trợ gói vẫn ưu tiên trước lịch lễ; lịch lễ chưa khai báo không biến thành trang rỗng.
+
 ## Kiểm chứng local
 
 Import `postman/task-06-search.postman_collection.json` và `postman/local.postman_environment.json`.
@@ -162,7 +177,7 @@ Mỗi lượt dùng model và biển số riêng, không cần xóa dữ liệu 
   cuộc đua hai khách tìm rồi giữ trong `SearchHoldConcurrencyIntegrationTest`.
   Kiểm thủ công khóa lịch dùng IntelliJ SQL Console theo hướng dẫn nghiệm thu, không có REST giả cho availability.
 
-### Kiểm cursor version 2 — Task 6b
+### Kiểm cursor theo mã xe
 
 Import `postman/task-06b-review.postman_collection.json`, dùng environment **Car Rental - Local**.
 Khởi động lại backend sau khi cập nhật code, rồi chạy cả thư mục **Part 1 - Business-code cursor**
@@ -171,7 +186,7 @@ bằng Collection Runner, theo thứ tự 16 request. Không cần chạy collec
 - Request 01–11 tự tạo hai chi nhánh và ba xe ACTIVE; model/biển số riêng mỗi lượt,
   thời gian thuê và hạn giấy tờ tự sinh. Fixture được giữ lại, không có thao tác xóa dữ liệu.
 - Request 12–13 kiểm hai xe cùng vị trí theo thứ tự mã, sau đó xe xa hơn; không lặp/mất xe.
-  Request 12 giải mã payload v2 và kiểm mã xe nằm ở cuối, không còn trường ID số.
+  Request 12 giải mã payload v3 và kiểm mã xe nằm ở cuối, không còn trường ID số.
 - Request 14 dựng cursor v1 với đúng hash/khoảng cách của cursor vừa nhận và ID số mẫu;
   request 15 gửi cursor hỏng; request 16 dùng cursor đúng nhưng đổi bán kính.
   Cả ba phải nhận **400 `INVALID_REQUEST`**, mọi `pm.test` phải xanh.
@@ -263,6 +278,20 @@ Các nhóm Manual không còn kỳ vọng đúng ngay sau khi dọn khóa.
 
 ## Giới hạn đã biết
 
-Search gọi tối đa ba truy vấn dữ liệu chính: chi nhánh → xe → xe bận; điều kiện thuê không truy cập CSDL.
-Lát cắt 1 lấy toàn bộ ứng viên, loại bận rồi phân trang trong bộ nhớ, đã được Chief Architect duyệt.
+Search gọi tối đa ba truy vấn dữ liệu chính: chi nhánh → xe kèm giá ngày → xe bận.
+Điều kiện thuê và pricing không truy cập CSDL cho từng xe: lịch/loại ngày chuẩn bị một lần cho cả khoảng.
+Lát cắt 1 lấy toàn bộ ứng viên, loại bận, tính/lọc giá rồi phân trang trong bộ nhớ, đã được duyệt.
 Chỉ tối ưu khi có số đo trên dữ liệu thật. Không coi số lượng ứng viên lớn là vấn đề đã được đo.
+
+## Kiểm tiền thuê local
+
+Import `postman/task-07-pricing.postman_collection.json`, dùng environment **Car Rental - Local**,
+chạy độc lập thư mục **Part 4 - Search rental prices (BR-126)** theo thứ tự 39 request.
+Khởi động lại backend trước khi chạy. Cấu hình thử: bảo hiểm `PER_BILLING_DAY` / `100000`,
+cuối tuần `0.2`, lễ `0.5`; chỉ dùng dữ liệu local giả, không phải phí bảo hiểm thật.
+
+Thư mục tự tạo hai chi nhánh/bốn xe riêng, kiểm NEAREST/PRICE_ASC, hai trang cursor,
+biên min/max, cursor v2/sai điều kiện và lịch lễ vượt 2027-12-31 kể cả khi không có xe.
+Ba cặp search → quote đối chiếu ví dụ a, k, k2 bằng `pm.test`, tiền thuê phải bằng nhau,
+bảo hiểm vẫn là khoản riêng. Các ví dụ cố định dùng **trước 07:00 Việt Nam 10/11/2026**;
+test tự động dùng Clock cố định và đối chiếu đủ a–k2 không hết hạn theo ngày chạy build.

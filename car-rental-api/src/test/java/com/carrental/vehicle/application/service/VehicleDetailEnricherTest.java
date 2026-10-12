@@ -70,6 +70,6 @@ class VehicleDetailEnricherTest {
     private VehicleDetail detail(Long branchId) {
         return new VehicleDetail(100, "XE-TEST01", "TEST-PLATE", OwnershipType.COMPANY,
                 FuelType.PETROL, branchId, VehicleStatus.DRAFT, null, null,
-                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(), SPECIFICATIONS.make(), SPECIFICATIONS.model(), null);
+                SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(), SPECIFICATIONS.make(), SPECIFICATIONS.model(), null, 1_000_000L);
     }
 }

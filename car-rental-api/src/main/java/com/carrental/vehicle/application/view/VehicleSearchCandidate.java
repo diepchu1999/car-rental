@@ -10,5 +10,5 @@ import com.carrental.vehicle.domain.Transmission;
  */
 public record VehicleSearchCandidate(long id, String code, long branchId,
         OwnershipType ownershipType, int seats, Transmission transmission,
-        FuelType fuelType, String make, String model) {
+        FuelType fuelType, String make, String model, long dailyRate) {
 }

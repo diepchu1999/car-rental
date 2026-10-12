@@ -47,7 +47,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Container dành riêng cho test, đóng khi hết lớp; không có transaction bao quanh phương thức test.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "car-rental.availability.hold-duration=PT1H")
+        properties = {"car-rental.availability.hold-duration=PT1H",
+                "car-rental.pricing.holiday-calendar.declared-through=2031-12-31"}) // Chỉ dữ liệu thử cho Clock 2030.
 @Import({PostgresTestConfiguration.class, SearchIntegrationTestConfiguration.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Execution(ExecutionMode.SAME_THREAD)

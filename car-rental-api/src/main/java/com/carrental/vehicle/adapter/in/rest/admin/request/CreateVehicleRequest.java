@@ -5,6 +5,7 @@ import com.carrental.vehicle.domain.FuelType;
 import com.carrental.vehicle.domain.Transmission;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 
 /**
  * Dữ liệu tạo xe công ty trong giai đoạn 1 theo BR-001, BR-003 và BR-410.
@@ -23,6 +24,7 @@ import java.time.LocalDate;
  * @param transmission hộp số theo BR-018
  * @param make hãng xe có nội dung
  * @param model dòng xe có nội dung
+ * @param dailyRate giá ngày tùy chọn theo BR-234; giữ số thập phân để domain từ chối thay vì cắt phần lẻ
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record CreateVehicleRequest(
@@ -34,6 +36,7 @@ public record CreateVehicleRequest(
         Integer seats,
         Transmission transmission,
         String make,
-        String model
+        String model,
+        BigDecimal dailyRate
 ) {
 }

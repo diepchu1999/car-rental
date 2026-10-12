@@ -2,12 +2,14 @@ package com.carrental.vehicle.application.command;
 
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.validation.Validations;
+import com.carrental.vehicle.domain.DailyRate;
 import com.carrental.vehicle.domain.FuelType;
 import com.carrental.vehicle.domain.OwnershipType;
 import com.carrental.vehicle.domain.VehicleDocuments;
 import com.carrental.vehicle.domain.VehicleSpecifications;
 import com.carrental.vehicle.domain.Transmission;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
@@ -34,6 +36,7 @@ import java.time.LocalDate;
  * @param branchCode mã nghiệp vụ của chi nhánh cần liên kết
  * @param documents thông tin hạn giấy tờ, không được null
  * @param specifications thuộc tính xe đã kiểm tra theo BR-018
+ * @param dailyRate giá ngày đã kiểm tra theo BR-234, có thể null lúc tạo
  */
 public record CreateVehicleCommand(
         String plateNumber,
@@ -41,7 +44,8 @@ public record CreateVehicleCommand(
         FuelType fuelType,
         String branchCode,
         VehicleDocuments documents,
-        VehicleSpecifications specifications
+        VehicleSpecifications specifications,
+        DailyRate dailyRate
 ) {
 
     /**
@@ -106,6 +110,7 @@ public record CreateVehicleCommand(
      * @param transmission hộp số
      * @param make hãng xe
      * @param model dòng xe
+     * @param dailyRate giá ngày đầu vào, có thể null; không làm tròn số không hợp lệ
      * @return command đã được kiểm tra cấu trúc đầu vào
      * @throws DomainException nếu thiếu trường bắt buộc
      *                         hoặc chuỗi bắt buộc không có nội dung
@@ -120,7 +125,8 @@ public record CreateVehicleCommand(
             Integer seats,
             Transmission transmission,
             String make,
-            String model
+            String model,
+            BigDecimal dailyRate
     ) {
         return new CreateVehicleCommand(
                 plateNumber,
@@ -131,7 +137,8 @@ public record CreateVehicleCommand(
                         inspectionExpiresOn,
                         liabilityInsuranceExpiresOn
                 ),
-                new VehicleSpecifications(seats, transmission, make, model)
+                new VehicleSpecifications(seats, transmission, make, model),
+                dailyRate == null ? null : DailyRate.from(dailyRate)
         );
     }
 }

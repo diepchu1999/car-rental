@@ -49,6 +49,8 @@ public final class Vehicle {
 
     private final VehicleSpecifications specifications;
 
+    private final DailyRate dailyRate;
+
     /**
      * Khởi tạo dữ liệu xe với các kiểm tra cấu trúc dùng chung.
      *
@@ -69,6 +71,7 @@ public final class Vehicle {
      * @param status trạng thái được cung cấp bởi đường khởi tạo tương ứng
      * @param documents thông tin hạn giấy tờ, không được null
      * @param specifications thuộc tính xe bắt buộc theo BR-018
+     * @param dailyRate giá ngày theo BR-234, được thiếu khi tạo bản nháp
      * @throws DomainException nếu dữ liệu không đáp ứng cấu trúc yêu cầu
      */
     private Vehicle(
@@ -79,7 +82,8 @@ public final class Vehicle {
             Long branchId,
             VehicleStatus status,
             VehicleDocuments documents,
-            VehicleSpecifications specifications
+            VehicleSpecifications specifications,
+            DailyRate dailyRate
     ) {
         this.code = Validations.requiredText(code, "code");
 
@@ -112,6 +116,11 @@ public final class Vehicle {
         this.status = Validations.required(status, "status");
         this.documents = Validations.required(documents, "documents");
         this.specifications = Validations.required(specifications, "specifications");
+        this.dailyRate = dailyRate;
+        if (dailyRate == null && (status == VehicleStatus.ACTIVE
+                || status == VehicleStatus.INACTIVE || status == VehicleStatus.RETIRED)) {
+            throw DomainException.ruleViolation(ErrorCode.VEHICLE_DAILY_RATE_REQUIRED);
+        }
     }
 
     /**
@@ -131,6 +140,7 @@ public final class Vehicle {
      * @param branchId định danh chi nhánh liên kết
      * @param documents thông tin giấy tờ, có thể chứa ngày chưa được cung cấp
      * @param specifications thuộc tính xe bắt buộc theo BR-018
+     * @param dailyRate giá ngày tùy chọn theo BR-234, không tự điền giá mặc định
      * @return xe mới ở trạng thái DRAFT
      * @throws DomainException nếu dữ liệu không hợp lệ
      */
@@ -141,7 +151,8 @@ public final class Vehicle {
             FuelType fuelType,
             Long branchId,
             VehicleDocuments documents,
-            VehicleSpecifications specifications
+            VehicleSpecifications specifications,
+            DailyRate dailyRate
     ) {
         return new Vehicle(
                 code,
@@ -151,7 +162,8 @@ public final class Vehicle {
                 branchId,
                 VehicleStatus.DRAFT,
                 documents,
-                specifications
+                specifications,
+                dailyRate
         );
     }
 
@@ -172,6 +184,7 @@ public final class Vehicle {
      * @param status trạng thái đã lưu
      * @param documents thông tin giấy tờ đã lưu
      * @param specifications thuộc tính xe đã lưu theo BR-018
+     * @param dailyRate giá ngày đã lưu; bắt buộc với ACTIVE, INACTIVE và RETIRED
      * @return aggregate biểu diễn dữ liệu đã lưu
      * @throws DomainException nếu dữ liệu không đáp ứng cấu trúc yêu cầu
      */
@@ -183,7 +196,8 @@ public final class Vehicle {
             Long branchId,
             VehicleStatus status,
             VehicleDocuments documents,
-            VehicleSpecifications specifications
+            VehicleSpecifications specifications,
+            DailyRate dailyRate
     ) {
         return new Vehicle(
                 code,
@@ -193,7 +207,8 @@ public final class Vehicle {
                 branchId,
                 status,
                 documents,
-                specifications
+                specifications,
+                dailyRate
         );
     }
 
@@ -214,9 +229,9 @@ public final class Vehicle {
     }
 
     /**
-     * Phê duyệt xe đang chờ duyệt theo BR-010 và BR-005.
+     * Phê duyệt xe đang chờ duyệt theo BR-010, BR-005 và BR-234.
      *
-     * <p>Kiểm trạng thái trước, sau đó kiểm giấy tờ có đủ và còn hạn.
+     * <p>Kiểm trạng thái trước, sau đó kiểm giấy tờ có đủ và còn hạn, cuối cùng kiểm giá ngày.
      * Chỉ tạo bản ACTIVE khi tất cả điều kiện đều được đáp ứng.
      *
      * <p>Phân quyền người duyệt thuộc task xác thực và phân quyền,
@@ -225,12 +240,15 @@ public final class Vehicle {
      * @param approvalDate ngày duyệt do application xác định
      * @return bản mới của xe ở trạng thái ACTIVE
      * @throws DomainException nếu trạng thái không cho phép duyệt,
-     *                         thiếu giấy tờ hoặc giấy tờ đã hết hạn
+     *                         thiếu giấy tờ, giấy tờ đã hết hạn hoặc chưa có giá ngày
      * @throws NullPointerException nếu thiếu ngày duyệt khi kiểm giấy tờ
      */
     public Vehicle approve(LocalDate approvalDate) {
         requireStatus(VehicleStatus.PENDING_APPROVAL);
         documents.validateForApproval(approvalDate);
+        if (dailyRate == null) {
+            throw DomainException.ruleViolation(ErrorCode.VEHICLE_DAILY_RATE_REQUIRED);
+        }
 
         return withStatus(VehicleStatus.ACTIVE);
     }
@@ -268,7 +286,8 @@ public final class Vehicle {
                 branchId,
                 newStatus,
                 documents,
-                specifications
+                specifications,
+                dailyRate
         );
     }
 
@@ -338,5 +357,23 @@ public final class Vehicle {
     /** Trả thuộc tính BR-018, giữ nguyên qua mọi bước chuyển trạng thái. */
     public VehicleSpecifications specifications() {
         return specifications;
+    }
+
+    /** Trả giá ngày BR-234, null khi hồ sơ chưa được nhập giá. */
+    public DailyRate dailyRate() {
+        return dailyRate;
+    }
+
+    /**
+     * Đổi giá ở mọi trạng thái theo BR-234; không cho xóa giá, không sửa bản xe cũ.
+     * @param newRate giá ngày mới đã kiểm tra, không được null
+     * @return bản xe mới giữ nguyên mọi trường ngoài giá
+     */
+    public Vehicle changeDailyRate(DailyRate newRate) {
+        if (newRate == null) {
+            throw DomainException.ruleViolation(ErrorCode.VEHICLE_INVALID_DAILY_RATE);
+        }
+        return new Vehicle(code, plateNumber, ownershipType, fuelType, branchId,
+                status, documents, specifications, newRate);
     }
 }

@@ -28,6 +28,7 @@ import java.util.Objects;
  * @param transmission hộp số theo BR-018
  * @param make hãng xe có nội dung
  * @param model dòng xe có nội dung
+ * @param dailyRate giá ngày nguyên VND theo BR-234, null nếu chưa nhập giá
  */
 public record VehicleResponse(
         String code,
@@ -41,7 +42,8 @@ public record VehicleResponse(
         Integer seats,
         Transmission transmission,
         String make,
-        String model
+        String model,
+        Long dailyRate
 ) {
 
     /**
@@ -59,7 +61,7 @@ public record VehicleResponse(
                 view.code(), view.plateNumber(), view.ownershipType(), view.fuelType(),
                 view.branchCode(), view.status(), view.inspectionExpiresOn(),
                 view.liabilityInsuranceExpiresOn(),
-                view.seats(), view.transmission(), view.make(), view.model()
+                view.seats(), view.transmission(), view.make(), view.model(), view.dailyRate()
         );
     }
 }

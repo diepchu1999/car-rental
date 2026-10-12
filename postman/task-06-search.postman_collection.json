@@ -152,7 +152,7 @@
             "description": "BR-018, BR-001: tạo xe đủ bốn thuộc tính, kiểm COMPANY/DRAFT và tự lưu mã xe.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -189,7 +189,7 @@
                   "pm.test(\"Vehicle created with all submitted attributes\", function () {",
                   "    pm.expect(body.success).to.eql(true);",
                   "    pm.expect(body.error).to.eql(null);",
-                  "    pm.expect(body.data).to.have.all.keys(\"code\", \"plateNumber\", \"ownershipType\", \"fuelType\", \"branchCode\", \"status\", \"inspectionExpiresOn\", \"liabilityInsuranceExpiresOn\", \"seats\", \"transmission\", \"make\", \"model\");",
+                  "    pm.expect(body.data).to.have.all.keys(\"dailyRate\", \"code\", \"plateNumber\", \"ownershipType\", \"fuelType\", \"branchCode\", \"status\", \"inspectionExpiresOn\", \"liabilityInsuranceExpiresOn\", \"seats\", \"transmission\", \"make\", \"model\");",
                   "    pm.expect(body.data.code).to.match(/^XE-[A-Z0-9]{6}$/);",
                   "    pm.expect(body.data.status).to.eql(\"DRAFT\");",
                   "    pm.expect(body.data.ownershipType).to.eql(\"COMPANY\");",
@@ -450,7 +450,7 @@
             "description": "BR-018: số chỗ 6 phải bị từ chối bằng đúng lỗi nghiệp vụ.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 6,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 6,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -518,7 +518,7 @@
             "description": "BR-018: thiếu seats phải trả lỗi đầu vào, không tự dùng giá trị mặc định.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -587,7 +587,7 @@
             "description": "BR-018: thiếu transmission phải trả lỗi đầu vào, không tự dùng giá trị mặc định.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -656,7 +656,7 @@
             "description": "BR-018: thiếu make phải trả lỗi đầu vào, không tự dùng giá trị mặc định.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -725,7 +725,7 @@
             "description": "BR-018: thiếu model phải trả lỗi đầu vào, không tự dùng giá trị mặc định.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -794,7 +794,7 @@
             "description": "BR-018: seats bằng null phải bị từ chối.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": null,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": null,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -863,7 +863,7 @@
             "description": "BR-018: transmission bằng null phải bị từ chối.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": null,\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": null,\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -932,7 +932,7 @@
             "description": "BR-018: make bằng null phải bị từ chối.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": null,\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": null,\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1001,7 +1001,7 @@
             "description": "BR-018: model bằng null phải bị từ chối.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": null\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": null\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1070,7 +1070,7 @@
             "description": "BR-018: make chỉ chứa khoảng trắng phải bị từ chối.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \" \\t\\n\",\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \" \\t\\n\",\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1139,7 +1139,7 @@
             "description": "BR-018: model chỉ chứa khoảng trắng phải bị từ chối.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \" \\t\\n\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \" \\t\\n\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1208,7 +1208,7 @@
             "description": "BR-018: hộp số ngoài MANUAL/AUTOMATIC phải trả lỗi đầu vào.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"UNKNOWN\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{requestPlate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p1BranchCode}}\",\n  \"inspectionExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p1DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"UNKNOWN\",\n  \"make\": \"Toyota\",\n  \"model\": \"Vios\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2127,7 +2127,7 @@
             "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6NearBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6NearBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2259,7 +2259,7 @@
             "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2391,7 +2391,7 @@
             "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2523,7 +2523,7 @@
             "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6FarBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6FarBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2655,7 +2655,7 @@
             "description": "BR-018/010: tạo xe riêng cho tập tìm kiếm; xe bắt đầu DRAFT.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
+              "raw": "{\n  \"dailyRate\": 1000000,\n  \"plateNumber\": \"{{p6Plate}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{p6OriginBranch}}\",\n  \"inspectionExpiresOn\": \"{{p6Expiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{p6Expiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{p6Model}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2724,7 +2724,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
@@ -2771,7 +2771,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
@@ -2817,7 +2817,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
@@ -2863,7 +2863,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
@@ -2909,7 +2909,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
@@ -2955,7 +2955,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
@@ -3010,7 +3010,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
@@ -3067,7 +3067,7 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\",\"make\",\"model\",\"seats\",\"transmission\",\"fuelType\",\"collateralFree\",\"branch\",\"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\",\"name\",\"address\");",
                   "    pm.expect(item.collateralFree).to.eql(true); pm.expect(item.distanceMeters).to.be.at.least(0);",
                   "  });",
@@ -3404,7 +3404,7 @@
           ]
         },
         {
-          "name": "34 - Reject price sorting",
+          "name": "34 - Price sorting",
           "request": {
             "method": "GET",
             "header": [
@@ -3422,7 +3422,7 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&sort=PRICE_ASC",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-126: hỗ trợ PRICE_ASC, thứ tự giá, khoảng cách rồi mã xe; không cộng bảo hiểm."
           },
           "event": [
             {
@@ -3430,10 +3430,10 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test(\"HTTP 422\", () => pm.response.to.have.status(422));",
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));",
                   "const body = pm.response.json();",
                   "pm.test(\"Response envelope\", () => { pm.expect(body).to.have.all.keys(\"success\", \"data\", \"error\"); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\"); });",
-                  "pm.test(\"Exact error\", () => { pm.expect(body.success).to.eql(false); pm.expect(body.data).to.eql(null); pm.expect(body.error.code).to.eql(\"SEARCH_SORT_NOT_SUPPORTED\"); pm.expect(body.error.message).to.be.a(\"string\").and.not.empty; });"
+                  "pm.test(\"Price search succeeds\", () => { pm.expect(body.success).to.eql(true); pm.expect(body.error).to.eql(null); pm.expect(body.data.items.length).to.eql(3); const a=body.data.items; for(let i=1;i<a.length;i++) { const p=a[i-1],c=a[i]; pm.expect(p.rentalAmount < c.rentalAmount || (p.rentalAmount === c.rentalAmount && (p.distanceMeters < c.distanceMeters || (p.distanceMeters === c.distanceMeters && p.code < c.code)))).to.eql(true); } });"
                 ]
               }
             }
@@ -3859,7 +3859,7 @@
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
@@ -3911,7 +3911,7 @@
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
@@ -3963,7 +3963,7 @@
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
@@ -4021,7 +4021,7 @@
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
@@ -4073,7 +4073,7 @@
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
@@ -4130,7 +4130,7 @@
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
@@ -4181,7 +4181,7 @@
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
@@ -4232,7 +4232,7 @@
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
-                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\");",
+                  "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
                   "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",

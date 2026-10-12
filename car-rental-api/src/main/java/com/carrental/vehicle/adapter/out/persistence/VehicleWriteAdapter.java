@@ -4,6 +4,7 @@ import com.carrental.shared.sql.SqlLoader;
 import com.carrental.vehicle.application.port.out.VehiclePlateConflictException;
 import com.carrental.vehicle.application.port.out.WriteVehiclePort;
 import com.carrental.vehicle.domain.Vehicle;
+import com.carrental.vehicle.domain.DailyRate;
 import com.carrental.vehicle.domain.VehicleStatus;
 import org.postgresql.util.PSQLException;
 import org.postgresql.util.ServerErrorMessage;
@@ -40,6 +41,7 @@ class VehicleWriteAdapter implements WriteVehiclePort {
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final String insertSql;
     private final String updateStatusSql;
+    private final String updateDailyRateSql;
 
     /**
      * Khởi tạo adapter và tải các câu SQL một lần.
@@ -54,6 +56,7 @@ class VehicleWriteAdapter implements WriteVehiclePort {
             SqlLoader sqlLoader
     ) {
         this.jdbcTemplate = jdbcTemplate;
+        this.updateDailyRateSql = sqlLoader.load(VehicleSqlPaths.UPDATE_DAILY_RATE);
         this.insertSql = sqlLoader.load(VehicleSqlPaths.INSERT);
         this.updateStatusSql = sqlLoader.load(
                 VehicleSqlPaths.UPDATE_STATUS
@@ -80,6 +83,7 @@ class VehicleWriteAdapter implements WriteVehiclePort {
     @Override
     public boolean insert(Vehicle vehicle) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("dailyRate", vehicle.dailyRate() == null ? null : vehicle.dailyRate().amount(), Types.BIGINT)
                 .addValue("code", vehicle.code(), Types.VARCHAR)
                 .addValue("seats", vehicle.specifications().seats(), Types.INTEGER)
                 .addValue("transmission", vehicle.specifications().transmission().name(), Types.VARCHAR)
@@ -214,6 +218,15 @@ class VehicleWriteAdapter implements WriteVehiclePort {
                 && PLATE_NUMBER_CONSTRAINT.equals(
                 details.getConstraint()
         );
+    }
+
+    /** BR-234: không đọc-rồi-ghi cả aggregate; số dòng vẫn phải là 0 hoặc 1. */
+    @Override
+    public boolean updateDailyRate(String code, DailyRate dailyRate) {
+        var parameters = new MapSqlParameterSource()
+                .addValue("code", code, Types.VARCHAR)
+                .addValue("dailyRate", dailyRate.amount(), Types.BIGINT);
+        return wasSingleRowAffected(jdbcTemplate.update(updateDailyRateSql, parameters), "update daily rate of");
     }
 
     /**

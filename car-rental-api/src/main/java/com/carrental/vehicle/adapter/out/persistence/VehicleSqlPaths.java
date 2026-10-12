@@ -8,6 +8,9 @@ package com.carrental.vehicle.adapter.out.persistence;
  */
 final class VehicleSqlPaths {
 
+    /** Cập nhật giá BR-234, không ghi đè trạng thái. */
+    static final String UPDATE_DAILY_RATE = "sql/vehicle/update_vehicle_daily_rate.sql";
+
     /** Truy vấn ứng viên tìm kiếm BR-010/126, chỉ đọc schema vehicle. */
     static final String FIND_SEARCH_CANDIDATES = "sql/vehicle/find_search_vehicles.sql";
 

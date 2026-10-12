@@ -270,7 +270,7 @@ class VehicleLifecycleTest {
                 OwnershipType.COMPANY,
                 fuelType,
                 BRANCH_ID,
-                documents, SPECIFICATIONS
+                documents, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
     }
 
@@ -295,7 +295,7 @@ class VehicleLifecycleTest {
                 FuelType.PETROL,
                 BRANCH_ID,
                 status,
-                documents, SPECIFICATIONS
+                documents, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
     }
 

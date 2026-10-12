@@ -72,7 +72,7 @@ public class SearchIntegrationTestConfiguration {
             LocalDate expiry = LocalDate.of(2031, 1, 1);
             return vehicles.create(CreateVehicleCommand.from("SEARCH-" + UUID.randomUUID(),
                     OwnershipType.COMPANY, FuelType.PETROL, branchCode, expiry, expiry,
-                    5, Transmission.AUTOMATIC, "Toyota", model));
+                    5, Transmission.AUTOMATIC, "Toyota", model, java.math.BigDecimal.valueOf(1_000_000L)));
         }
 
         /** Gửi duyệt và duyệt bằng nghiệp vụ thật, không ghi tắt trạng thái vào bảng vehicle. */

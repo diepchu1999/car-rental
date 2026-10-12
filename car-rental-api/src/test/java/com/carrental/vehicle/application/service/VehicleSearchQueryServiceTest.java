@@ -35,6 +35,7 @@ class VehicleSearchQueryServiceTest {
         assertEquals(" Toyota ", first.make());
         assertEquals(" Vios ", first.model());
         assertTrue(first.collateralFree());
+        assertEquals(855_000L, first.dailyRate());
         assertThrows(UnsupportedOperationException.class, result::clear);
     }
 
@@ -91,7 +92,7 @@ class VehicleSearchQueryServiceTest {
     /** Tạo read model nội bộ, không mở API tạo xe đối tác. */
     private VehicleSearchCandidate candidate(long id, OwnershipType ownership) {
         return new VehicleSearchCandidate(id, "XE-T6000" + id, 42L, ownership,
-                5, Transmission.AUTOMATIC, FuelType.PETROL, " Toyota ", " Vios ");
+                5, Transmission.AUTOMATIC, FuelType.PETROL, " Toyota ", " Vios ", 855_000L);
     }
 
     /** Lắp use case bằng resolver thật, không mock ma trận nghiệp vụ. */

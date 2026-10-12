@@ -58,7 +58,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Nhịp job ngắn chỉ trong context này; dữ liệu/múi giờ dùng fixture tìm kiếm BR-125 đã có.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "car-rental.availability.hold-sweep-interval=PT0.25S")
+        properties = {"car-rental.availability.hold-sweep-interval=PT0.25S",
+                "car-rental.pricing.holiday-calendar.declared-through=2031-12-31"}) // Chỉ lịch giả cho fixture 2030.
 @Import({PostgresTestConfiguration.class, SearchIntegrationTestConfiguration.class,
         SqlCallerFlowIntegrationTest.GateConfiguration.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)

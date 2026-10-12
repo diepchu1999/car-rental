@@ -2,6 +2,7 @@ package com.carrental.search.application.service;
 
 import com.carrental.search.application.query.SearchVehiclesQuery;
 import com.carrental.search.domain.SearchPosition;
+import com.carrental.search.domain.SearchSort;
 import com.carrental.shared.error.DomainException;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -11,16 +12,16 @@ import java.util.Base64;
 import java.util.Optional;
 
 /**
- * Cursor opaque có phiên bản, dấu SHA-256 của điều kiện và khóa (khoảng cách, mã xe).
+ * Cursor opaque v3 có dấu SHA-256, khóa giá/khoảng cách/mã; NEAREST dùng sentinel giá 0.
  * Khoảng cách giữ nguyên 64 bit, không làm tròn nên trang sau không đổi khóa thứ tự.
  * Dấu điều kiện chống dùng nhầm cursor, không phải chữ ký xác thực hay snapshot CSDL.
  * Không cần secret vì cursor của danh sách công khai không cấp quyền truy cập dữ liệu.
  */
 final class SearchCursorCodec {
-    private static final byte VERSION = 2;
+    private static final byte VERSION = 3;
     private static final int HASH_BYTES = 32;
     private static final int VEHICLE_CODE_BYTES = 9;
-    private static final int TOKEN_BYTES = 1 + HASH_BYTES + Double.BYTES + VEHICLE_CODE_BYTES;
+    private static final int TOKEN_BYTES = 1 + HASH_BYTES + Long.BYTES + Double.BYTES + VEHICLE_CODE_BYTES;
 
     /** Tiện ích thuần Java, không có trạng thái giữa request. */
     private SearchCursorCodec() {
@@ -42,7 +43,9 @@ final class SearchCursorCodec {
                     Double.toHexString(effectiveRadiusKm), query.sort().name(),
                     filters.seats() == null ? null : filters.seats().toString(),
                     filters.transmission(), filters.fuelType(), filters.make(), filters.model(),
-                    filters.collateralFree() == null ? null : filters.collateralFree().toString()
+                    filters.collateralFree() == null ? null : filters.collateralFree().toString(),
+                    filters.minRentalAmount() == null ? null : filters.minRentalAmount().toString(),
+                    filters.maxRentalAmount() == null ? null : filters.maxRentalAmount().toString()
             }) {
                 update(digest, value);
             }
@@ -63,12 +66,13 @@ final class SearchCursorCodec {
         digest.update(bytes);
     }
 
-    /** Mã hóa 50 byte gồm mã {@code XE-<6>} ASCII, không có ID; Base64 URL-safe không padding. */
+    /** Mã hóa 58 byte: phiên bản, hash, giá (NEAREST=0), khoảng cách, mã; không có ID số. */
     static String encode(SearchPosition position, byte[] fingerprint) {
         if (fingerprint.length != HASH_BYTES) {
             throw new IllegalArgumentException("Invalid search fingerprint length.");
         }
         byte[] bytes = ByteBuffer.allocate(TOKEN_BYTES).put(VERSION).put(fingerprint)
+                .putLong(position.rentalAmount())
                 .putDouble(position.distanceMeters())
                 .put(position.vehicleCode().getBytes(StandardCharsets.US_ASCII)).array();
         return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
@@ -76,11 +80,16 @@ final class SearchCursorCodec {
 
     /** Chặn cursor hỏng/sai phiên bản/sai điều kiện trước khi đọc danh mục; null là trang đầu. */
     static Optional<SearchPosition> decode(String token, byte[] expectedFingerprint) {
+        return decode(token, expectedFingerprint, SearchSort.NEAREST);
+    }
+
+    /** Thứ tự đã được fingerprint ràng buộc; không tự suy sort từ con số trong token. */
+    static Optional<SearchPosition> decode(String token, byte[] expectedFingerprint, SearchSort sort) {
         if (token == null) {
             return Optional.empty();
         }
         try {
-            if (!token.matches("[A-Za-z0-9_-]{67}")) {
+            if (!token.matches("[A-Za-z0-9_-]{78}")) {
                 throw new IllegalArgumentException("Invalid cursor encoding.");
             }
             byte[] bytes = Base64.getUrlDecoder().decode(token);
@@ -97,10 +106,11 @@ final class SearchCursorCodec {
             if (!MessageDigest.isEqual(actualFingerprint, expectedFingerprint)) {
                 throw new IllegalArgumentException("Cursor belongs to different search criteria.");
             }
+            long rentalAmount = payload.getLong();
             double distanceMeters = payload.getDouble();
             byte[] vehicleCode = new byte[VEHICLE_CODE_BYTES];
             payload.get(vehicleCode);
-            return Optional.of(new SearchPosition(distanceMeters,
+            return Optional.of(new SearchPosition(sort, rentalAmount, distanceMeters,
                     new String(vehicleCode, StandardCharsets.US_ASCII)));
         } catch (IllegalArgumentException failure) {
             throw DomainException.invalidInput("cursor is invalid or does not match the search criteria.");

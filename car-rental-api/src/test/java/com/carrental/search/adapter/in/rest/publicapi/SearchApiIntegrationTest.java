@@ -45,7 +45,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Fixture commit vì server chạy luồng khác; model riêng cô lập dữ liệu, container đóng sau lớp.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "car-rental.availability.hold-duration=PT1H")
+        properties = {"car-rental.availability.hold-duration=PT1H",
+                "car-rental.pricing.holiday-calendar.declared-through=2031-12-31"}) // Lịch giả cho Clock 2030 của test.
 @Import({PostgresTestConfiguration.class, SearchIntegrationTestConfiguration.class,
         SearchApiIntegrationTest.HttpConfiguration.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -55,6 +56,7 @@ class SearchApiIntegrationTest {
     @Autowired private ObjectMapper mapper;
     @Autowired private SearchIntegrationTestConfiguration.Fixtures fixtures;
     @Autowired private AvailabilityDirectory availability;
+    @Autowired private com.carrental.vehicle.application.port.in.ChangeVehicleDailyRateUseCase rates;
     private Map<String, String> parameters;
     private String model;
 
@@ -89,7 +91,8 @@ class SearchApiIntegrationTest {
         assertEquals(nearestVehicle.code(), first.path("code").asString());
         assertEquals(fartherVehicle.code(), data.path("items").get(1).path("code").asString());
         assertEquals(Set.of("code", "make", "model", "seats", "transmission", "fuelType",
-                "collateralFree", "branch", "distanceMeters"), Set.copyOf(first.propertyNames()));
+                "collateralFree", "branch", "distanceMeters", "rentalAmount"), Set.copyOf(first.propertyNames()));
+        assertEquals(1_000_000L, first.path("rentalAmount").longValue());
         assertEquals("Toyota", first.path("make").asString());
         assertEquals(model, first.path("model").asString());
         assertEquals(5, first.path("seats").intValue());
@@ -158,9 +161,9 @@ class SearchApiIntegrationTest {
         String cursor = page1.path("nextCursor").asString();
         assertFalse(cursor.isBlank());
         byte[] payload = Base64.getUrlDecoder().decode(cursor);
-        assertEquals(50, payload.length);
-        assertEquals(2, payload[0]);
-        assertEquals(sortedCodes.getFirst(), new String(payload, 41, 9, StandardCharsets.US_ASCII));
+        assertEquals(58, payload.length);
+        assertEquals(3, payload[0]);
+        assertEquals(sortedCodes.getFirst(), new String(payload, 49, 9, StandardCharsets.US_ASCII));
         parameters.put("cursor", cursor);
         var page2 = success(get());
         assertEquals(1, page2.path("items").size());
@@ -181,9 +184,87 @@ class SearchApiIntegrationTest {
         byte[] current = Base64.getUrlDecoder().decode(page.path("nextCursor").asString());
         long anchorId = first.code().equals(page.path("items").get(0).path("code").asString())
                 ? first.id() : second.id();
-        byte[] legacy = ByteBuffer.allocate(49).put((byte) 1).put(current, 1, 40).putLong(anchorId).array();
+        byte[] legacy = ByteBuffer.allocate(49).put((byte) 1).put(current, 1, 32)
+                .put(current, 41, 8).putLong(anchorId).array();
         parameters.put("cursor", Base64.getUrlEncoder().withoutPadding().encodeToString(legacy));
         error(get(), 400, "INVALID_REQUEST");
+    }
+
+    /** BR-126: giá thắng khoảng cách, cùng giá so khoảng cách/mã; đi hai trang và lọc đúng cả hai biên. */
+    @Test
+    void pricesAndPagesActualVehiclesUsingInclusiveBounds() throws Exception {
+        var origin = fixtures.branch(10.76, 106.66);
+        var near = fixtures.branch(10.761, 106.66);
+        var expensiveFar = fixtures.active(near.code(), model);
+        var expensiveA = fixtures.active(origin.code(), model);
+        var expensiveB = fixtures.active(origin.code(), model);
+        var cheapFar = fixtures.active(near.code(), model);
+        rates.changeDailyRate(com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand.from(
+                cheapFar.code(), java.math.BigDecimal.valueOf(500_000)));
+        var nearCodes = List.of(expensiveA.code(), expensiveB.code()).stream().sorted().toList();
+        parameters.put("sort", "PRICE_ASC");
+        parameters.put("limit", "2");
+        var first = success(get());
+        assertEquals(List.of(cheapFar.code(), nearCodes.getFirst()), codes(first));
+        assertEquals(500_000L, first.path("items").get(0).path("rentalAmount").longValue());
+        assertEquals(1_000_000L, first.path("items").get(1).path("rentalAmount").longValue());
+        String cursor = first.path("nextCursor").asString();
+        parameters.put("cursor", cursor);
+        var second = success(get());
+        assertEquals(List.of(nearCodes.getLast(), expensiveFar.code()), codes(second));
+        assertTrue(second.path("nextCursor").isNull());
+        parameters.put("minRentalAmount", "1000000");
+        error(get(), 400, "INVALID_REQUEST"); // Bộ lọc giá là một phần của fingerprint.
+        parameters.remove("cursor");
+        parameters.put("maxRentalAmount", "1000000");
+        var filtered = success(get());
+        assertEquals(nearCodes, codes(filtered));
+        assertTrue(filtered.path("nextCursor").isString());
+        parameters.put("cursor", filtered.path("nextCursor").asString());
+        var filteredLast = success(get());
+        assertEquals(List.of(expensiveFar.code()), codes(filteredLast));
+        assertTrue(filteredLast.path("nextCursor").isNull());
+        parameters.remove("cursor");
+        parameters.put("minRentalAmount", "1000001");
+        parameters.put("maxRentalAmount", "2000000");
+        assertTrue(success(get()).path("items").isEmpty());
+    }
+
+    /** Phiên bản v2 không được dùng tiếp, dù hash/khoảng cách/mã lấy từ đúng request hiện tại. */
+    @Test
+    void rejectsVersionTwoBusinessCodeCursorOverHttp() throws Exception {
+        var branch = fixtures.branch(10.76, 106.66);
+        fixtures.active(branch.code(), model);
+        fixtures.active(branch.code(), model);
+        parameters.put("limit", "1");
+        byte[] current = Base64.getUrlDecoder().decode(success(get()).path("nextCursor").asString());
+        byte[] legacy = ByteBuffer.allocate(50).put((byte) 2).put(current, 1, 32)
+                .put(current, 41, 17).array();
+        parameters.put("cursor", Base64.getUrlEncoder().withoutPadding().encodeToString(legacy));
+        error(get(), 400, "INVALID_REQUEST");
+    }
+
+    /** BR-218/125: lịch lễ kiểm trước tập xe rỗng; hỗ trợ và điều kiện thuê giữ ưu tiên tất định. */
+    @Test
+    void validatesCalendarBeforeEmptyResultsButAfterSupportAndTerms() throws Exception {
+        parameters.put("startInclusive", "2030-03-01T03:00:00Z");
+        parameters.put("endExclusive", "2032-01-01T03:00:00Z");
+        error(get(), 422, "HOLIDAY_CALENDAR_NOT_DECLARED");
+        parameters.put("sort", "RATING_DESC");
+        error(get(), 422, "SEARCH_SORT_NOT_SUPPORTED");
+        parameters.remove("sort");
+        parameters.put("rentalType", "MONTHLY");
+        error(get(), 422, "SEARCH_RENTAL_TYPE_NOT_SUPPORTED");
+        parameters.put("rentalType", "DAILY");
+        parameters.put("startInclusive", "2030-03-01T17:00:00Z"); // 00:00 Việt Nam.
+        error(get(), 422, "OUTSIDE_BRANCH_HOURS");
+    }
+
+    /** Dùng mã công khai để đối chiếu thứ tự, không để ID tạo fixture định nghĩa kỳ vọng. */
+    private List<String> codes(JsonNode page) {
+        var values = new java.util.ArrayList<String>();
+        for (var item : page.path("items")) values.add(item.path("code").asString());
+        return values;
     }
 
     /** Tập rỗng là 200 với items rỗng và nextCursor null, không phải 404. */
@@ -212,7 +293,10 @@ class SearchApiIntegrationTest {
             "limit,101", "limit,0", "limit,-1", "limit,1.5", "limit,999999999999999",
             "seats,five", "transmission,CVT", "fuelType,WATER", "collateralFree,maybe",
             "cursor,broken", "ownershipType,COMPANY", "minPrice,100",
-            "radiusKm,''", "limit,''", "seats,''", "collateralFree,''", "make,' '", "cursor,''"
+            "radiusKm,''", "limit,''", "seats,''", "collateralFree,''", "make,' '", "cursor,''",
+            "minRentalAmount,-1", "maxRentalAmount,-1", "minRentalAmount,1.5",
+            "maxRentalAmount,9223372036854775808", "minRentalAmount,''", "maxRentalAmount,nope",
+            "startInclusive,2030-01-15T03:00:00.000000001Z"
     })
     void rejectsInvalidParameters(String field, String value) throws Exception {
         parameters.put(field, value);
@@ -223,6 +307,10 @@ class SearchApiIntegrationTest {
     @Test
     void rejectsDuplicateParameters() throws Exception {
         error(getWithSuffix("&latitude=11"), 400, "INVALID_REQUEST");
+        error(getWithSuffix("&minRentalAmount=1&minRentalAmount=2"), 400, "INVALID_REQUEST");
+        parameters.put("minRentalAmount", "2000000");
+        parameters.put("maxRentalAmount", "1000000");
+        error(get(), 400, "INVALID_REQUEST");
     }
 
     /** Lựa chọn đúng enum nhưng chưa hỗ trợ phải ra đúng lỗi 422, không fallback sang tìm kiếm khác. */
@@ -231,7 +319,6 @@ class SearchApiIntegrationTest {
             "rentalType,MONTHLY,SEARCH_RENTAL_TYPE_NOT_SUPPORTED",
             "driveMode,WITH_DRIVER,SEARCH_DRIVE_MODE_NOT_SUPPORTED",
             "pickupMethod,DELIVERY,SEARCH_PICKUP_METHOD_NOT_SUPPORTED",
-            "sort,PRICE_ASC,SEARCH_SORT_NOT_SUPPORTED",
             "sort,RATING_DESC,SEARCH_SORT_NOT_SUPPORTED",
             "seats,6,VEHICLE_INVALID_SEATS"
     })

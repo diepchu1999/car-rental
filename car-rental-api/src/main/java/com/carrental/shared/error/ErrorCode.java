@@ -15,6 +15,27 @@ package com.carrental.shared.error;
  */
 public enum ErrorCode {
 
+    /** Báo giá không tồn tại khi đọc theo BR-122. */
+    QUOTE_NOT_FOUND("The requested quote was not found."),
+
+    /** BR-125: lát cắt báo giá chưa hỗ trợ có tài xế. */
+    QUOTE_DRIVE_MODE_NOT_SUPPORTED("Quotes with a driver are not supported yet."),
+
+    /** BR-125: lát cắt báo giá chưa hỗ trợ giao xe tận nơi. */
+    QUOTE_PICKUP_METHOD_NOT_SUPPORTED("Delivery quotes are not supported yet."),
+
+    /** BR-218: không tính giá ngày thường cho khoảng thuê vượt lịch lễ đã khai báo. */
+    HOLIDAY_CALENDAR_NOT_DECLARED("The holiday calendar has not been declared through the rental return date."),
+
+    /** BR-125: lát cắt báo giá hiện chưa hỗ trợ gói tháng. */
+    QUOTE_RENTAL_TYPE_NOT_SUPPORTED("Monthly rental quotes are not supported yet."),
+
+    /** BR-234: phải có giá ngày trước khi duyệt xe. */
+    VEHICLE_DAILY_RATE_REQUIRED("A daily rate is required before vehicle approval."),
+
+    /** BR-234: giá ngày nguyên VND, dương và chia hết cho 1.000. */
+    VEHICLE_INVALID_DAILY_RATE("Vehicle daily rate must be a positive integer multiple of 1000 VND."),
+
     /** BR-125: lát cắt 1 chưa hỗ trợ tìm xe theo gói tháng. */
     SEARCH_RENTAL_TYPE_NOT_SUPPORTED("Monthly rental search is not supported yet."),
 

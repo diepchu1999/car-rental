@@ -210,7 +210,7 @@ class VehicleStatusPersistenceIntegrationTest {
                 new VehicleDocuments(
                         APPROVAL_DATE.plusDays(30),
                         APPROVAL_DATE.plusDays(60)
-                ), SPECIFICATIONS
+                ), SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
     }
 
@@ -258,7 +258,7 @@ class VehicleStatusPersistenceIntegrationTest {
                 before.inspectionExpiresOn(),
                 before.liabilityInsuranceExpiresOn(),
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null, 1_000_000L
         );
 
         assertEquals(expected, after);

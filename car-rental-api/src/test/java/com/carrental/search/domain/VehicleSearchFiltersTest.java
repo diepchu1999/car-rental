@@ -16,6 +16,32 @@ class VehicleSearchFiltersTest {
                 VehicleSearchFilters.none());
     }
 
+    /** BR-126: hai biên đều được tính, null mở biên, không bắt buộc biên lọc là bội số 1000. */
+    @Test
+    void priceBoundsAreInclusiveAndOptional() {
+        var filters = prices(685_000L, 685_000L);
+        assertTrue(filters.includesRentalAmount(685_000));
+        assertFalse(filters.includesRentalAmount(684_000));
+        assertFalse(filters.includesRentalAmount(686_000));
+        assertTrue(prices(0L, null).includesRentalAmount(1_000));
+        assertTrue(prices(null, Long.MAX_VALUE).includesRentalAmount(1_000));
+        assertFalse(prices(null, 0L).includesRentalAmount(1_000));
+        assertTrue(prices(684_999L, 685_001L).includesRentalAmount(685_000));
+    }
+
+    /** BR-126: âm hoặc min lớn hơn max là INVALID_REQUEST, không tự đảo/cắt giá trị. */
+    @Test
+    void rejectsNegativeOrReversedPriceBounds() {
+        assertInvalid(() -> prices(-1L, null));
+        assertInvalid(() -> prices(null, -1L));
+        assertInvalid(() -> prices(2L, 1L));
+    }
+
+    /** Tạo bộ lọc chỉ có khoảng giá để cô lập nguyên nhân. */
+    private VehicleSearchFilters prices(Long min, Long max) {
+        return new VehicleSearchFilters(null, null, null, null, null, null, min, max);
+    }
+
     /** Giữ nội dung và chữ hoa thường; chỉ bỏ khoảng trắng ở hai đầu. */
     @Test
     void normalizesTextWithoutChangingLiteralContent() {

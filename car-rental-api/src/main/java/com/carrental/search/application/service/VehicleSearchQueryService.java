@@ -5,6 +5,8 @@ import com.carrental.availability.api.Period;
 import com.carrental.booking.api.RentalTermsDirectory;
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchSearchView;
+import com.carrental.pricing.api.RentalPricingDirectory;
+import com.carrental.pricing.api.VehicleDailyRate;
 import com.carrental.search.application.port.in.SearchVehiclesUseCase;
 import com.carrental.search.application.query.SearchVehiclesQuery;
 import com.carrental.search.application.view.SearchBranchSummary;
@@ -12,6 +14,7 @@ import com.carrental.search.application.view.SearchVehicleListItem;
 import com.carrental.search.application.view.SearchVehiclesPage;
 import com.carrental.search.domain.SearchPosition;
 import com.carrental.search.domain.SearchRadiusSettings;
+import com.carrental.search.domain.SearchSort;
 import com.carrental.shared.validation.Validations;
 import com.carrental.vehicle.api.VehicleSearchDirectory;
 import com.carrental.vehicle.api.VehicleSearchView;
@@ -34,17 +37,19 @@ class VehicleSearchQueryService implements SearchVehiclesUseCase {
     private final AvailabilityDirectory availability;
     private final SearchRadiusSettings radii;
     private final SearchSupportPolicyResolver support;
+    private final RentalPricingDirectory pricing;
 
     /** Chỉ nhận cổng công khai của module sở hữu và chính sách của search; không import tầng nội bộ. */
     VehicleSearchQueryService(RentalTermsDirectory terms, BranchDirectory branches,
             VehicleSearchDirectory vehicles, AvailabilityDirectory availability,
-            SearchRadiusSettings radii, SearchSupportPolicyResolver support) {
+            SearchRadiusSettings radii, SearchSupportPolicyResolver support, RentalPricingDirectory pricing) {
         this.terms = terms;
         this.branches = branches;
         this.vehicles = vehicles;
         this.availability = availability;
         this.radii = radii;
         this.support = support;
+        this.pricing = pricing;
     }
 
     /**
@@ -59,9 +64,10 @@ class VehicleSearchQueryService implements SearchVehiclesUseCase {
         support.resolve(query.rentalType(), query.driveMode(), query.pickupMethod(), query.sort()).validate();
         double radiusKm = radii.resolve(query.radiusKm());
         byte[] fingerprint = SearchCursorCodec.fingerprint(query, radiusKm);
-        var cursor = SearchCursorCodec.decode(query.cursor(), fingerprint);
+        var cursor = SearchCursorCodec.decode(query.cursor(), fingerprint, query.sort());
         var rentalTerms = terms.getTerms(query.rentalType(), query.pickupMethod(),
                 query.startInclusive(), query.endExclusive());
+        var pricePlan = pricing.prepare(query.rentalType(), query.startInclusive(), query.endExclusive());
         var nearby = branches.findWithinRadius(query.latitude(), query.longitude(), radiusKm * 1000);
         if (nearby.isEmpty()) {
             return new SearchVehiclesPage(List.of(), null);
@@ -76,32 +82,40 @@ class VehicleSearchQueryService implements SearchVehiclesUseCase {
         }
         var busy = availability.findBusyVehicleIds(new Period(query.startInclusive(), query.endExclusive()),
                 rentalTerms.turnaroundBuffer(), candidates.stream().map(VehicleSearchView::id).toList());
-        var afterCursor = candidates.stream()
-                .filter(vehicle -> !busy.contains(vehicle.id()))
-                .map(vehicle -> toListItem(vehicle, branchesById.get(vehicle.branchId())))
-                .sorted(Comparator.comparing(VehicleSearchQueryService::position))
-                .filter(item -> cursor.isEmpty() || position(item).compareTo(cursor.orElseThrow()) > 0)
+        var free = candidates.stream().filter(vehicle -> !busy.contains(vehicle.id())).toList();
+        var amounts = pricePlan.rentalAmounts(free.stream()
+                .map(vehicle -> new VehicleDailyRate(vehicle.code(), vehicle.dailyRate())).toList());
+        var afterCursor = free.stream()
+                .map(vehicle -> {
+                    Long amount = amounts.get(vehicle.code());
+                    if (amount == null) throw new IllegalStateException("Rental pricing omitted a vehicle.");
+                    return toListItem(vehicle, branchesById.get(vehicle.branchId()), amount);
+                })
+                .filter(item -> filter.includesRentalAmount(item.rentalAmount()))
+                .sorted(Comparator.comparing((SearchVehicleListItem item) -> position(item, query.sort())))
+                .filter(item -> cursor.isEmpty() || position(item, query.sort()).compareTo(cursor.orElseThrow()) > 0)
                 .limit(query.limit() + 1L)
                 .toList();
         boolean hasNext = afterCursor.size() > query.limit();
         var items = hasNext ? afterCursor.subList(0, query.limit()) : afterCursor;
         String nextCursor = hasNext
-                ? SearchCursorCodec.encode(position(items.getLast()), fingerprint) : null;
+                ? SearchCursorCodec.encode(position(items.getLast(), query.sort()), fingerprint) : null;
         return new SearchVehiclesPage(items, nextCursor);
     }
 
     /** Ghép đúng chi nhánh theo ID, giữ khoảng cách và cờ thế chấp do module sở hữu trả về. */
-    private SearchVehicleListItem toListItem(VehicleSearchView vehicle, BranchSearchView branch) {
+    private SearchVehicleListItem toListItem(VehicleSearchView vehicle, BranchSearchView branch, long rentalAmount) {
         if (branch == null) {
             throw new IllegalStateException("Vehicle search returned a vehicle outside the requested branches.");
         }
         return new SearchVehicleListItem(vehicle.id(), vehicle.code(), vehicle.make(), vehicle.model(),
                 vehicle.seats(), vehicle.transmission(), vehicle.fuelType(), vehicle.collateralFree(),
-                new SearchBranchSummary(branch.code(), branch.name(), branch.address()), branch.distanceMeters());
+                new SearchBranchSummary(branch.code(), branch.name(), branch.address()), branch.distanceMeters(), rentalAmount);
     }
 
     /** Dùng chung khóa so sánh và khóa ghi cursor để không lệch thứ tự giữa hai trang. */
-    private static SearchPosition position(SearchVehicleListItem item) {
-        return new SearchPosition(item.distanceMeters(), item.code());
+    private static SearchPosition position(SearchVehicleListItem item, SearchSort sort) {
+        return new SearchPosition(sort, sort == SearchSort.PRICE_ASC ? item.rentalAmount() : 0,
+                item.distanceMeters(), item.code());
     }
 }

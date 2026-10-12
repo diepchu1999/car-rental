@@ -3,6 +3,7 @@ package com.carrental.vehicle.adapter.out.persistence;
 import com.carrental.vehicle.application.view.VehicleDetail;
 import com.carrental.vehicle.application.view.VehicleSearchCandidate;
 import com.carrental.vehicle.domain.FuelType;
+import com.carrental.vehicle.domain.DailyRate;
 import com.carrental.vehicle.domain.OwnershipType;
 import com.carrental.vehicle.domain.Vehicle;
 import com.carrental.vehicle.domain.VehicleSpecifications;
@@ -29,7 +30,8 @@ final class VehicleRowMappers {
             new VehicleSearchCandidate(rs.getLong("id"), rs.getString("code"),
                     rs.getLong("branch_id"), OwnershipType.valueOf(rs.getString("ownership_type")),
                     rs.getInt("seats"), Transmission.valueOf(rs.getString("transmission")),
-                    FuelType.valueOf(rs.getString("fuel_type")), rs.getString("make"), rs.getString("model"));
+                    FuelType.valueOf(rs.getString("fuel_type")), rs.getString("make"), rs.getString("model"),
+                    rs.getLong("daily_rate"));
 
     /**
      * Ánh xạ dòng hiện tại sang thông tin chi tiết xe.
@@ -67,7 +69,8 @@ final class VehicleRowMappers {
                     resultSet.getInt("seats"),
                     Transmission.valueOf(resultSet.getString("transmission")),
                     resultSet.getString("make"),
-                    resultSet.getString("model"), null
+                    resultSet.getString("model"), null,
+                    resultSet.getObject("daily_rate", Long.class)
             );
 
     /**
@@ -111,7 +114,8 @@ final class VehicleRowMappers {
                             Transmission.valueOf(resultSet.getString("transmission")),
                             resultSet.getString("make"),
                             resultSet.getString("model")
-                    )
+                    ),
+                    DailyRate.ofNullable(resultSet.getObject("daily_rate", Long.class))
             );
 
     /**

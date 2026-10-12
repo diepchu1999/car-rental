@@ -57,6 +57,27 @@ test -f .env || cp .env.example .env
 
 Mở `.env`, thay các giá trị mẫu bằng giá trị local của bạn. Không commit file `.env`.
 
+**Bảo hiểm bắt buộc khai báo (BR-231):** đặt `CAR_RENTAL_INSURANCE_CALCULATION` và
+`CAR_RENTAL_INSURANCE_VALUE` trước khi khởi động backend, kể cả khi chạy từ IntelliJ.
+`.env.example` để trống hai giá trị vì chưa có mức phí thật được chốt.
+
+- `PER_BILLING_DAY`: giá trị là số nguyên VND > 0, nhân số ngày tính tiền; gói giờ luôn một ngày.
+- `PERCENT_OF_RENT`: giá trị là tỷ lệ thập phân > 0; `0.1` nghĩa là 10%, không đặt trần 100%.
+
+Để thử local bằng dữ liệu giả, bạn có thể tự đặt trong `.env`:
+
+```dotenv
+CAR_RENTAL_INSURANCE_CALCULATION=PER_BILLING_DAY
+CAR_RENTAL_INSURANCE_VALUE=100000
+```
+
+100.000 VND ở đây chỉ là dữ liệu thử, không phải giá bảo hiểm thật hay mặc định của ứng dụng.
+Thiếu/rỗng, giá 0/âm hoặc phí cố định có phần lẻ làm startup thất bại, log nêu tên
+`car-rental.pricing.insurance.calculation` hoặc `car-rental.pricing.insurance.value`.
+Mức tăng cuối tuần/lễ dùng dạng thập phân, không âm; hạn báo giá phải dương.
+Nguồn tham số hiện là cấu hình ứng dụng, đổi cần khởi động lại; lịch lễ nằm trong YAML,
+không tự suy ngày nghỉ liền kề. Trước khi chạy với khách thật phải có module config (ADR-0013).
+
 ### 2. Khởi động hạ tầng
 
 ```bash

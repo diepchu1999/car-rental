@@ -67,6 +67,76 @@ class VehicleConstraintIntegrationTest {
     private String insertSql;
     private String updateOwnershipSql;
 
+    /** BR-234: INSERT giá sai phải thất bại đúng constraint giá, không phải trạng thái. */
+    @ParameterizedTest
+    @ValueSource(longs = {-1000, 0, 999, 1500})
+    void rejectsInvalidDailyRateOnInsert(long rate) {
+        var parameters = specificationParameters().addValue("dailyRate", rate, Types.BIGINT);
+        assertDatabaseViolation(() -> jdbcTemplate.update(insertSql, parameters),
+                "23514", "chk_vehicle_daily_rate");
+    }
+
+    /** CHECK hiện diện trên UPDATE, không chỉ trên đường tạo xe. */
+    @ParameterizedTest
+    @ValueSource(longs = {-1000, 0, 1500})
+    void rejectsInvalidDailyRateOnUpdate(long rate) {
+        var parameters = specificationParameters();
+        assertEquals(1, jdbcTemplate.update(insertSql, parameters));
+        parameters.addValue("dailyRate", rate, Types.BIGINT);
+        String sql = sqlLoader.load("sql/vehicle/update_vehicle_rate_for_constraint_test.sql");
+        assertDatabaseViolation(() -> jdbcTemplate.update(sql, parameters), "23514", "chk_vehicle_daily_rate");
+    }
+
+    /** Cả ACTIVE, INACTIVE và RETIRED đều không được chèn mới khi thiếu giá. */
+    @ParameterizedTest
+    @ValueSource(strings = {"ACTIVE", "INACTIVE", "RETIRED"})
+    void rejectsApprovedStateWithoutRateOnInsert(String status) {
+        var parameters = specificationParameters().addValue("dailyRate", null, Types.BIGINT)
+                .addValue("status", status, Types.VARCHAR);
+        assertDatabaseViolation(() -> jdbcTemplate.update(insertSql, parameters),
+                "23514", "chk_vehicle_approved_has_daily_rate");
+    }
+
+    /** DRAFT chưa nhập giá không thể bị SQL tay đẩy vào trạng thái đã từng duyệt. */
+    @ParameterizedTest
+    @ValueSource(strings = {"ACTIVE", "INACTIVE", "RETIRED"})
+    void rejectsApprovedStateWithoutRateOnUpdate(String status) {
+        var parameters = specificationParameters().addValue("dailyRate", null, Types.BIGINT);
+        assertEquals(1, jdbcTemplate.update(insertSql, parameters));
+        parameters.addValue("status", status, Types.VARCHAR);
+        String sql = sqlLoader.load("sql/vehicle/update_vehicle_rate_for_constraint_test.sql");
+        assertDatabaseViolation(() -> jdbcTemplate.update(sql, parameters),
+                "23514", "chk_vehicle_approved_has_daily_rate");
+    }
+
+    /** Xe đã có giá và đã duyệt không thể bị SQL tay xóa giá. */
+    @ParameterizedTest
+    @ValueSource(strings = {"ACTIVE", "INACTIVE", "RETIRED"})
+    void rejectsClearingApprovedRate(String status) {
+        var parameters = specificationParameters().addValue("status", status, Types.VARCHAR);
+        assertEquals(1, jdbcTemplate.update(insertSql, parameters));
+        parameters.addValue("dailyRate", null, Types.BIGINT);
+        String sql = sqlLoader.load("sql/vehicle/update_vehicle_rate_for_constraint_test.sql");
+        assertDatabaseViolation(() -> jdbcTemplate.update(sql, parameters),
+                "23514", "chk_vehicle_approved_has_daily_rate");
+    }
+
+    /** CHECK không bắt nhầm ba trạng thái chưa được duyệt khi chưa nhập giá. */
+    @ParameterizedTest
+    @ValueSource(strings = {"DRAFT", "PENDING_APPROVAL", "REJECTED"})
+    void acceptsUnapprovedStateWithoutRate(String status) {
+        assertEquals(1, jdbcTemplate.update(insertSql, specificationParameters()
+                .addValue("status", status, Types.VARCHAR).addValue("dailyRate", null, Types.BIGINT)));
+    }
+
+    /** CHECK chấp nhận giá đúng ở mọi trạng thái, không cấm sửa giá xe ngừng hoạt động. */
+    @ParameterizedTest
+    @ValueSource(strings = {"DRAFT", "PENDING_APPROVAL", "ACTIVE", "INACTIVE", "REJECTED", "RETIRED"})
+    void acceptsValidRateInEveryState(String status) {
+        assertEquals(1, jdbcTemplate.update(insertSql, specificationParameters()
+                .addValue("status", status, Types.VARCHAR).addValue("dailyRate", 855_000L, Types.BIGINT)));
+    }
+
     /**
      * Tải hai câu SQL dành riêng cho test ràng buộc.
      */
@@ -143,6 +213,7 @@ class VehicleConstraintIntegrationTest {
     /** Dữ liệu hợp lệ để mỗi test BR-018 chỉ đổi đúng một trường cần kiểm. */
     private static MapSqlParameterSource specificationParameters() {
         return new MapSqlParameterSource()
+                .addValue("dailyRate", 1_000_000L, Types.BIGINT)
                 .addValue("code", "XE-SPEC01", Types.VARCHAR)
                 .addValue("plateNumber", "SPEC-01", Types.VARCHAR)
                 .addValue("ownershipType", "COMPANY", Types.VARCHAR)
@@ -387,6 +458,7 @@ class VehicleConstraintIntegrationTest {
             Long branchId
     ) {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("dailyRate", 1_000_000L, Types.BIGINT)
                 .addValue("code", code, Types.VARCHAR)
                 .addValue("plateNumber", plateNumber, Types.VARCHAR)
                 .addValue("seats", 5, Types.INTEGER)

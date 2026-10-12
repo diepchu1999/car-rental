@@ -27,6 +27,6 @@ class VehicleSearchDirectoryAdapter implements VehicleSearchDirectory {
                 fuelType, make, model, collateralFree);
         return useCase.list(query).stream().map(view -> new VehicleSearchView(
                 view.id(), view.code(), view.branchId(), view.seats(), view.transmission(),
-                view.fuelType(), view.make(), view.model(), view.collateralFree())).toList();
+                view.fuelType(), view.make(), view.model(), view.collateralFree(), view.dailyRate())).toList();
     }
 }

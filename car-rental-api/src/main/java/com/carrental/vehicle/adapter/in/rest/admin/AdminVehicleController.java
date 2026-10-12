@@ -2,6 +2,9 @@ package com.carrental.vehicle.adapter.in.rest.admin;
 
 import com.carrental.shared.api.ApiResponse;
 import com.carrental.vehicle.adapter.in.rest.admin.request.CreateVehicleRequest;
+import com.carrental.vehicle.adapter.in.rest.admin.request.ChangeVehicleDailyRateRequest;
+import com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand;
+import com.carrental.vehicle.application.port.in.ChangeVehicleDailyRateUseCase;
 import com.carrental.vehicle.adapter.in.rest.admin.response.VehicleResponse;
 import com.carrental.vehicle.application.command.ApproveVehicleCommand;
 import com.carrental.vehicle.application.command.CreateVehicleCommand;
@@ -17,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 
 /**
- * Cung cấp API tạo, đọc, gửi duyệt và duyệt xe theo BR-003, BR-005, BR-010.
+ * Cung cấp API tạo, đọc, gửi duyệt, duyệt và đổi giá xe theo BR-003, BR-005, BR-010, BR-234.
  *
  * <p>Chỉ chuyển đổi dữ liệu HTTP và gọi port đầu vào, không truy cập JDBC.
  * API GĐ1 cố định COMPANY, không rẽ nhánh theo loại sở hữu.
@@ -40,6 +44,7 @@ class AdminVehicleController {
     private final GetVehicleUseCase getVehicleUseCase;
     private final SubmitVehicleForApprovalUseCase submitVehicleUseCase;
     private final ApproveVehicleUseCase approveVehicleUseCase;
+    private final ChangeVehicleDailyRateUseCase changeVehicleDailyRateUseCase;
 
     /**
      * Nhận các chức năng ứng dụng qua interface.
@@ -48,15 +53,18 @@ class AdminVehicleController {
      * @param getVehicleUseCase đọc xe theo mã
      * @param submitVehicleUseCase gửi duyệt
      * @param approveVehicleUseCase phê duyệt
+     * @param changeVehicleDailyRateUseCase đổi giá ngày, không đổi trạng thái
      */
     AdminVehicleController(CreateVehicleUseCase createVehicleUseCase,
                            GetVehicleUseCase getVehicleUseCase,
                            SubmitVehicleForApprovalUseCase submitVehicleUseCase,
-                           ApproveVehicleUseCase approveVehicleUseCase) {
+                           ApproveVehicleUseCase approveVehicleUseCase,
+                           ChangeVehicleDailyRateUseCase changeVehicleDailyRateUseCase) {
         this.createVehicleUseCase = createVehicleUseCase;
         this.getVehicleUseCase = getVehicleUseCase;
         this.submitVehicleUseCase = submitVehicleUseCase;
         this.approveVehicleUseCase = approveVehicleUseCase;
+        this.changeVehicleDailyRateUseCase = changeVehicleDailyRateUseCase;
     }
 
     /**
@@ -70,7 +78,7 @@ class AdminVehicleController {
         CreateVehicleCommand command = CreateVehicleCommand.from(
                 request.plateNumber(), OwnershipType.COMPANY, request.fuelType(),
                 request.branchCode(), request.inspectionExpiresOn(), request.liabilityInsuranceExpiresOn(),
-                request.seats(), request.transmission(), request.make(), request.model()
+                request.seats(), request.transmission(), request.make(), request.model(), request.dailyRate()
         );
         VehicleResponse response = VehicleResponse.fromDomain(createVehicleUseCase.create(command));
         return ResponseEntity.created(URI.create(BASE_PATH + "/" + response.code()))
@@ -88,6 +96,14 @@ class AdminVehicleController {
         return ApiResponse.success(VehicleResponse.fromDomain(
                 getVehicleUseCase.get(GetVehicleQuery.from(code))
         ));
+    }
+
+    /** Đổi duy nhất giá ngày theo BR-234, trả cùng hợp đồng chi tiết như GET. */
+    @PutMapping(path = "/{code}/daily-rate", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ApiResponse<VehicleResponse> changeDailyRate(@PathVariable("code") String code,
+            @RequestBody ChangeVehicleDailyRateRequest request) {
+        return ApiResponse.success(VehicleResponse.fromDomain(changeVehicleDailyRateUseCase.changeDailyRate(
+                ChangeVehicleDailyRateCommand.from(code, request.dailyRate()))));
     }
 
     /**

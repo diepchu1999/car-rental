@@ -46,7 +46,7 @@ class VehicleSearchIntegrationTest {
         assertEquals(List.of(code(1), code(4)), result.stream().map(VehicleSearchView::code).toList());
         long expectedId = reads.findByCode(code(1)).orElseThrow().id();
         assertEquals(new VehicleSearchView(expectedId, code(1), BRANCH, 7,
-                "MANUAL", "DIESEL", " Ford ", " Everest ", true), result.getFirst());
+                "MANUAL", "DIESEL", " Ford ", " Everest ", true, 1_000_000L), result.getFirst());
         assertTrue(result.get(1).id() > expectedId);
         assertThrows(UnsupportedOperationException.class, result::clear);
     }
@@ -164,7 +164,7 @@ class VehicleSearchIntegrationTest {
     void partnerCandidateFailsExplicitlyInsteadOfBeingHidden() {
         var vehicle = Vehicle.restore(code(1), "SEARCH-1", OwnershipType.PARTNER,
                 FuelType.PETROL, BRANCH, VehicleStatus.ACTIVE,
-                new VehicleDocuments(null, null), new VehicleSpecifications(5, Transmission.AUTOMATIC, "Toyota", "Vios"));
+                new VehicleDocuments(null, null), new VehicleSpecifications(5, Transmission.AUTOMATIC, "Toyota", "Vios"), com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE);
         assertTrue(writes.insert(vehicle));
         var error = assertThrowsExactly(IllegalStateException.class,
                 () -> list(null, null, null, null, null, false));
@@ -182,7 +182,7 @@ class VehicleSearchIntegrationTest {
             FuelType fuel, String make, String model) {
         var vehicle = Vehicle.restore(code(index), "SEARCH-" + index, OwnershipType.COMPANY,
                 fuel, branch, status, new VehicleDocuments(LocalDate.of(2000, 1, 1), LocalDate.of(2000, 1, 1)),
-                new VehicleSpecifications(seats, transmission, make, model));
+                new VehicleSpecifications(seats, transmission, make, model), com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE);
         assertTrue(writes.insert(vehicle));
     }
 

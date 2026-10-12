@@ -40,6 +40,6 @@ class VehicleSearchQueryService implements ListSearchVehiclesUseCase {
         var policy = resolver.resolve(candidate.ownershipType(), query.rentalType());
         return new VehicleSearchSummary(candidate.id(), candidate.code(), candidate.branchId(),
                 candidate.seats(), candidate.transmission().name(), candidate.fuelType().name(),
-                candidate.make(), candidate.model(), policy.collateralFree());
+                candidate.make(), candidate.model(), policy.collateralFree(), candidate.dailyRate());
     }
 }

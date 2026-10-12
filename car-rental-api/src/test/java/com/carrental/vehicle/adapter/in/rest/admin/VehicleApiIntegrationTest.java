@@ -50,6 +50,90 @@ class VehicleApiIntegrationTest {
     @Autowired private ObjectMapper mapper;
     @Autowired private Clock clock;
 
+    /** BR-234: bỏ giá hoặc gửi null vẫn tạo được DRAFT nhưng không được duyệt. */
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void createsWithoutRateButRejectsApproval(boolean explicitNull) throws Exception {
+        var expiry = LocalDate.now(clock).plusDays(30);
+        var body = payload(branch(), "PETROL", expiry, expiry);
+        body.remove("dailyRate");
+        if (explicitNull) body.put("dailyRate", null);
+        var draft = vehicleSuccess(post(PATH, body), 201, "DRAFT");
+        assertTrue(draft.path("dailyRate").isNull());
+        var resource = PATH + "/" + draft.path("code").asString();
+        assertEquals(draft, vehicleSuccess(get(resource), 200, "DRAFT"));
+        var pending = vehicleSuccess(postEmpty(resource + "/submit-for-approval"), 200, "PENDING_APPROVAL");
+        error(postEmpty(resource + "/approve"), 422, "VEHICLE_DAILY_RATE_REQUIRED");
+        assertEquals(pending, vehicleSuccess(get(resource), 200, "PENDING_APPROVAL"));
+        var priced = vehicleSuccess(putRate(resource, "855000"), 200, "PENDING_APPROVAL");
+        assertEquals(855_000L, priced.path("dailyRate").longValue());
+        assertEquals(855_000L, vehicleSuccess(postEmpty(resource + "/approve"), 200, "ACTIVE")
+                .path("dailyRate").longValue());
+    }
+
+    /** Đổi giá DRAFT và ACTIVE giữ nguyên các trường khác, GET đọc đúng giá mới. */
+    @Test
+    void changesRateWithoutChangingVehicleData() throws Exception {
+        var expiry = LocalDate.now(clock).plusDays(30);
+        var draft = vehicleSuccess(post(PATH, payload(branch(), "PETROL", expiry, expiry)), 201, "DRAFT");
+        assertEquals(1_000_000L, draft.path("dailyRate").longValue());
+        var resource = PATH + "/" + draft.path("code").asString();
+        var changed = vehicleSuccess(putRate(resource, "855000"), 200, "DRAFT");
+        for (String field : draft.propertyNames()) {
+            if (!field.equals("dailyRate")) assertEquals(draft.path(field), changed.path(field), field);
+        }
+        vehicleSuccess(postEmpty(resource + "/submit-for-approval"), 200, "PENDING_APPROVAL");
+        var active = vehicleSuccess(postEmpty(resource + "/approve"), 200, "ACTIVE");
+        var repriced = vehicleSuccess(putRate(resource, "3000000000"), 200, "ACTIVE");
+        assertEquals(3_000_000_000L, repriced.path("dailyRate").longValue());
+        for (String field : active.propertyNames()) {
+            if (!field.equals("dailyRate")) assertEquals(active.path(field), repriced.path(field), field);
+        }
+        assertEquals(repriced, vehicleSuccess(get(resource), 200, "ACTIVE"));
+    }
+
+    /** Giá sai bị chặn ở cả POST và PUT, phần lẻ không bị Jackson cắt trước validation. */
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1000", "1500", "1000.5", "9223372036854776000"})
+    void rejectsInvalidRateWithoutChangingStoredVehicle(String rate) throws Exception {
+        var body = payload(branch(), "PETROL", null, null);
+        var original = vehicleSuccess(post(PATH, body), 201, "DRAFT");
+        var resource = PATH + "/" + original.path("code").asString();
+        body.put("plateNumber", "RATE-" + UUID.randomUUID());
+        body.put("dailyRate", new java.math.BigDecimal(rate));
+        error(post(PATH, body), 422, "VEHICLE_INVALID_DAILY_RATE");
+        error(putRate(resource, rate), 422, "VEHICLE_INVALID_DAILY_RATE");
+        assertEquals(original, vehicleSuccess(get(resource), 200, "DRAFT"));
+    }
+
+    /** PUT không có đường xóa giá: thiếu trường và null đều bị từ chối. */
+    @ParameterizedTest
+    @ValueSource(strings = {"{}", "{\"dailyRate\":null}"})
+    void rejectsMissingReplacementRate(String body) throws Exception {
+        var draft = vehicleSuccess(post(PATH, payload(branch(), "PETROL", null, null)), 201, "DRAFT");
+        var resource = PATH + "/" + draft.path("code").asString();
+        error(send("PUT", resource + "/daily-rate", body, "application/json"), 422, "VEHICLE_INVALID_DAILY_RATE");
+        assertEquals(draft, vehicleSuccess(get(resource), 200, "DRAFT"));
+    }
+
+    /** Đổi giá mã xe không tồn tại trả đúng 404, không sinh ra hồ sơ xe mới. */
+    @Test
+    void rejectsRateChangeForMissingVehicle() throws Exception {
+        error(putRate(PATH + "/missing-vehicle", "1000000"), 404, "VEHICLE_NOT_FOUND");
+    }
+
+    /** JSON sai không biến thành lỗi nghiệp vụ hoặc lỗi 500. */
+    @ParameterizedTest
+    @ValueSource(strings = {"{", "null", "", "{\"dailyRate\":\"invalid\"}"})
+    void rejectsMalformedRateRequest(String body) throws Exception {
+        error(send("PUT", PATH + "/XE-MISS01/daily-rate", body, "application/json"), 400, "INVALID_REQUEST");
+    }
+
+    /** Gửi số JSON nguyên văn để kiểm cả phần lẻ và giá trị lớn, không qua ép kiểu long. */
+    private HttpResponse<String> putRate(String resource, String rate) throws Exception {
+        return send("PUT", resource + "/daily-rate", "{\"dailyRate\":" + rate + "}", "application/json");
+    }
+
     /**
      * Tạo và đọc bản nháp với đủ bốn loại nhiên liệu theo BR-410, chưa cần giấy tờ.
      * @param fuel loại nhiên liệu hợp lệ
@@ -346,6 +430,7 @@ class VehicleApiIntegrationTest {
         body.put("transmission", "AUTOMATIC");
         body.put("make", "Toyota");
         body.put("model", "Vios");
+        body.put("dailyRate", 1_000_000L);
         body.put("branchCode", branchCode);
         body.put("inspectionExpiresOn", inspection == null ? null : inspection.toString());
         body.put("liabilityInsuranceExpiresOn", insurance == null ? null : insurance.toString());
@@ -434,7 +519,7 @@ class VehicleApiIntegrationTest {
         assertTrue(root.path("error").isNull());
         JsonNode data = root.path("data");
         assertEquals(Set.of("code", "plateNumber", "ownershipType", "fuelType", "branchCode", "status",
-                "inspectionExpiresOn", "liabilityInsuranceExpiresOn", "seats", "transmission", "make", "model"), Set.copyOf(data.propertyNames()));
+                "inspectionExpiresOn", "liabilityInsuranceExpiresOn", "seats", "transmission", "make", "model", "dailyRate"), Set.copyOf(data.propertyNames()));
         assertTrue(data.path("code").asString().matches("XE-[A-Z0-9]{6}"));
         assertEquals(vehicleStatus, data.path("status").asString());
         assertTrue(data.path("plateNumber").isString());
@@ -468,7 +553,7 @@ class VehicleApiIntegrationTest {
      */
     private static void assertSameVehicleFields(JsonNode before, JsonNode after) {
         for (String field : Set.of("code", "plateNumber", "ownershipType", "fuelType", "branchCode",
-                "inspectionExpiresOn", "liabilityInsuranceExpiresOn", "seats", "transmission", "make", "model")) {
+                "inspectionExpiresOn", "liabilityInsuranceExpiresOn", "seats", "transmission", "make", "model", "dailyRate")) {
             assertEquals(before.path(field), after.path(field), field);
         }
     }

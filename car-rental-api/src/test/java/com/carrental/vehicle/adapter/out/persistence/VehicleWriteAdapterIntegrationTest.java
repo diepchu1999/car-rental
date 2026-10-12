@@ -110,7 +110,7 @@ class VehicleWriteAdapterIntegrationTest {
                 OwnershipType.COMPANY,
                 FuelType.ELECTRIC,
                 BRANCH_ID + 1L,
-                new VehicleDocuments(null, null), SPECIFICATIONS
+                new VehicleDocuments(null, null), SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
 
         assertFalse(writeVehiclePort.insert(conflicting));
@@ -183,7 +183,7 @@ class VehicleWriteAdapterIntegrationTest {
                 OwnershipType.COMPANY,
                 FuelType.PETROL,
                 null,
-                new VehicleDocuments(null, null), SPECIFICATIONS
+                new VehicleDocuments(null, null), SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
 
         DataIntegrityViolationException failure = assertThrows(
@@ -218,7 +218,7 @@ class VehicleWriteAdapterIntegrationTest {
                         OwnershipType.COMPANY,
                         FuelType.DIESEL,
                         BRANCH_ID,
-                        new VehicleDocuments(null, null), SPECIFICATIONS
+                        new VehicleDocuments(null, null), SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
                 ),
                 Vehicle.createDraft(
                         VEHICLE_CODE,
@@ -229,7 +229,7 @@ class VehicleWriteAdapterIntegrationTest {
                         new VehicleDocuments(
                                 INSPECTION_EXPIRES_ON,
                                 null
-                        ), SPECIFICATIONS
+                        ), SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
                 ),
                 Vehicle.createDraft(
                         VEHICLE_CODE,
@@ -240,7 +240,7 @@ class VehicleWriteAdapterIntegrationTest {
                         new VehicleDocuments(
                                 null,
                                 LIABILITY_INSURANCE_EXPIRES_ON
-                        ), SPECIFICATIONS
+                        ), SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
                 ),
                 Vehicle.createDraft(
                         VEHICLE_CODE,
@@ -251,7 +251,7 @@ class VehicleWriteAdapterIntegrationTest {
                         new VehicleDocuments(
                                 LocalDate.of(2000, 1, 10),
                                 LocalDate.of(2001, 2, 20)
-                        ), SPECIFICATIONS
+                        ), SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
                 ),
                 Vehicle.createDraft(
                         VEHICLE_CODE,
@@ -262,7 +262,7 @@ class VehicleWriteAdapterIntegrationTest {
                         new VehicleDocuments(
                                 INSPECTION_EXPIRES_ON,
                                 LIABILITY_INSURANCE_EXPIRES_ON
-                        ), SPECIFICATIONS
+                        ), SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
                 )
         );
     }
@@ -290,7 +290,7 @@ class VehicleWriteAdapterIntegrationTest {
                 new VehicleDocuments(
                         INSPECTION_EXPIRES_ON,
                         LIABILITY_INSURANCE_EXPIRES_ON
-                ), SPECIFICATIONS
+                ), SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
     }
 
@@ -327,7 +327,7 @@ class VehicleWriteAdapterIntegrationTest {
                 expected.documents().inspectionExpiresOn(),
                 expected.documents().liabilityInsuranceExpiresOn(),
                 SPECIFICATIONS.seats(), SPECIFICATIONS.transmission(),
-                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null
+                SPECIFICATIONS.make(), SPECIFICATIONS.model(), null, 1_000_000L
         );
 
         assertEquals(expectedDetail, actual);

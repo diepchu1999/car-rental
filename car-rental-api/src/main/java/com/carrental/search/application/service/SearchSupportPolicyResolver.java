@@ -29,7 +29,7 @@ class SearchSupportPolicyResolver {
         if (pickupMethod == PickupMethod.DELIVERY) {
             return unsupported(ErrorCode.SEARCH_PICKUP_METHOD_NOT_SUPPORTED);
         }
-        if (sort != SearchSort.NEAREST) {
+        if (sort == SearchSort.RATING_DESC) {
             return unsupported(ErrorCode.SEARCH_SORT_NOT_SUPPORTED);
         }
         return () -> { /* Các lựa chọn đều thuộc lát cắt đã hỗ trợ. */ };

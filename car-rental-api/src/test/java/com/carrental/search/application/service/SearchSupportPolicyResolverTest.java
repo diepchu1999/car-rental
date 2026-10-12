@@ -19,6 +19,8 @@ class SearchSupportPolicyResolverTest {
     void permitsSupportedSlice(RentalType rentalType) {
         assertDoesNotThrow(() -> resolver.resolve(rentalType, DriveMode.SELF_DRIVE,
                 PickupMethod.BRANCH, SearchSort.NEAREST).validate());
+        assertDoesNotThrow(() -> resolver.resolve(rentalType, DriveMode.SELF_DRIVE,
+                PickupMethod.BRANCH, SearchSort.PRICE_ASC).validate());
     }
 
     /** Mỗi lựa chọn chưa hỗ trợ có mã lỗi riêng, không thành kết quả rỗng. */
@@ -27,7 +29,6 @@ class SearchSupportPolicyResolverTest {
             "MONTHLY,SELF_DRIVE,BRANCH,NEAREST,SEARCH_RENTAL_TYPE_NOT_SUPPORTED",
             "DAILY,WITH_DRIVER,BRANCH,NEAREST,SEARCH_DRIVE_MODE_NOT_SUPPORTED",
             "DAILY,SELF_DRIVE,DELIVERY,NEAREST,SEARCH_PICKUP_METHOD_NOT_SUPPORTED",
-            "DAILY,SELF_DRIVE,BRANCH,PRICE_ASC,SEARCH_SORT_NOT_SUPPORTED",
             "DAILY,SELF_DRIVE,BRANCH,RATING_DESC,SEARCH_SORT_NOT_SUPPORTED"
     })
     void rejectsUnsupportedOptions(RentalType rentalType, DriveMode driveMode,

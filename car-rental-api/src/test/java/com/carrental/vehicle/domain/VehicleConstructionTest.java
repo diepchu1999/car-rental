@@ -213,7 +213,7 @@ class VehicleConstructionTest {
                         FuelType.PETROL,
                         BRANCH_ID,
                         null,
-                        DOCUMENTS, SPECIFICATIONS
+                        DOCUMENTS, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
                 ),
                 "status is required."
         );
@@ -235,7 +235,7 @@ class VehicleConstructionTest {
                 OwnershipType.COMPANY,
                 FuelType.PETROL,
                 BRANCH_ID,
-                DOCUMENTS, SPECIFICATIONS
+                DOCUMENTS, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
 
         Vehicle restored = Vehicle.restore(
@@ -245,7 +245,7 @@ class VehicleConstructionTest {
                 FuelType.PETROL,
                 BRANCH_ID,
                 VehicleStatus.ACTIVE,
-                DOCUMENTS, SPECIFICATIONS
+                DOCUMENTS, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
 
         assertEquals(plateNumber, draft.plateNumber());
@@ -277,7 +277,7 @@ class VehicleConstructionTest {
                 FuelType.HYBRID,
                 BRANCH_ID,
                 status,
-                DOCUMENTS, SPECIFICATIONS
+                DOCUMENTS, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
         );
 
         assertEquals(CODE, restored.code());
@@ -319,7 +319,7 @@ class VehicleConstructionTest {
                         ownershipType,
                         fuelType,
                         branchId,
-                        documents, SPECIFICATIONS
+                        documents, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
                 ),
                 expectedMessage
         );
@@ -332,7 +332,7 @@ class VehicleConstructionTest {
                         fuelType,
                         branchId,
                         VehicleStatus.DRAFT,
-                        documents, SPECIFICATIONS
+                        documents, SPECIFICATIONS, com.carrental.vehicle.VehicleTestFixtures.DAILY_RATE
                 ),
                 expectedMessage
         );
