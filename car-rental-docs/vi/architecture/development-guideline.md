@@ -38,7 +38,10 @@ Làm trọn một luồng nghiệp vụ xuyên mọi tầng rồi mới sang lu�
 car-rental/
 ├── CLAUDE.md · AGENTS.md · README.md     # contract và chỉ mục
 ├── .gitignore · .env.example
+├── .ai/prompts/                          # quy trình cho AI: soạn prompt, làm task, review
+├── .agents/skills/                       # skill của Codex, chỉ trỏ tới .ai/prompts/
 ├── car-rental-docs/                      # tài liệu
+├── postman/                              # collection Postman mỗi task + environment local
 ├── infra/                                # hạ tầng local, KHÔNG lẫn vào code
 │   ├── docker-compose.yml
 │   ├── postgres/init/
@@ -62,6 +65,8 @@ car-rental/
 │       └── test/java/com/carrental/
 │           ├── architecture/             # ArchitectureRulesTest
 │           └── <module>/                 # gương với main
+├── car-rental-keycloak/                  # mở rộng Keycloak (Java SPI): OTP qua SMS — ADR-0006
+│   └── pom.xml · src/                    # build ra .jar, nạp vào container Keycloak
 ├── customer-web/ · admin-web/            # React + TypeScript
 └── mobile/                               # React Native
 ```

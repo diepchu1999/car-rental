@@ -15,7 +15,7 @@ Gói gốc: `com.carrental`
 
 | Module | Schema | Trách nhiệm | GĐ |
 |---|---|---|---|
-| `identity` | `identity` | Tài khoản (một SĐT một tài khoản), vai, giấy tờ CCCD/GPLX, hồ sơ vi phạm | 1 |
+| `identity` | `identity` | Tài khoản (một SĐT một tài khoản), đồng ý điều khoản, chi nhánh của nhân viên, giấy tờ CCCD/GPLX, hồ sơ vi phạm | 1 |
 | `branch` | `branch` | Chi nhánh, địa điểm, giờ làm việc, quản lý, yêu cầu hỗ trợ chéo | 1 |
 | `config` | `config` | Tham số kinh doanh có hiệu lực theo thời gian, lịch ngày lễ (ADR-0013) | 1 |
 | `storage` | — | Port lưu trữ object: ảnh xe, giấy tờ, biên bản | 1 |
@@ -121,6 +121,12 @@ duyệt xe nằm ở `vehicle` — để giá ở `pricing` thì `vehicle` phả
 thuộc nhu cầu. Đặt cùng bảng xe còn cho phép một `CHECK` chặn xe `ACTIVE` không có giá, thay vì kiểm ở
 ứng dụng. `pricing` giữ **cách tính** — loại ngày, gói giờ, gói ngày, làm tròn, bảo hiểm — và báo giá.
 
+**Keycloak giữ thông tin đăng nhập, `identity` giữ dữ liệu nghiệp vụ của người dùng.** Keycloak giữ
+mật khẩu, luồng OTP và **vai** (BR-801). Schema `identity` giữ tài khoản, bản sao đồng ý điều khoản
+(BR-120) và **chi nhánh của nhân viên** (BR-803, BR-807). Vai trong token cho biết người đó *là ai*;
+chi nhánh trong `identity` cho biết họ *được động vào đâu*. Token có vai nhân viên mà chưa được gán chi
+nhánh thì **từ chối** — không đoán chi nhánh. Chi tiết luồng: ADR-0006, mục làm rõ 12/10/2026.
+
 **`search` không sở hữu schema.** Nó là read model đọc từ `vehicle` và `availability`. Cho nó sở hữu
 bảng gốc là mở đường để nó dần biết những thứ không nên biết.
 
@@ -148,6 +154,7 @@ Các cổng chính:
 | `pricing` lấy giá ngày của xe | `vehicle` | cổng riêng trong `vehicle.api` — chỉ thứ cần để tính giá, không có `ownershipType` |
 | `search` hiện tiền thuê, lọc và xếp theo giá | `pricing` | `pricing.api` — **cùng một cách tính** với báo giá (BR-126) |
 | `booking` lấy báo giá đã đóng băng | `pricing` | `pricing.api` — làm cùng `booking` |
+| Mọi module kiểm người gọi được động vào chi nhánh nào | `identity` | `identity.api` — vai và chi nhánh của người gọi (BR-803, BR-810) |
 | `fleet` khoá lịch bảo dưỡng | `availability` | `AvailabilityDirectory.block(...)` |
 | `fleet` tạo khoá giấy tờ **lúc duyệt xe**, không đợi tới ngày hết hạn | `availability` | `AvailabilityDirectory.block(..., COMPLIANCE_HOLD)` |
 | `fleet` dời khoá giấy tờ khi giấy tờ được gia hạn | `availability` | `AvailabilityDirectory.moveComplianceHoldStart(...)` |

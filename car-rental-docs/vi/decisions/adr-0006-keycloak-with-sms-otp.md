@@ -30,3 +30,23 @@ Thêm nữa, Keycloak SPI là Java — cùng ngôn ngữ với backend (ADR-0002
 - Token trên mobile lưu ở Keychain/Keystore, không lưu ở AsyncStorage.
 - Realm export vào repo để tái lập được ở local.
 - Adapter gửi SMS ở local là mock — in OTP ra log.
+
+## Làm rõ 12/10/2026 — luồng tài khoản cho lát cắt 1
+
+**Ai giữ gì.** Keycloak giữ mật khẩu, luồng OTP và vai (BR-801). Schema `identity` của backend giữ tài
+khoản, bản sao đồng ý điều khoản (BR-120) và chi nhánh của nhân viên (BR-803, BR-807). Token có vai
+nhân viên mà chưa gán chi nhánh thì backend **từ chối**.
+
+**Khách: đăng ký là lần đăng nhập OTP đầu tiên.** Số điện thoại chưa có người dùng thì luồng Keycloak
+tạo người dùng, sau khi khách đồng ý điều khoản (BR-120). Màn hình đồng ý nằm **trong luồng Keycloak** —
+đó là chỗ duy nhất chạy trước khi tài khoản tồn tại. Backend tạo `identity.account` ở **lần gọi API đầu
+tiên có token**, an toàn khi hai request đầu tới cùng lúc.
+
+**Nhân viên: mật khẩu cộng OTP** (BR-809) — luồng đăng nhập riêng, gắn với client `admin-web`.
+
+**Tạo nhân viên khi chưa có `admin-web`.** `ADMIN` tạo người dùng, đặt mật khẩu và gán vai trong màn
+hình quản trị có sẵn của Keycloak; gán chi nhánh qua API backend `/api/v1/admin/...`. Tài khoản `ADMIN`
+đầu tiên chỉ có trong realm export dùng cho local, không bao giờ trong môi trường thật.
+
+**Mã nguồn.** Phần mở rộng Keycloak ở `car-rental-keycloak/` (development-guideline §5); realm ở
+`infra/keycloak/realm-export.json`.
