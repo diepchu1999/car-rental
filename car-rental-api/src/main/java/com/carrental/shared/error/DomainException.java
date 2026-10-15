@@ -76,6 +76,34 @@ public final class DomainException extends RuntimeException {
     }
 
     /**
+     * Tạo lỗi chưa xác thực theo ADR-0006, không mang nguyên nhân kiểm token ra response.
+     *
+     * @return lỗi công khai chung cho token thiếu hoặc không hợp lệ
+     */
+    public static DomainException unauthenticated() {
+        return new DomainException(
+                ErrorCode.UNAUTHENTICATED,
+                Category.UNAUTHENTICATED,
+                ErrorCode.UNAUTHENTICATED.defaultMessage()
+        );
+    }
+
+    /**
+     * Tạo lỗi từ chối truy cập theo BR-120/803/809/810, độc lập với Spring Security.
+     *
+     * @param errorCode mã từ chối đã được duyệt trong backend-guideline §5
+     * @return lỗi giữ thông báo công khai mặc định, không kèm token hay định danh đầu vào
+     * @throws NullPointerException nếu mã lỗi là null
+     */
+    public static DomainException forbidden(ErrorCode errorCode) {
+        return new DomainException(
+                errorCode,
+                Category.FORBIDDEN,
+                errorCode.defaultMessage()
+        );
+    }
+
+    /**
      * Tạo lỗi khi không tìm thấy tài nguyên mà thao tác yêu cầu.
      *
      * @param errorCode mã lỗi xác định loại tài nguyên không tìm thấy
@@ -147,6 +175,12 @@ public final class DomainException extends RuntimeException {
      * Nhóm lỗi không chứa giá trị HTTP hoặc dependency framework.
      */
     public enum Category {
+
+        /** Chưa có danh tính được xác thực; ánh xạ sang 401 ở biên HTTP. */
+        UNAUTHENTICATED,
+
+        /** Có danh tính nhưng không được phép thực hiện thao tác; ánh xạ sang 403. */
+        FORBIDDEN,
 
         /**
          * Dữ liệu đầu vào sai định dạng hoặc thiếu giá trị bắt buộc.

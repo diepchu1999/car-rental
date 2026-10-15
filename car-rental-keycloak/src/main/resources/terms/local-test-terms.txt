@@ -1,0 +1,10 @@
+ĐIỀU KHOẢN THỬ — CHỈ DÙNG LOCAL
+
+Đây là văn bản giả để kiểm thử màn hình đồng ý điều khoản sử dụng và chính sách dữ liệu cá nhân.
+Không phải điều khoản pháp lý thật và không được dùng để cung cấp dịch vụ cho khách hàng thật.
+
+Chỉ nhập số điện thoại và dữ liệu giả trong môi trường này.
+Khi chọn đồng ý, hệ thống thử nghiệm ghi lại phiên bản của văn bản này và thời điểm bạn đồng ý.
+Nếu không đồng ý, hệ thống không tạo tài khoản khách qua luồng đăng ký này.
+
+Nội dung điều khoản và chính sách dữ liệu thật sẽ do Tech Owner cung cấp.

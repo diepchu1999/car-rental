@@ -1,0 +1,5 @@
+{
+  "themes": [
+    {"name": "car-rental", "types": ["login"]}
+  ]
+}

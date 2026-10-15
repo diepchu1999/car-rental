@@ -1,0 +1,145 @@
+{
+  "info": {
+    "name": "Car Rental - Task 08a - Identity",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "BR-120/129/809: đăng nhập khách và nhân viên bằng Authorization Code + PKCE S256. Chỉ dùng số điện thoại, mật khẩu và SMS giả trên local. Đây là endpoint OIDC của Keycloak, không phải response envelope của backend. Lấy token tương tác bằng Get New Access Token rồi Use Token trước khi chạy request 03/04. Không bật Share Token hoặc Sync Token; không export token, mật khẩu, OTP hay response chứa thông tin tài khoản vào Git. Collection Runner kiểm được các request sau khi đã lấy token còn hạn, không tự nhập OTP."
+  },
+  "variable": [
+    {"key": "keycloakBaseUrl", "value": "http://localhost:8080", "type": "string"},
+    {"key": "realm", "value": "car-rental", "type": "string"},
+    {"key": "employeePhone", "value": "+84910000002", "type": "string"}
+  ],
+  "item": [
+    {
+      "name": "Part 2 - Keycloak login (BR-120, BR-129, BR-809)",
+      "description": "Chạy 01/02 trước. Với 03/04, mở Authorization, giữ callback https://oauth.pstmn.io/v1/callback, bỏ chọn Authorize using browser để dùng cửa sổ Postman, rồi Get New Access Token. Client public: để trống Client Secret. Đọc SMS giả trong log Keycloak, hoàn tất đăng nhập, chọn Use Token rồi Send. Khách mới phải đồng ý điều khoản thử. Nhân viên mẫu mặc định là STAFF +84910000002; mật khẩu tạm lấy từ CAR_RENTAL_LOCAL_STAFF_PASSWORD trong .env và phải đổi lần đầu. Đổi employeePhone nếu kiểm một nhân viên mẫu khác; giá trị này chỉ dùng kiểm kết quả, không tự điền form. Chạy lại không cần xoá tài khoản; hạn mức gửi OTP vẫn áp dụng theo BR-129.",
+      "item": [
+        {
+          "name": "01 - Read OIDC discovery",
+          "request": {
+            "auth": {"type": "noauth"},
+            "method": "GET",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "X-Client-Platform", "value": "web"},
+              {"key": "X-Client-Version", "value": "0.0.1"}
+            ],
+            "url": "{{keycloakBaseUrl}}/realms/{{realm}}/.well-known/openid-configuration",
+            "description": "BR-129/809, ADR-0006: realm cung cấp endpoint OIDC và hỗ trợ PKCE S256."
+          },
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Realm endpoints and PKCE S256', () => {",
+            "  const body = pm.response.json();",
+            "  const issuer = pm.variables.replaceIn('{{keycloakBaseUrl}}/realms/{{realm}}');",
+            "  pm.expect(body.issuer).to.eql(issuer);",
+            "  pm.expect(body.authorization_endpoint).to.eql(issuer + '/protocol/openid-connect/auth');",
+            "  pm.expect(body.token_endpoint).to.eql(issuer + '/protocol/openid-connect/token');",
+            "  pm.expect(body.userinfo_endpoint).to.eql(issuer + '/protocol/openid-connect/userinfo');",
+            "  pm.expect(body.code_challenge_methods_supported).to.include('S256');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "02 - Reject user info without token",
+          "request": {
+            "auth": {"type": "noauth"},
+            "method": "GET",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "X-Client-Platform", "value": "web"},
+              {"key": "X-Client-Version", "value": "0.0.1"}
+            ],
+            "url": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/userinfo",
+            "description": "BR-120/809: chưa xác thực thì không được đọc thông tin tài khoản; đây là phép thử âm, HTTP 401 là đạt."
+          },
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+            "pm.test('Bearer authentication required', () => pm.expect(pm.response.headers.get('WWW-Authenticate')).to.match(/^Bearer\\b/i));"
+          ]}}]
+        },
+        {
+          "name": "03 - Customer user info after OTP and consent",
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {"key": "grant_type", "value": "authorization_code_with_pkce", "type": "string"},
+                {"key": "authUrl", "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth", "type": "string"},
+                {"key": "accessTokenUrl", "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token", "type": "string"},
+                {"key": "clientId", "value": "customer-web", "type": "string"},
+                {"key": "clientSecret", "value": "", "type": "string"},
+                {"key": "redirect_uri", "value": "https://oauth.pstmn.io/v1/callback", "type": "string"},
+                {"key": "scope", "value": "openid", "type": "string"},
+                {"key": "challengeAlgorithm", "value": "S256", "type": "string"},
+                {"key": "state", "value": "{{$guid}}", "type": "string"},
+                {"key": "client_authentication", "value": "body", "type": "string"},
+                {"key": "addTokenTo", "value": "header", "type": "string"},
+                {"key": "tokenName", "value": "Car Rental Local Customer", "type": "string"},
+                {"key": "useBrowser", "value": false, "type": "boolean"}
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "X-Client-Platform", "value": "web"},
+              {"key": "X-Client-Version", "value": "0.0.1"}
+            ],
+            "url": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/userinfo",
+            "description": "BR-120/129: lấy token bằng OTP và đồng ý điều khoản khi đăng ký lần đầu; userinfo phải có số chuẩn E.164 và bằng chứng đồng ý. Chỉ đăng nhập bằng số thử, không dùng số thật."
+          },
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Customer identity and original consent', () => {",
+            "  const body = pm.response.json();",
+            "  pm.expect(body.sub).to.be.a('string').and.not.empty;",
+            "  pm.expect(body.phone_number).to.match(/^\\+84[35789]\\d{8}$/);",
+            "  pm.expect(body.terms_version).to.be.a('string').and.not.empty;",
+            "  pm.expect(body.consented_at).to.be.a('string').and.not.empty;",
+            "  pm.expect(Number.isFinite(Date.parse(body.consented_at))).to.eql(true);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "04 - Employee user info after password and OTP",
+          "request": {
+            "auth": {
+              "type": "oauth2",
+              "oauth2": [
+                {"key": "grant_type", "value": "authorization_code_with_pkce", "type": "string"},
+                {"key": "authUrl", "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth", "type": "string"},
+                {"key": "accessTokenUrl", "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token", "type": "string"},
+                {"key": "clientId", "value": "admin-web", "type": "string"},
+                {"key": "clientSecret", "value": "", "type": "string"},
+                {"key": "redirect_uri", "value": "https://oauth.pstmn.io/v1/callback", "type": "string"},
+                {"key": "scope", "value": "openid", "type": "string"},
+                {"key": "challengeAlgorithm", "value": "S256", "type": "string"},
+                {"key": "state", "value": "{{$guid}}", "type": "string"},
+                {"key": "client_authentication", "value": "body", "type": "string"},
+                {"key": "addTokenTo", "value": "header", "type": "string"},
+                {"key": "tokenName", "value": "Car Rental Local Employee", "type": "string"},
+                {"key": "useBrowser", "value": false, "type": "boolean"}
+              ]
+            },
+            "method": "GET",
+            "header": [
+              {"key": "Accept", "value": "application/json"},
+              {"key": "X-Client-Platform", "value": "web"},
+              {"key": "X-Client-Version", "value": "0.0.1"}
+            ],
+            "url": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/userinfo",
+            "description": "BR-809: đăng nhập nhân viên mẫu bằng mật khẩu và SMS; lần đầu bắt đổi mật khẩu tối thiểu 12 ký tự. Mặc định kiểm STAFF +84910000002, không kiểm quyền backend ở request này."
+          },
+          "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": [
+            "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+            "pm.test('Expected employee identity', () => {",
+            "  const body = pm.response.json();",
+            "  pm.expect(body.sub).to.be.a('string').and.not.empty;",
+            "  pm.expect(body.phone_number).to.eql(pm.variables.get('employeePhone'));",
+            "});"
+          ]}}]
+        }
+      ]
+    }
+  ]
+}

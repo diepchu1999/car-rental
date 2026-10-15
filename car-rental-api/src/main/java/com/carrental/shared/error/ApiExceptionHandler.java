@@ -43,6 +43,8 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
             WebRequest request
     ) {
         HttpStatus status = switch (exception.category()) {
+            case UNAUTHENTICATED -> HttpStatus.UNAUTHORIZED;
+            case FORBIDDEN -> HttpStatus.FORBIDDEN;
             case INVALID_INPUT -> HttpStatus.BAD_REQUEST;
             case NOT_FOUND -> HttpStatus.NOT_FOUND;
             case CONFLICT -> HttpStatus.CONFLICT;
@@ -54,10 +56,15 @@ class ApiExceptionHandler extends ResponseEntityExceptionHandler {
                 exception.getMessage()
         );
 
+        HttpHeaders headers = new HttpHeaders();
+        if (status == HttpStatus.UNAUTHORIZED) {
+            headers.set(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+        }
+
         return handleExceptionInternal(
                 exception,
                 body,
-                HttpHeaders.EMPTY,
+                headers,
                 status,
                 request
         );

@@ -1,0 +1,3 @@
+com.carrental.keycloak.authentication.EmployeePasswordAuthenticatorFactory
+com.carrental.keycloak.authentication.EmployeeSmsAuthenticatorFactory
+com.carrental.keycloak.authentication.CustomerOtpAuthenticatorFactory

@@ -15,6 +15,7 @@ car-rental/
 ├── AGENTS.md              contract cho codex (Principal Engineer)
 ├── car-rental-docs/       tài liệu — nguồn sự thật duy nhất
 ├── car-rental-api/        backend Spring Boot
+├── car-rental-keycloak/   provider OTP, Java 21, nạp vào Keycloak local
 ├── customer-web/          web khách thuê             (chưa tạo)
 ├── admin-web/             web vận hành               (chưa tạo)
 ├── mobile/                React Native               (chưa tạo)
@@ -80,12 +81,64 @@ không tự suy ngày nghỉ liền kề. Trước khi chạy với khách thậ
 
 ### 2. Khởi động hạ tầng
 
+**Build provider trước khi chạy Keycloak** (bytecode Java 21, dùng được JDK 25 ở trên):
+
 ```bash
+cd car-rental-keycloak
+./mvnw clean verify
+cd ..
+```
+
+Trong `.env`, bổ sung đủ khối **Keycloak OTP** từ `.env.example`. Giữ các tham số BR-129 theo mẫu.
+Sáu biến secret đang để trống phải được điền riêng; không lấy secret công khai của test:
+
+- `CAR_RENTAL_OTP_HMAC_SECRET`: dùng `openssl rand -base64 32`; giữ nguyên qua restart để không đổi
+  khoá HMAC của dữ liệu OTP/hạn mức đã lưu.
+- `CAR_RENTAL_KEYCLOAK_READER_SECRET`: dùng một giá trị riêng từ `openssl rand -hex 32`.
+- Bốn biến `CAR_RENTAL_LOCAL_*_PASSWORD`: mỗi biến dùng một giá trị riêng từ `openssl rand -hex 16`.
+  Đây là mật khẩu tạm, tối thiểu 12 ký tự, phải đổi sau mật khẩu + SMS ở lần đăng nhập đầu (BR-809).
+
+Chỉ chạy các lệnh sinh secret trên máy mình, không dán kết quả vào chat/log chia sẻ hoặc commit.
+`CAR_RENTAL_TERMS_VERSION=local-test-v1` chỉ định văn bản **thử**, không phải điều khoản dùng cho khách thật.
+
+```bash
+docker compose config --quiet
 docker compose up -d
 docker compose ps
 ```
 
 PostgreSQL, Keycloak và MinIO phải cùng hiện trạng thái `(healthy)`.
+`config --quiet` kiểm cấu hình mà không in giá trị secret; thiếu biến sẽ báo đúng tên biến.
+
+Compose chỉ mount provider lõi và JAR SMS local, không mount JAR `*-tests.jar`. Nếu chưa build,
+mount phải báo thiếu file, không tự tạo thư mục giả mang tên `.jar`. Không đổi image/platform.
+
+Realm `car-rental` được import từ `infra/keycloak/realm-export.json`; các bảng OTP được Liquibase
+của Keycloak tạo trong **database `keycloak`**, không thuộc Flyway/backend. Import lúc khởi động
+[bỏ qua realm đã tồn tại](https://www.keycloak.org/server/importExport#_importing_a_realm_during_startup):
+restart không xoá user, không đặt lại mật khẩu và không áp lại nội dung JSON lên realm cũ.
+Nếu local đã có realm `car-rental` từ cấu hình khác, dừng để đối chiếu trước; **không xoá realm hoặc volume**.
+
+Khi build lại JAR hoặc đổi biến môi trường, từ gốc repo chạy `docker compose up -d --force-recreate keycloak`
+để nạp lại đúng file mount/cấu hình. Không dùng `down -v`. `docker compose restart` không cập nhật biến
+môi trường mới. Đổi các biến mật khẩu/secret import sau lần đầu không đổi credential đang lưu trong realm.
+
+Thông tin các flow, tài khoản thử và cách kiểm provider: [Keycloak provider](car-rental-keycloak/README.md).
+Backend được bảo vệ bằng token chỉ khi phần resource server/identity đã được cấu hình; import realm
+không tự khoá các endpoint Spring Boot.
+
+Backend tra vai hiện tại bằng client chỉ đọc `identity-reader`. Bổ sung vào `.env`:
+
+```dotenv
+CAR_RENTAL_KEYCLOAK_BASE_URL=http://localhost:8080
+CAR_RENTAL_KEYCLOAK_REALM=car-rental
+CAR_RENTAL_KEYCLOAK_READER_CLIENT_ID=identity-reader
+```
+
+Cổng trong URL phải khớp `KEYCLOAK_PORT`. Backend dùng lại `CAR_RENTAL_KEYCLOAK_READER_SECRET`
+đã khai báo ở trên; phải khớp credential đang lưu trong realm, không sinh lại mỗi lần chạy.
+Thiếu cấu hình làm backend dừng ngay khi khởi động; lỗi kết nối/quyền client lúc đọc vai không được
+coi như người dùng không tồn tại. Kết nối có timeout, không đi theo redirect, không cache vai.
 
 ### 3. Nạp biến môi trường
 

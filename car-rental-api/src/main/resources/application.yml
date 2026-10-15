@@ -38,6 +38,15 @@ management:
 
 car-rental:
   time-zone: ${CAR_RENTAL_TIME_ZONE:Asia/Ho_Chi_Minh}
+  identity:
+    jwt:
+      # Phải khớp mapper backend-audience trong realm Keycloak (ADR-0006).
+      audience: car-rental-api
+    keycloak:
+      base-url: ${CAR_RENTAL_KEYCLOAK_BASE_URL}
+      realm: ${CAR_RENTAL_KEYCLOAK_REALM}
+      reader-client-id: ${CAR_RENTAL_KEYCLOAK_READER_CLIENT_ID}
+      reader-secret: ${CAR_RENTAL_KEYCLOAK_READER_SECRET}
   pricing:
     # BR-218/225: tỷ lệ thập phân, 0.2 nghĩa là tăng 20%.
     weekend-days: ${CAR_RENTAL_PRICING_WEEKEND_DAYS:SATURDAY,SUNDAY}
