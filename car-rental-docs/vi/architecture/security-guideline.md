@@ -23,6 +23,9 @@ Keycloak không hỗ trợ sẵn — phải viết Authenticator SPI bằng Java
   hình, không đóng cứng.
 - **Nhân viên: mật khẩu cộng OTP** (BR-809). Khách chỉ OTP (BR-129).
 - Ở local, adapter gửi SMS là mock — in mã ra log, **không** gửi thật.
+- **IP thật của khách:** giới hạn theo IP (BR-129) dùng địa chỉ kết nối trực tiếp — đúng ở local. Đặt
+  Keycloak sau proxy hay load balancer thì **phải** cấu hình Keycloak đọc IP từ header của proxy tin cậy,
+  và chỉ từ proxy đó. Không làm thì mọi người dùng chung một IP, và giới hạn 20 lần gửi/giờ chặn cả hệ thống.
 
 ### Token trên mobile
 - Lưu ở **Keychain (iOS) / Keystore (Android)**. Không lưu ở AsyncStorage hay SharedPreferences.
@@ -122,7 +125,7 @@ Chính sách dữ liệu cá nhân phải nêu rõ ngoại lệ này để khác
 | Xác minh OTP | Chống dò mã |
 | Tìm kiếm xe | Tốn tài nguyên, và dễ bị quét lấy toàn bộ danh mục |
 | Tạo báo giá | Như trên |
-| Đăng nhập | Chống dò |
+| Đăng nhập | Chống dò — mật khẩu nhân viên khoá tạm theo BR-809; OTP theo BR-129 |
 
 ## 7. Checklist cho mỗi endpoint mới
 

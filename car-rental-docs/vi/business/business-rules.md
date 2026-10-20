@@ -1462,7 +1462,11 @@ Kết quả tìm kiếm chỉ ghi "cách 3,2 km" thì khách không biết đó 
 - **Mật khẩu nhân viên:** tối thiểu **12 ký tự** · **không** bắt đổi định kỳ · không dùng lại **5** mật
   khẩu gần nhất · mật khẩu tạm do `ADMIN` cấp **phải đổi** ở lần đăng nhập đầu. Bắt đổi định kỳ đẩy người
   dùng tới mật khẩu dễ đoán theo mẫu; mật khẩu dài cộng OTP mới là chỗ bảo vệ.
-*Nguồn: Tech Owner duyệt 12/10/2026.*
+- **Đoán mật khẩu nhân viên:** sai **5 lần liên tiếp** thì **khoá tạm 15 phút**; tiếp tục sai thì thời gian
+  khoá **tăng dần** (mỗi 5 lần sai cộng thêm 15 phút). **Không khoá vĩnh viễn** — khoá vĩnh viễn cho phép
+  người ngoài cố tình làm tê liệt tài khoản nhân viên. Thời gian khoá **tối đa 1 giờ**; `ADMIN` mở khoá
+  sớm được.
+*Nguồn: Tech Owner duyệt 12/10/2026. Khoá khi đoán mật khẩu: duyệt 20/10/2026, review Task 8a phát hiện.*
 
 ### BR-810 — Quyền trên chi nhánh và danh mục xe ✅ GĐ1
 | Thao tác | Vai được phép |
