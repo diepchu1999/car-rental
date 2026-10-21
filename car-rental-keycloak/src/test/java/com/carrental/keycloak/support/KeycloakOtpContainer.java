@@ -31,6 +31,7 @@ public final class KeycloakOtpContainer implements AutoCloseable {
     private final GenericContainer<?> postgres;
     private GenericContainer<?> keycloak;
     private final boolean importLoginRealm;
+    private final boolean installProbe;
     private final Map<String, String> loginSecrets = Map.of(
             "CAR_RENTAL_KEYCLOAK_READER_SECRET", UUID.randomUUID().toString(),
             "CAR_RENTAL_LOCAL_ADMIN_PASSWORD", "Test-" + UUID.randomUUID(),
@@ -45,7 +46,13 @@ public final class KeycloakOtpContainer implements AutoCloseable {
 
     /** Test đăng nhập import realm thật và không cài probe; test kho OTP giữ cấu hình cũ. */
     public KeycloakOtpContainer(boolean importLoginRealm) {
+        this(importLoginRealm, !importLoginRealm);
+    }
+
+    /** Cho test giới hạn thời gian dùng probe riêng; đăng nhập thường vẫn kiểm realm không có probe. */
+    public KeycloakOtpContainer(boolean importLoginRealm, boolean installProbe) {
         this.importLoginRealm = importLoginRealm;
+        this.installProbe = installProbe;
         postgres = new GenericContainer<>(DockerImageName.parse(TestSettings.repositorySetting("POSTGRES_IMAGE")))
                 .withCreateContainerCmdModifier(command -> command.withPlatform(TestSettings.repositorySetting("POSTGRES_PLATFORM")))
                 .withNetwork(network).withNetworkAliases("otp-postgres")
@@ -107,7 +114,8 @@ public final class KeycloakOtpContainer implements AutoCloseable {
                     .withCopyFileToContainer(MountableFile.forHostPath(
                             TestSettings.repositoryFile("infra/keycloak/realm-export.json"), 0644),
                             "/opt/keycloak/data/import/car-rental-realm.json");
-        } else {
+        }
+        if (installProbe) {
             container.withCopyFileToContainer(jar("probe.jar"), "/opt/keycloak/providers/car-rental-test-probe.jar");
         }
         return container;
@@ -132,10 +140,15 @@ public final class KeycloakOtpContainer implements AutoCloseable {
 
     /** HTTP đồng bộ, timeout hữu hạn; lỗi 500 là test đỏ chứ không chuyển thành kết quả nghiệp vụ. */
     public String call(String operation, Map<String, String> fields) throws Exception {
+        return callInRealm("master", operation, fields);
+    }
+
+    /** Chỉ dùng với probe của container test; chọn realm để điều khiển đồng hồ bản ghi brute force. */
+    public String callInRealm(String realm, String operation, Map<String, String> fields) throws Exception {
         String form = fields.entrySet().stream().map(entry -> encode(entry.getKey()) + "=" + encode(entry.getValue()))
                 .collect(Collectors.joining("&"));
         var request = HttpRequest.newBuilder(URI.create("http://" + keycloak.getHost() + ":" + keycloak.getMappedPort(8080)
-                        + "/realms/master/otp-probe/" + operation))
+                        + "/realms/" + encode(realm) + "/otp-probe/" + operation))
                 .timeout(Duration.ofSeconds(45)).header("Content-Type", "application/x-www-form-urlencoded")
                 .header("X-Test-Probe", probeSecret).POST(HttpRequest.BodyPublishers.ofString(form)).build();
         var response = http.send(request, HttpResponse.BodyHandlers.ofString());

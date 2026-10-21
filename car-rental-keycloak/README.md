@@ -88,6 +88,17 @@ Client `identity-reader` lấy secret từ `CAR_RENTAL_KEYCLOAK_READER_SECRET`, 
 `query-users` được gán trực tiếp; `view-users` của Keycloak bao gồm `query-groups`, nên token có thêm
 quyền đọc đó nhưng không có `manage-users`. Chỉ dùng các số/tài khoản này làm dữ liệu thử, không gửi SMS thật.
 
+Kiểm giới hạn mật khẩu BR-809 bằng Keycloak thật:
+
+```sh
+./mvnw '-Dit.test=KeycloakBruteForceIT,KeycloakLoginIT,ProviderPackagingIT' verify
+```
+
+`KeycloakBruteForceIT` dùng container riêng có JAR probe test để dịch mốc hết khoá trong dữ liệu thử,
+không chờ thật 15–60 phút. Nó giữ nguyên policy realm và bộ đếm, gửi mật khẩu qua form thật;
+probe không được cài vào local. Cấu hình realm đang chạy và thao tác ADMIN mở khoá sớm xem
+[hướng dẫn chạy local](../README.md#2-khởi-động-hạ-tầng). Restart không áp lại realm JSON đã import.
+
 Required action `UPDATE_PASSWORD` dùng provider có guard khi cấu hình
 `car-rental.employee-mfa-required=true` trong realm. Phải có bằng chứng của cả mật khẩu lẫn SMS trong
 đúng phiên nhân viên mới được mở/gửi form đổi mật khẩu. Realm `master` không bật guard này nên giữ

@@ -12,6 +12,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.ext.Provider;
 import org.keycloak.models.KeycloakSession;
+import org.keycloak.common.util.Time;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 
@@ -53,6 +54,38 @@ public final class OtpProbeResource {
     private OtpScope scope(String authenticationSession, String phone, String purpose) {
         return new OtpScope(session.getContext().getRealm().getId(), authenticationSession, phone,
                 OtpScope.Purpose.valueOf(purpose));
+    }
+
+    /**
+     * Chỉ dịch mốc của bản ghi đã có trong container test, giữ nguyên số lần sai và policy realm.
+     * Cho phép thử đủ 25 mật khẩu sai và cửa sổ 12 giờ mà không chờ hàng giờ ngoài đời thực.
+     * Không cấp token, không sinh lượt sai giả, không nằm trong JAR provider triển khai.
+     */
+    @POST @Path("age-password-failure")
+    public String agePasswordFailure(@HeaderParam("X-Test-Probe") String secret,
+                                     @FormParam("userId") String userId,
+                                     @FormParam("ageSeconds") int ageSeconds) {
+        authorize(secret);
+        if (ageSeconds < 2 || ageSeconds > 43201) throw new IllegalArgumentException("Invalid test failure age.");
+        var realm = session.getContext().getRealm();
+        var failure = session.loginFailures().getUserLoginFailure(realm, userId);
+        if (failure == null) throw new IllegalStateException("Expected an existing password failure.");
+
+        // Keycloak 26.7.2 chỉ cho hai setter thời gian tăng, nên không thể lùi trực tiếp.
+        // Chụp trước khi clear; phục hồi bộ đếm trong cùng transaction, không thêm lần sai mới.
+        int failures = failure.getNumFailures();
+        int temporaryLockouts = failure.getNumTemporaryLockouts();
+        String lastIp = failure.getLastIPFailure();
+        long lastFailure = Math.min(Time.currentTimeMillis(), failure.getLastFailure()) - ageSeconds * 1000L;
+        if (failures < 1 || lastFailure <= 0) throw new IllegalStateException("Expected a recorded password failure.");
+        // clearFailures không xoá numSecondaryAuthFailures; không được increment lại bộ đếm này.
+        failure.clearFailures();
+        for (int i = 0; i < failures; i++) failure.incrementFailures();
+        for (int i = 0; i < temporaryLockouts; i++) failure.incrementTemporaryLockouts();
+        failure.setLastIPFailure(lastIp);
+        failure.setLastFailure(lastFailure);
+        failure.setFailedLoginNotBefore(Math.toIntExact(Time.currentTimeSeconds() - 1));
+        return "aged|" + lastFailure;
     }
 
     /** Fixture chỉ hoạt động với secret ngẫu nhiên do test giữ, ngay cả trong container cô lập. */

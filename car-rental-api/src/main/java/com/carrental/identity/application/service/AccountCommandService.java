@@ -38,7 +38,8 @@ class AccountCommandService implements ResolveAccountUseCase {
     }
 
     /**
-     * Để UNIQUE phân xử lần gọi đầu tiên; chỉ CODE_COLLISION mới được thử mã khác.
+     * Đọc subject trước để request lặp không INSERT; UNIQUE vẫn phân xử hai request đầu đồng thời.
+     * Chỉ CODE_COLLISION mới được thử mã khác; không suy ra quyền từ việc tài khoản đã tồn tại.
      * Bên gọi phải chạy ngoài transaction read-only hoặc transaction có isolation khác;
      * transaction này thuộc bước đồng bộ danh tính, không thuộc use case đọc của endpoint.
      */
@@ -46,6 +47,8 @@ class AccountCommandService implements ResolveAccountUseCase {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     public AccountDetail resolve(ResolveAccountCommand command) {
         Validations.required(command, "command");
+        var existing = read.findBySubject(command.keycloakSubject());
+        if (existing.isPresent()) return reconcile(command, existing.orElseThrow());
         Instant createdAt = clock.instant();
         for (int attempt = 0; attempt < MAX_CODE_GENERATION_ATTEMPTS; attempt++) {
             Account candidate = Account.create(codes.generate("TK"), command.keycloakSubject(),
@@ -53,14 +56,13 @@ class AccountCommandService implements ResolveAccountUseCase {
             WriteAccountPort.InsertResult result = write.insert(candidate, createdAt);
             if (result == WriteAccountPort.InsertResult.CODE_COLLISION) continue;
             if (result == null) throw new IllegalStateException("Account insert returned no result.");
-            return reconcile(command);
+            return reconcile(command, reload(command.keycloakSubject()));
         }
         throw new IllegalStateException("Failed to create an account with a unique code after 5 attempts.");
     }
 
     /** Đối chiếu trước khi bổ sung; luôn đọc lại sau UPDATE, kể cả khi bên kia đã ghi trước. */
-    private AccountDetail reconcile(ResolveAccountCommand command) {
-        Account stored = reload(command.keycloakSubject());
+    private AccountDetail reconcile(ResolveAccountCommand command, Account stored) {
         Account verified = verify(stored, command);
         if (stored.consent().isEmpty() && verified.consent().isPresent()) {
             write.addConsentIfAbsent(verified);

@@ -31,6 +31,7 @@ public final class KeycloakLoginBrowser implements AutoCloseable {
     private String client;
     private String verifier;
     private String state;
+    private URI redirectUri = CALLBACK;
 
     /** Mỗi instance có cookie jar riêng, tương đương một trình duyệt hoặc một người dùng độc lập. */
     public KeycloakLoginBrowser(URI base) {
@@ -39,18 +40,20 @@ public final class KeycloakLoginBrowser implements AutoCloseable {
                 .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(10)).build();
     }
 
-    /** Khởi động Authorization Code + S256 bằng cùng redirect đã khai báo cho Postman. */
+    /** Authorization Code + S256; dùng redirect Postman hoặc console đã khai báo cho đúng client. */
     public void start(String clientId) throws Exception { start(clientId, Map.of()); }
 
     /** Tham số bổ sung chỉ ở test giao thức, ví dụ kc_action hoặc thử thiếu PKCE; không sửa server. */
     public void start(String clientId, Map<String, String> extra) throws Exception {
         client = clientId;
+        redirectUri = "security-admin-console".equals(client)
+                ? base.resolve("/admin/car-rental/console/") : CALLBACK;
         verifier = UUID.randomUUID().toString() + UUID.randomUUID();
         state = UUID.randomUUID().toString();
         callback = null;
         var fields = new LinkedHashMap<String, String>();
         fields.put("client_id", client); fields.put("response_type", "code");
-        fields.put("scope", "openid"); fields.put("redirect_uri", CALLBACK.toString()); fields.put("state", state);
+        fields.put("scope", "openid"); fields.put("redirect_uri", redirectUri.toString()); fields.put("state", state);
         fields.put("code_challenge", Base64.getUrlEncoder().withoutPadding().encodeToString(
                 MessageDigest.getInstance("SHA-256").digest(verifier.getBytes(StandardCharsets.US_ASCII))));
         fields.put("code_challenge_method", "S256");
@@ -73,7 +76,7 @@ public final class KeycloakLoginBrowser implements AutoCloseable {
                 .POST(HttpRequest.BodyPublishers.ofString(form(values))).build(), HttpResponse.BodyHandlers.ofString()));
     }
 
-    /** Theo redirect nội bộ hữu hạn; callback Postman chỉ được giữ trong bộ nhớ, không gọi mạng ra ngoài. */
+    /** Theo redirect hữu hạn; callback Postman/console chỉ giữ trong bộ nhớ để đổi code, không tải UI. */
     private void navigate(HttpResponse<String> response) throws Exception {
         for (int redirect = 0; redirect < 12; redirect++) {
             page = response;
@@ -99,8 +102,8 @@ public final class KeycloakLoginBrowser implements AutoCloseable {
 
     /** So nguyên origin/path, không dùng phép startsWith dễ chấp nhận hostname hoặc path giả. */
     private boolean sameCallback(URI uri) {
-        return CALLBACK.getScheme().equals(uri.getScheme()) && CALLBACK.getAuthority().equals(uri.getAuthority())
-                && CALLBACK.getPath().equals(uri.getPath());
+        return redirectUri.getScheme().equals(uri.getScheme()) && redirectUri.getAuthority().equals(uri.getAuthority())
+                && redirectUri.getPath().equals(uri.getPath());
     }
 
     /** HTML không được ghi vào log vì có action URL và thông tin phiên. */
@@ -134,7 +137,7 @@ public final class KeycloakLoginBrowser implements AutoCloseable {
     public HttpResponse<String> exchangeUsing(String suppliedVerifier) throws Exception {
         assertTrue(hasCode(), "No authorization code was issued.");
         return token(Map.of("grant_type", "authorization_code", "client_id", client,
-                "redirect_uri", CALLBACK.toString(), "code", query(callback).get("code"), "code_verifier", suppliedVerifier));
+                "redirect_uri", redirectUri.toString(), "code", query(callback).get("code"), "code_verifier", suppliedVerifier));
     }
 
     /** Gọi token endpoint thật; password grant chỉ xuất hiện trong phép thử buộc từ chối. */

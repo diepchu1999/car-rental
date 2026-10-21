@@ -119,6 +119,41 @@ của Keycloak tạo trong **database `keycloak`**, không thuộc Flyway/backen
 restart không xoá user, không đặt lại mật khẩu và không áp lại nội dung JSON lên realm cũ.
 Nếu local đã có realm `car-rental` từ cấu hình khác, dừng để đối chiếu trước; **không xoá realm hoặc volume**.
 
+**Chống đoán mật khẩu nhân viên (BR-809).** Realm mới import bật khoá tạm: 5 lần sai → 15 phút,
+mỗi nhóm 5 lần sai tăng thêm 15 phút, trần 1 giờ; không khoá vĩnh viễn. OTP vẫn dùng giới hạn riêng
+BR-129. Đăng nhập nhân viên thành công **đầy đủ mật khẩu + SMS** xoá bộ đếm; chỉ hết thời gian khoá
+không xoá bộ đếm. Mặc định Keycloak 26.7.2 đặt `maxDeltaTimeSeconds=43200`: nếu lần sai tiếp theo
+cách lần sai trước **hơn 12 giờ**, bộ đếm được đặt lại rồi tính lần sai mới là 1.
+
+Để áp lên realm local **đã tồn tại**, không import đè, không xoá volume và không cần restart:
+
+1. Vào `http://localhost:8080/admin/master/console/`, đăng nhập bằng quản trị hạ tầng đã tạo từ `.env`.
+   Chọn realm **car-rental**, không sửa realm `master`. ADMIN nghiệp vụ chỉ có quyền quản lý người dùng,
+   không có `manage-realm`; không cấp thêm quyền này chỉ để làm bước cấu hình.
+2. Mở **Realm settings → Security defenses → Brute force detection**, đặt các giá trị sau rồi **Save**:
+
+   | Trường giao diện | Giá trị | Thuộc tính realm |
+   |---|---|---|
+   | Brute Force Mode | Lockout temporarily | `bruteForceProtected=true`, `permanentLockout=false` |
+   | Max login failures | 5 | `failureFactor=5` |
+   | Wait increment | 15 Minutes (900 giây) | `waitIncrementSeconds=900` |
+   | Max wait | 1 Hour (3600 giây) | `maxFailureWaitSeconds=3600` |
+
+3. Giữ các tham số khác ở mặc định Keycloak: strategy **Multiple**, failure reset **12 Hours**,
+   quick login check **1000 ms**, minimum quick login wait **1 Minute**,
+   `maxTemporaryLockouts=0`, `maxSecondaryAuthFailures=0`. Nếu realm cũ khác các giá trị này,
+   đối chiếu trước khi tiếp tục; không coi restart là đã áp cấu hình.
+4. Tải lại trang, kiểm các giá trị đã lưu. Thay đổi có hiệu lực ngay và tồn tại qua restart.
+
+Quick-login là bảo vệ mặc định bổ sung: hai lần sai cách nhau dưới 1 giây có thể bị khoá 60 giây
+ngay trước ngưỡng 5 lần. Khi kiểm ngưỡng 5 lần bằng tay, giãn mỗi lần sai ít nhất 2 giây.
+
+**ADMIN mở khoá sớm:** vào `http://localhost:8080/admin/car-rental/console/`, đăng nhập ADMIN bằng
+mật khẩu + OTP; chọn **Users → nhân viên cần mở → Details → Temporarily locked**, chuyển sang **Off**.
+Tải lại để kiểm trạng thái đã hết khoá, rồi nhân viên đăng nhập lại bằng cả hai yếu tố.
+Không đổi mật khẩu, không xoá user, không dùng **Unlock all users**. Thao tác này chỉ xoá khoá/bộ đếm
+mật khẩu của người được chọn, **không** xoá hạn mức OTP BR-129.
+
 Khi build lại JAR hoặc đổi biến môi trường, từ gốc repo chạy `docker compose up -d --force-recreate keycloak`
 để nạp lại đúng file mount/cấu hình. Không dùng `down -v`. `docker compose restart` không cập nhật biến
 môi trường mới. Đổi các biến mật khẩu/secret import sau lần đầu không đổi credential đang lưu trong realm.
