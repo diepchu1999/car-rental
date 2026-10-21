@@ -7,8 +7,11 @@
 - BR-231: bảo hiểm là khoản riêng, không nằm trong `rentalAmount`.
 - BR-113/119/121/125: dùng cùng điều kiện thuê của `booking.api.RentalTermsDirectory`.
 - Không thu tiền, giữ chỗ hoặc kiểm lịch xe. Báo giá không cam kết xe còn trống (ADR-0005).
-- Namespace `client` hiện chưa có xác thực hoặc chủ thể sở hữu báo giá; ai có mã đều đọc được.
-  Đây là phạm vi local chưa có khách thật. Task identity phải bổ sung xác thực/phân quyền trước khi dùng thật.
+- Namespace `/client` cần access token hợp lệ có vai `CUSTOMER` (BR-120/801).
+  Gửi `Authorization: Bearer <access-token>`; thiếu/token sai trả `401 UNAUTHENTICATED`,
+  sai quyền namespace trả `403 ACCESS_DENIED`, giữ response envelope chung.
+- Báo giá chưa gắn chủ thể sở hữu: khách đã xác thực có mã vẫn đọc được báo giá đó.
+  Chỉ dùng dữ liệu giả ở local; xác thực không thay thế kiểm quyền sở hữu tài nguyên.
 - Không có phí tài xế/giao xe, giảm giá, cọc, phần còn lại hoặc thế chấp trong lát cắt này.
 
 ## Endpoint

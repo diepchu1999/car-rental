@@ -10,6 +10,8 @@ import com.carrental.branch.application.query.GetBranchQuery;
 import com.carrental.branch.application.query.ListNearbyBranchesQuery;
 import com.carrental.branch.application.view.BranchDetail;
 import com.carrental.branch.application.view.BranchDistanceSummary;
+import com.carrental.identity.api.CallerDirectory;
+import com.carrental.identity.api.CallerRef;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
 import com.carrental.shared.validation.Validations;
@@ -26,19 +28,40 @@ import java.util.Optional;
 @Service
 class BranchQueryService implements GetBranchUseCase, FindBranchUseCase, FindBranchByIdUseCase, ListNearbyBranchesUseCase {
     private final ReadBranchPort readBranchPort;
+    private final CallerDirectory callers;
 
-    /** Nhận một cổng đọc gộp cho resource chi nhánh theo module-architecture §3. */
-    BranchQueryService(ReadBranchPort readBranchPort) {
+    /** Nhận cổng đọc và danh tính; chỉ luồng get cho quản trị dùng CallerDirectory (BR-810). */
+    BranchQueryService(ReadBranchPort readBranchPort, CallerDirectory callers) {
         this.readBranchPort = readBranchPort;
+        this.callers = callers;
     }
 
-    /** Đọc bắt buộc cho API admin; giữ nguyên BRANCH_NOT_FOUND khi không có chi nhánh. */
+    /**
+     * BR-810: ADMIN đọc mọi chi nhánh; STAFF/MANAGER chỉ đọc chi nhánh được gán.
+     * Kiểm vai và việc gán trước truy vấn; so ID nội bộ trước khi trả view.
+     * Người có quyền đọc nhưng mã không tồn tại vẫn nhận BRANCH_NOT_FOUND.
+     * Các luồng tra cứu nội bộ bên dưới không áp quyền của endpoint quản trị.
+     */
     @Override
     @Transactional(readOnly = true)
     public BranchDetail get(GetBranchQuery query) {
         Validations.required(query, "query");
-        return readBranchPort.findByCode(query.code())
+        CallerRef caller = callers.current();
+        boolean admin = caller.hasRole("ADMIN");
+        if (!admin) {
+            if (!caller.hasRole("BRANCH_STAFF") && !caller.hasRole("BRANCH_MANAGER")) {
+                throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+            }
+            if (caller.branchId() == null) {
+                throw DomainException.forbidden(ErrorCode.STAFF_BRANCH_REQUIRED);
+            }
+        }
+        BranchDetail branch = readBranchPort.findByCode(query.code())
                 .orElseThrow(() -> DomainException.notFound(ErrorCode.BRANCH_NOT_FOUND));
+        if (!admin && caller.branchId().longValue() != branch.id()) {
+            throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+        }
+        return branch;
     }
 
     /** Đọc tùy chọn cho cổng cross-module: không tìm thấy trả rỗng, lỗi lưu trữ truyền nguyên. */

@@ -1,10 +1,60 @@
 {
   "info": {
     "name": "Car Rental - Task 06b - Review fixes",
-    "description": "Task 6b, Phần 1: cursor v3 dùng mã xe (BR-112/126, database-guideline §2). Chọn Car Rental - Local và chạy cả thư mục theo thứ tự. Tự tạo hai chi nhánh, ba xe ACTIVE và thời gian hợp lệ, mỗi lượt một model/biển số riêng; không xóa fixture, không dùng SQL. Hai xe cùng chi nhánh sắp theo mã, xe xa hơn đứng sau. Cursor v1/hỏng/sai điều kiện phải trả 400 INVALID_REQUEST. Biến b1* chỉ thuộc collection này. Phần 3 kiểm branchCode trên tất cả response admin xe; chạy từng thư mục độc lập.",
+    "description": "Task 6b: kiểm cursor hiện tại v3 theo mã nghiệp vụ, từ chối cursor v1 chứa ID số, và kiểm VehicleResponse dùng branchCode thay cho branchId. Chọn Car Rental - Local. BR-803/809/810: chọn token ADMIN local +84910000001 qua OAuth2 admin-web tại Authorization của COLLECTION, Use Token, tắt Share/Sync Token. Dùng lại token còn hạn; không xin OTP cho từng request. Chạy Part 0 trước. Request /admin kế thừa token collection; mọi request /public đặt No Auth tường minh để kiểm tìm xe không cần đăng nhập. Không lưu token vào file hoặc Git. Các nhóm tự tạo fixture chạy theo thứ tự trong từng nhóm, một iteration; không cần xoá dữ liệu.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
+    {
+      "name": "Part 0 - Verify ADMIN (BR-803, BR-810)",
+      "description": "BR-803/809/810: xác nhận đúng tài khoản ADMIN local trước khi kiểm log endpoint quản trị. Giữ token này ở collection trong toàn bộ lượt kiểm.",
+      "item": [
+        {
+          "name": "01 - Verify local ADMIN identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-803/809/810: phải là ADMIN +84910000001, không dùng token quản lý hoặc STAFF cho các fixture tạo chi nhánh."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is safe', () => pm.expect(pm.response.headers.get('X-Request-Id')).to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Expected local ADMIN account', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b).to.have.all.keys('success','data','error');",
+                  "  pm.expect(b.success).to.eql(true);",
+                  "  pm.expect(b.error).to.eql(null);",
+                  "  pm.expect(b.data.code).to.match(/^TK-[A-Z0-9]{6}$/);",
+                  "  pm.expect(b.data.phoneNumber).to.eql('+84910000001');",
+                  "  pm.expect(b.data.roles).to.include('ADMIN');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "Part 1 - Business-code cursor",
       "description": "Chạy đủ 16 request theo thứ tự: 11 tạo dữ liệu, 2 phân trang, 3 đầu vào lỗi. Không cần chạy collection Task 6 trước.",
@@ -540,7 +590,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{b1Start}}&endExclusive={{b1End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{b1Model}}&limit=1",
-            "description": "BR-112/126, database-guideline §2: trang đầu theo mã; giải mã toàn bộ cursor v3 để chứng minh chỉ có mã xe, không có trường ID số."
+            "description": "BR-112/126, database-guideline §2: trang đầu theo mã; giải mã toàn bộ cursor v3 để chứng minh chỉ có mã xe, không có trường ID số.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -607,7 +660,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{b1Start}}&endExclusive={{b1End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{b1Model}}&limit=2&cursor={{b1Cursor}}",
-            "description": "BR-112/126: trang sau theo mã còn lại rồi xe xa hơn, không lặp/mất xe; đổi limit không làm hỏng cursor."
+            "description": "BR-112/126: trang sau theo mã còn lại rồi xe xa hơn, không lặp/mất xe; đổi limit không làm hỏng cursor.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -663,7 +719,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{b1Start}}&endExclusive={{b1End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{b1Model}}&cursor={{b1LegacyCursor}}",
-            "description": "database-guideline §2, BR-126: cursor v1 đủ cấu trúc cũ (version/hash/distance/ID số) phải trả 400 INVALID_REQUEST."
+            "description": "database-guideline §2, BR-126: cursor v1 đủ cấu trúc cũ (version/hash/distance/ID số) phải trả 400 INVALID_REQUEST.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -715,7 +774,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{b1Start}}&endExclusive={{b1End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{b1Model}}&cursor=broken",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -751,7 +813,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{b1Start}}&endExclusive={{b1End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{b1Model}}&cursor={{b1Cursor}}&radiusKm=5",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -1227,6 +1292,88 @@
           ]
         }
       ]
+    }
+  ],
+  "auth": {
+    "type": "oauth2",
+    "oauth2": [
+      {
+        "key": "grant_type",
+        "value": "authorization_code_with_pkce",
+        "type": "string"
+      },
+      {
+        "key": "authUrl",
+        "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+        "type": "string"
+      },
+      {
+        "key": "accessTokenUrl",
+        "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+        "type": "string"
+      },
+      {
+        "key": "clientId",
+        "value": "admin-web",
+        "type": "string"
+      },
+      {
+        "key": "clientSecret",
+        "value": "",
+        "type": "string"
+      },
+      {
+        "key": "redirect_uri",
+        "value": "https://oauth.pstmn.io/v1/callback",
+        "type": "string"
+      },
+      {
+        "key": "scope",
+        "value": "openid",
+        "type": "string"
+      },
+      {
+        "key": "challengeAlgorithm",
+        "value": "S256",
+        "type": "string"
+      },
+      {
+        "key": "state",
+        "value": "{{$guid}}",
+        "type": "string"
+      },
+      {
+        "key": "client_authentication",
+        "value": "body",
+        "type": "string"
+      },
+      {
+        "key": "addTokenTo",
+        "value": "header",
+        "type": "string"
+      },
+      {
+        "key": "tokenName",
+        "value": "Car Rental Local ADMIN",
+        "type": "string"
+      },
+      {
+        "key": "useBrowser",
+        "value": false,
+        "type": "boolean"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "keycloakBaseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "realm",
+      "value": "car-rental",
+      "type": "string"
     }
   ]
 }

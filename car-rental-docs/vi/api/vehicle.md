@@ -9,7 +9,16 @@
 - BR-410: `PETROL`, `DIESEL`, `ELECTRIC`, `HYBRID`.
 - BR-018: bắt buộc số chỗ, hộp số, hãng và dòng xe ngay khi tạo.
 - BR-234: giá ngày nguyên VND, lớn hơn 0 và chia hết cho 1.000; bắt buộc khi duyệt, đổi được ở mọi trạng thái.
-- Không xác thực/phân quyền trong task này. Namespace admin không tự bảo vệ API.
+- Namespace `/admin` cần access token hợp lệ, vai nhân viên và `azp=admin-web` (BR-801/809).
+  Gửi `Authorization: Bearer <access-token>`; thiếu/token sai trả `401 UNAUTHENTICATED`,
+  sai quyền namespace trả `403 ACCESS_DENIED`, giữ response envelope chung.
+- Tạo xe kiểm quyền tại use case theo BR-810: ADMIN ở mọi chi nhánh;
+  STAFF/MANAGER chỉ ở chi nhánh mình; STAFF không được nhập giá.
+- Gửi duyệt kiểm vai và chi nhánh đã lưu trên xe theo BR-810; không lấy phạm vi từ body/query/header.
+- Duyệt chỉ cho ADMIN hoặc MANAGER của chi nhánh có xe; STAFF không được duyệt (BR-810).
+- Đọc xe quản trị chỉ cho ADMIN hoặc STAFF/MANAGER của chi nhánh có xe (BR-810).
+- Đổi giá chỉ cho ADMIN hoặc MANAGER của chi nhánh có xe; STAFF không được đổi giá (BR-810).
+  Mọi kiểm quyền dữ liệu nằm ở use case, cửa namespace không thay thế chúng. Chỉ dùng dữ liệu giả ở local.
 - Không xử lý availability, partner onboarding, điều chuyển, sửa giấy tờ hoặc thanh lý.
 
 ## Endpoint
@@ -28,6 +37,19 @@ URL luôn dùng mã `XE-<6>`, không dùng khóa chính số.
 Tra cứu giữ nguyên mã đầu vào, không cắt khoảng trắng hoặc đổi kiểu chữ.
 
 ## Tạo xe
+
+### Quyền tạo — BR-803/810
+
+- `ADMIN` được tạo ở mọi chi nhánh, có hoặc không có giá, không cần được gán chi nhánh.
+- `BRANCH_STAFF` và `BRANCH_MANAGER` chỉ tạo ở chi nhánh mình.
+  Chưa gán nhận `403 STAFF_BRANCH_REQUIRED`; chọn chi nhánh khác đang tồn tại nhận `403 ACCESS_DENIED`.
+- Chỉ `BRANCH_MANAGER` của chi nhánh đó hoặc `ADMIN` được nhập giá khi tạo.
+  STAFF gửi kèm giá trong yêu cầu hợp lệ nhận `403 ACCESS_DENIED`, không tạo xe và không bỏ qua giá.
+- Vai khác không được tạo, kể cả `ACCOUNTANT`/`OPERATIONS_MANAGER`.
+- Kiểm quyền trong use case trước sinh mã/ghi xe. Vai và phạm vi lấy từ danh tính đã xác thực,
+  không nhận từ header, query hoặc các trường ngoài hợp đồng trong body.
+- Validation cấu trúc command và giá theo BR-234 vẫn thực hiện trước khi gọi use case;
+  JSON sai hoặc giá không hợp lệ giữ lỗi đầu vào bên dưới.
 
 Content-Type: `application/json`.
 
@@ -116,6 +138,49 @@ Gửi duyệt và phê duyệt giữ nguyên cả bốn thuộc tính BR-018 và
 Hai POST chuyển trạng thái không cần body. Body không được dùng để chọn trạng thái,
 ngày duyệt hoặc sửa thông tin giấy tờ.
 
+### Quyền đọc — BR-803/810
+
+`GET /api/v1/admin/vehicles/{code}`:
+
+- `ADMIN` xem mọi xe, không yêu cầu được gán chi nhánh.
+- `BRANCH_STAFF`/`BRANCH_MANAGER` chỉ xem xe có chi nhánh khớp với phân công của mình.
+  Chưa gán nhận `403 STAFF_BRANCH_REQUIRED` trước khi đọc xe; liên kết khác hoặc null nhận
+  `403 ACCESS_DENIED` trước khi tra mã chi nhánh để trả response.
+- Các vai khác nhận `403 ACCESS_DENIED` trước khi đọc xe, kể cả ACCOUNTANT/OPERATIONS_MANAGER.
+- Người đủ vai và đã có phạm vi được gán gọi mã không tồn tại nhận `404 VEHICLE_NOT_FOUND`.
+- Không kiểm lại điều kiện phê duyệt: mọi trạng thái, giấy tờ thiếu/hết hạn và giá null vẫn đọc được
+  nếu đúng quyền. Query/header tự khai vai hoặc chi nhánh không thay đổi phạm vi đã xác thực.
+- Kiểm tại use case; không áp quyền quản trị này lên các cổng tra cứu nội bộ dành cho search/pricing.
+
+### Quyền gửi duyệt — BR-803/810
+
+`POST /api/v1/admin/vehicles/{code}/submit-for-approval`:
+
+- `ADMIN` gửi xe ở mọi chi nhánh, không yêu cầu được gán chi nhánh.
+- `BRANCH_STAFF`/`BRANCH_MANAGER` chỉ gửi xe của chi nhánh mình, kể cả xe có giá đã nhập trước đó.
+  Quyền gửi duyệt không đồng nghĩa với quyền nhập giá hoặc phê duyệt.
+- Sai vai trả `403 ACCESS_DENIED`, chưa được gán trả `403 STAFF_BRANCH_REQUIRED` trước khi tải xe.
+- Đủ vai/phạm vi nhưng mã xe không tồn tại trả `404 VEHICLE_NOT_FOUND`.
+- Xe thuộc chi nhánh khác trả `403 ACCESS_DENIED` **trước kiểm trạng thái**, kể cả xe đã gửi duyệt;
+  không trả dữ liệu hay lỗi trạng thái của xe đó. Không có liên kết chi nhánh khớp cũng bị từ chối.
+- Các chốt quyền ở use case; header/query/body tự khai vai hoặc chi nhánh không thay thế phạm vi
+  đã xác thực và chi nhánh đọc từ aggregate.
+
+### Quyền phê duyệt — BR-803/810
+
+`POST /api/v1/admin/vehicles/{code}/approve`:
+
+- `ADMIN` duyệt ở mọi chi nhánh, không cần được gán chi nhánh.
+- `BRANCH_MANAGER` chỉ duyệt xe của chi nhánh mình; chưa gán nhận `403 STAFF_BRANCH_REQUIRED`
+  trước khi tải xe. Xe khác chi nhánh (hoặc không có liên kết khớp) nhận `403 ACCESS_DENIED`.
+- `BRANCH_STAFF` bị từ chối ngay cả với xe cùng chi nhánh; các vai còn lại cũng nhận
+  `403 ACCESS_DENIED` trước khi tải xe. Quyền gửi duyệt không đồng nghĩa quyền phê duyệt.
+- Kiểm quyền trước trạng thái, giấy tờ và giá; không trả lỗi nội dung hồ sơ của xe ngoài phạm vi.
+- Đủ quyền nhưng mã không tồn tại nhận `404 VEHICLE_NOT_FOUND`; đủ quyền không bỏ qua các
+  điều kiện nghiệp vụ dưới đây. Vai, chi nhánh, ngày duyệt hoặc trạng thái tự khai không có tác dụng.
+
+### Điều kiện chuyển trạng thái
+
 1. Gửi duyệt chỉ nhận DRAFT và trả PENDING_APPROVAL; chưa kiểm đủ giấy tờ hoặc giá ngày.
 2. Duyệt chỉ nhận PENDING_APPROVAL. Cả đăng kiểm và TNDS phải có ngày hết hạn
    **sau ngày duyệt**; ngày hết hạn bằng ngày duyệt cũng bị từ chối.
@@ -139,10 +204,17 @@ duyệt chặn đúng; đừng thêm endpoint sửa chỉ để hoàn thành ví
 }
 ```
 
+- BR-803/810: ADMIN đổi ở mọi chi nhánh, không yêu cầu được gán; MANAGER chỉ đổi xe thuộc chi nhánh mình.
+  MANAGER chưa gán nhận `403 STAFF_BRANCH_REQUIRED` trước khi tải xe;
+  xe khác chi nhánh hoặc không có liên kết khớp nhận `403 ACCESS_DENIED` trước khi ghi.
+  STAFF và các vai còn lại nhận `403 ACCESS_DENIED` trước khi tải xe, kể cả cùng chi nhánh.
+  Phạm vi lấy từ danh tính đã xác thực và aggregate đã lưu, không nhận từ body/header/query.
 - BR-234: không giới hạn trạng thái; DRAFT, PENDING_APPROVAL, ACTIVE, INACTIVE, REJECTED và RETIRED đều đổi được.
 - `dailyRate` bắt buộc, không cho xóa giá: thiếu/null hoặc số không hợp lệ trả 422 `VEHICLE_INVALID_DAILY_RATE`.
   JSON không đọc được hoặc giá không chuyển được thành số trả 400 `INVALID_REQUEST`.
-- Kiểm đầu vào trước khi tra xe. Đầu vào hợp lệ nhưng mã xe không tồn tại trả 404 `VEHICLE_NOT_FOUND`.
+- Command kiểm đầu vào trước khi gọi use case. Đầu vào hợp lệ và người gọi đủ quyền nhưng mã xe
+  không tồn tại trả 404 `VEHICLE_NOT_FOUND`. Đầu vào số không hợp lệ vẫn trả 422 trước kiểm quyền dữ liệu;
+  thiếu/sai token vẫn bị chặn tại lớp xác thực trước controller.
 - Chỉ cập nhật `daily_rate`, không đổi trạng thái, giấy tờ, thuộc tính hay chi nhánh.
   Response 200 cùng hình dạng GET, mang giá mới. Ghi và đọc lại trong một transaction;
   lỗi khi đọc lại hoặc tra chi nhánh làm rollback.
@@ -155,6 +227,9 @@ duyệt chặn đúng; đừng thêm endpoint sửa chỉ để hoàn thành ví
 
 | HTTP | error.code | Khi nào |
 |---|---|---|
+| 401 | UNAUTHENTICATED | Thiếu hoặc sai token |
+| 403 | ACCESS_DENIED | Sai quyền namespace; tạo/đọc/gửi duyệt/duyệt/đổi giá sai vai hoặc khác chi nhánh; STAFF nhập giá khi tạo |
+| 403 | STAFF_BRANCH_REQUIRED | STAFF/MANAGER chưa gán khi tạo/đọc/gửi duyệt; MANAGER chưa gán khi duyệt/đổi giá |
 | 400 | INVALID_REQUEST | Thiếu trường, chuỗi trắng, enum/ngày/JSON không hợp lệ |
 | 422 | VEHICLE_INVALID_SEATS | Số chỗ ngoài tập `4`, `5`, `7`, `16` theo BR-018 |
 | 404 | BRANCH_NOT_FOUND | Mã chi nhánh không tồn tại khi tạo |
@@ -168,6 +243,43 @@ duyệt chặn đúng; đừng thêm endpoint sửa chỉ để hoàn thành ví
 | 422 | VEHICLE_INVALID_DAILY_RATE | Giá sai khi tạo/đổi, hoặc thiếu/null khi đổi giá |
 | 415 | INVALID_REQUEST | Content-Type tạo xe hoặc đổi giá không được hỗ trợ |
 | 500 | INTERNAL_ERROR | Lỗi bất ngờ, hết lượt thử mã hoặc không đọc lại được bản ghi vừa ghi |
+
+Kiểm quyền tạo bằng `postman/task-08a-identity.postman_collection.json`, thư mục
+`Part 4 - Vehicle creation authorization (BR-810)`: chạy 01–03 bằng ADMIN (xác nhận danh tính,
+tạo chi nhánh thử, tạo xe có giá); đổi token thư mục sang STAFF rồi chạy 04–08 (lấy chi nhánh
+mình, tạo không giá 201, gửi giá 403, tạo khác chi nhánh 403, không token 401).
+STAFF phải đã được gán chi nhánh ở phần gán nhân viên. Mã tự lưu và biển số sinh ngẫu nhiên;
+mỗi lượt thành công tạo một chi nhánh và hai xe DRAFT. Không chạy cả thư mục bằng một token,
+không bật Share Token, dừng nếu kiểm danh tính không xanh.
+
+Kiểm quyền gửi duyệt bằng cùng collection, thư mục
+`Part 4 - Vehicle submission authorization (BR-810)`: chạy 01–04 bằng ADMIN (kiểm danh tính,
+tạo chi nhánh và xe thử, gửi duyệt 200); đổi token sang STAFF rồi chạy 05–10 (lấy chi nhánh mình,
+tạo xe không giá, gửi duyệt 200, gửi lại 422, gửi xe khác chi nhánh 403, không token 401).
+STAFF phải đã được gán chi nhánh. Mỗi lượt tạo một chi nhánh và hai xe thử mới; không sửa việc gán,
+không cần copy mã. Chạy lại cả lượt từ đầu; gửi lại riêng request đã thành công sẽ nhận lỗi trạng thái.
+
+Kiểm quyền đổi giá bằng cùng collection, thư mục **Part 4 - Vehicle daily rate authorization (BR-810)**:
+01–04 bằng STAFF lấy chi nhánh, tạo xe không giá, PUT giá bị 403 rồi GET xác nhận giá vẫn null;
+05–09 bằng ADMIN xác nhận danh tính, đặt giá 855000 thành công, GET xác nhận giá mới,
+thử giá 0 nhận 422 rồi GET xác nhận giá vẫn 855000; 10 No Auth nhận 401.
+Mỗi lượt tạo một xe mới, không tạo/gán lại chi nhánh. Request tự lưu mã và đối chiếu toàn bộ dữ liệu
+ngoài giá với lúc tạo. Chạy lại từ 01, dừng nếu setup/kiểm danh tính lỗi; không chạy cả thư mục bằng một token.
+
+Kiểm quyền đọc bằng cùng collection, thư mục **Part 4 - Vehicle read authorization (BR-810)**:
+01 bằng STAFF lấy chi nhánh; 02–05 bằng ADMIN tạo chi nhánh khác, tạo xe DRAFT và đọc 200;
+06–09 bằng STAFF tạo xe ở chi nhánh mình, đọc 200 rồi đọc xe khác chi nhánh nhận 403;
+10 No Auth nhận 401. Mỗi lượt tạo một chi nhánh và hai xe mới, không gán lại nhân viên.
+Request tự lưu mã và so sánh GET với dữ liệu lúc tạo; chạy lại từ 01, dừng nếu setup/kiểm danh tính lỗi.
+Đặt token ở thư mục, tắt Share Token; không chạy toàn bộ thư mục bằng một token.
+
+Kiểm quyền phê duyệt bằng cùng collection, thư mục
+`Part 4 - Vehicle approval authorization (BR-810)`:
+01 bằng STAFF lấy chi nhánh; 02–04 bằng ADMIN tạo xe đủ giá/giấy tờ ở chi nhánh đó và gửi duyệt;
+05–06 bằng STAFF chứng minh cùng chi nhánh vẫn bị 403; 07–09 bằng ADMIN duyệt chính xe đó 200
+rồi thử duyệt lại 422; 10 No Auth nhận 401. Mỗi lượt tạo một xe mới, không tạo chi nhánh hay
+thay việc gán nhân viên. Ngày giấy tờ thử được sinh trong tương lai; mã và dữ liệu tự lưu,
+không copy giữa request. Chạy từ đầu nếu cần một lượt mới, không chạy toàn bộ bằng một token.
 
 Hai request chuyển trạng thái cùng lúc: request đến sau có thể nhận 422 nếu đọc sau commit,
 hoặc 409 nếu đã đọc trạng thái cũ nhưng thua cập nhật có điều kiện. Cả hai đều không được ghi đè.

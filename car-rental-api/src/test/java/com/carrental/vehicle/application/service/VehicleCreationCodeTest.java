@@ -3,6 +3,7 @@ package com.carrental.vehicle.application.service;
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchRef;
 import com.carrental.branch.api.BranchSearchView;
+import com.carrental.identity.api.CallerRef;
 import com.carrental.shared.code.BusinessCodeGeneratorTestFactory;
 import com.carrental.vehicle.application.command.CreateVehicleCommand;
 import com.carrental.vehicle.application.port.out.ReadVehiclePort;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.time.Clock;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.random.RandomGenerator;
 
@@ -132,7 +134,8 @@ class VehicleCreationCodeTest {
                 readVehiclePort,
                 BusinessCodeGeneratorTestFactory.create(random),
                 branchDirectory,
-                Clock.systemUTC()
+                Clock.systemUTC(),
+                () -> new CallerRef("TK-ADMIN1", Set.of("ADMIN"), null)
         );
 
         VehicleDetail actual = service.create(COMMAND);
@@ -217,7 +220,8 @@ class VehicleCreationCodeTest {
                 readVehiclePort,
                 BusinessCodeGeneratorTestFactory.create(random),
                 branchDirectory,
-                Clock.systemUTC()
+                Clock.systemUTC(),
+                () -> new CallerRef("TK-ADMIN1", Set.of("ADMIN"), null)
         );
 
         IllegalStateException failure = assertThrowsExactly(

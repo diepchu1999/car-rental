@@ -19,19 +19,19 @@ BEGIN
     FOR expected IN
         SELECT * FROM (VALUES
             (
-                'KL-T6M001', 'XE-B76A44', 'CN-JMRGMT', 'RENTAL', 'CONFIRMED',
-                'TASK06-MANUAL-7fa9992b-RENTAL', 'Task 6 manual search fixture',
-                TIMESTAMPTZ '2026-10-09 06:00:00+07', TIMESTAMPTZ '2026-10-09 12:00:00+07'
+                'KL-T8M001', 'XE-GPQFVV', 'CN-6W0VVV', 'RENTAL', 'CONFIRMED',
+                'TASK06-MANUAL-ff9d534b-RENTAL', 'Task 6 manual search fixture',
+                TIMESTAMPTZ '2026-10-22 06:00:00+07', TIMESTAMPTZ '2026-10-22 12:00:00+07'
             ),
             (
-                'KL-T6M002', 'XE-09Z3NS', 'CN-JMRGMT', 'COMPLIANCE_HOLD', 'BLOCKED',
-                NULL, 'Task 6 manual compliance fixture 7fa9992b',
-                TIMESTAMPTZ '2026-10-09 00:00:00+07', NULL::TIMESTAMPTZ
+                'KL-T8M002', 'XE-YYZEY6', 'CN-6W0VVV', 'COMPLIANCE_HOLD', 'BLOCKED',
+                NULL, 'Task 6 manual compliance fixture ff9d534b',
+                TIMESTAMPTZ '2026-10-22 00:00:00+07', NULL::TIMESTAMPTZ
             ),
             (
-                'KL-T6M003', 'XE-TTJ8LW', 'CN-ELJ86T', 'RENTAL', 'CONFIRMED',
-                'TASK06-MANUAL-7fa9992b-HOURLY', 'Task 6 manual hourly fixture 7fa9992b',
-                TIMESTAMPTZ '2026-10-09 06:00:00+07', TIMESTAMPTZ '2026-10-09 11:00:00+07'
+                'KL-T8M003', 'XE-QWFS1I', 'CN-QNKBRE', 'RENTAL', 'CONFIRMED',
+                'TASK06-MANUAL-ff9d534b-HOURLY', 'Task 6 manual hourly fixture ff9d534b',
+                TIMESTAMPTZ '2026-10-22 06:00:00+07', TIMESTAMPTZ '2026-10-22 11:00:00+07'
             )
         ) AS fixtures (
             reservation_code, vehicle_code, branch_code, kind, status,
@@ -64,7 +64,7 @@ BEGIN
                 JOIN branch.branch AS b ON b.id = v.branch_id
                 WHERE v.id = actual.vehicle_id
                   AND v.code = expected.vehicle_code
-                  AND v.model = 'T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042'
+                  AND v.model = 'T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799'
                   AND b.code = expected.branch_code
             ) THEN
             RAISE EXCEPTION 'Fixture % differs from expected data. Cleanup was aborted.',
@@ -84,12 +84,12 @@ COMMIT;
 -- Sau COMMIT phải bằng 0. Lượt chạy lại cũng phải bằng 0.
 SELECT COUNT(*) AS remaining_manual_reservations
 FROM availability.reservation
-WHERE code IN ('KL-T6M001', 'KL-T6M002', 'KL-T6M003');
+WHERE code IN ('KL-T8M001', 'KL-T8M002', 'KL-T8M003');
 
 -- Ba xe và hai chi nhánh liên quan vẫn còn, không bị thao tác dọn fixture xóa.
 SELECT v.code AS vehicle_code, b.code AS branch_code
 FROM vehicle.vehicle AS v
 JOIN branch.branch AS b ON b.id = v.branch_id
-WHERE v.model = 'T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042'
-  AND v.code IN ('XE-B76A44', 'XE-09Z3NS', 'XE-TTJ8LW')
+WHERE v.model = 'T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799'
+  AND v.code IN ('XE-GPQFVV', 'XE-YYZEY6', 'XE-QWFS1I')
 ORDER BY v.code;

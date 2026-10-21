@@ -8,7 +8,8 @@ import com.carrental.shared.error.DomainException;
  * Cổng đầu vào cho chức năng đọc chi tiết chi nhánh theo mã nghiệp vụ.
  *
  * <p>Người gọi không cần biết cách tra cứu hoặc nơi lưu dữ liệu.
- * Chức năng này chỉ đọc, không thay đổi chi nhánh.
+ * Chức năng này chỉ đọc, không thay đổi chi nhánh. BR-810: ADMIN đọc mọi chi nhánh,
+ * STAFF/MANAGER chỉ đọc chi nhánh mình; tra cứu cross-module dùng FindBranchUseCase.
  */
 public interface GetBranchUseCase {
 
@@ -18,7 +19,8 @@ public interface GetBranchUseCase {
      * @param query yêu cầu tra cứu đã được kiểm tra, không được null
      * @return thông tin chi tiết của chi nhánh tìm được
      * @throws DomainException nếu không tìm thấy chi nhánh,
-     *                        với mã lỗi {@code BRANCH_NOT_FOUND}
+     *                        với mã lỗi {@code BRANCH_NOT_FOUND}, chưa xác thực,
+     *                        thiếu gán chi nhánh hoặc không có quyền đọc
      */
     BranchDetail get(GetBranchQuery query);
 }

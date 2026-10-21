@@ -9,9 +9,13 @@ theo ngoại lệ thay đổi trước phát hành của api-guideline.
 - Vị trí chi nhánh phục vụ BR-003: xe công ty sử dụng vị trí chi nhánh khi tìm kiếm.
 - Mã chi nhánh theo database-guideline mục 2: `CN-` và sáu ký tự thuộc `A-Z`, `0-9`.
 - Mã do application sinh; cơ sở dữ liệu bảo vệ tính duy nhất.
-- Chưa lưu `managerId`. BR-807 được hiện thực cùng module identity ở task sau.
-- Chỉ chạy local. Chưa có xác thực và phân quyền.
-- Namespace `/admin` không tự bảo vệ quyền truy cập.
+- Không lưu `managerId` trong bảng chi nhánh; quan hệ gán nhân viên/quản lý nằm trong module identity (BR-807).
+- Chỉ chạy local. Namespace `/admin` cần access token hợp lệ, vai nhân viên và `azp=admin-web` (BR-801/809).
+- Gửi `Authorization: Bearer <access-token>`; thiếu/token sai trả `401 UNAUTHENTICATED`,
+  sai quyền namespace trả `403 ACCESS_DENIED`. Response lỗi giữ envelope chung.
+- Tạo chi nhánh chỉ cho `ADMIN`, kiểm trong use case trước sinh mã và gọi cổng lưu trữ (BR-810).
+- Đọc chi nhánh: ADMIN xem tất cả; BRANCH_STAFF/BRANCH_MANAGER chỉ xem chi nhánh mình;
+  các vai khác bị từ chối. Quyền dữ liệu được kiểm trong use case (BR-803/810).
 
 Tài liệu liên quan:
 
@@ -33,6 +37,10 @@ Mọi endpoint áp dụng [header truy vết X-Request-Id](http-headers.md); res
 Không có endpoint danh sách, cập nhật hoặc đóng chi nhánh trong phạm vi này.
 
 ## POST /api/v1/admin/branches
+
+Chỉ `ADMIN` được tạo (BR-810), không yêu cầu ADMIN được gán một chi nhánh.
+Các vai nhân viên khác, kể cả `BRANCH_MANAGER` và `OPERATIONS_MANAGER`, nhận
+`403 ACCESS_DENIED` khi gửi yêu cầu hợp lệ; không sinh mã hoặc ghi chi nhánh.
 
 ### Request
 
@@ -144,6 +152,18 @@ Hai request hợp lệ có cùng tọa độ có thể tạo hai chi nhánh khá
 
 ## GET /api/v1/admin/branches/{code}
 
+### Quyền truy cập — BR-803/810
+
+- `ADMIN` đọc mọi chi nhánh, không yêu cầu được gán một chi nhánh.
+- `BRANCH_STAFF` và `BRANCH_MANAGER` chỉ đọc chi nhánh được gán; chưa gán trả
+  `403 STAFF_BRANCH_REQUIRED`, mã trỏ đến chi nhánh khác đang tồn tại trả `403 ACCESS_DENIED`.
+- Các vai khác, kể cả `ACCOUNTANT` và `OPERATIONS_MANAGER`, nhận `403 ACCESS_DENIED`;
+  phạm vi cấp công ty không tự cấp quyền đọc danh mục quản trị.
+- Vai và việc gán được kiểm trước truy vấn; phạm vi so với ID nội bộ trước khi trả dữ liệu.
+  Header/query tự khai vai hoặc chi nhánh không thay thế danh tính đã xác thực.
+- Các tra cứu cross-module qua `BranchDirectory` không dùng quyền HTTP này;
+  tìm xe công khai và việc ánh xạ mã chi nhánh của `/accounts/me` vẫn hoạt động như trước.
+
 ### Request
 
 Ví dụ:
@@ -157,7 +177,7 @@ Accept: application/json
 - Endpoint không nhận request body.
 - Mã được truyền nguyên trạng vào truy vấn, không tự đổi kiểu chữ hoặc cắt khoảng trắng.
 - Không áp lại quy tắc định dạng tạo mã tại query.
-- Không tìm thấy bản ghi tương ứng thì trả `BRANCH_NOT_FOUND`.
+- Người có quyền đọc và đủ việc gán nhưng mã không tồn tại nhận `BRANCH_NOT_FOUND`.
 
 ### Response thành công
 
@@ -199,6 +219,10 @@ HTTP status: `404 Not Found`.
 
 | Endpoint | HTTP | error.code | Trường hợp |
 |---|---|---|---|
+| POST, GET | 401 | `UNAUTHENTICATED` | Thiếu access token hoặc token không hợp lệ |
+| POST | 403 | `ACCESS_DENIED` | Người gọi không có vai ADMIN |
+| GET | 403 | `ACCESS_DENIED` | Vai không được phép hoặc STAFF/MANAGER đọc chi nhánh khác |
+| GET | 403 | `STAFF_BRANCH_REQUIRED` | STAFF/MANAGER chưa được gán chi nhánh |
 | POST | 400 | `INVALID_REQUEST` | JSON không đọc được, thiếu hoặc null tọa độ, tọa độ không hữu hạn hoặc ngoài giới hạn; thiếu/null/rỗng/trắng tên hoặc địa chỉ |
 | POST | 415 | `INVALID_REQUEST` | Content-Type không được endpoint hỗ trợ |
 | GET | 404 | `BRANCH_NOT_FOUND` | Không tìm thấy chi nhánh theo mã |
@@ -228,6 +252,20 @@ Chuỗi rỗng hoặc trắng trả cùng mã lỗi, với thông báo
 `name must not be blank.` hoặc `address must not be blank.`.
 
 ## Collection Postman — Task 6, Phần 2
+
+Kiểm quyền tạo chi nhánh bằng collection `postman/task-08a-identity.postman_collection.json`,
+thư mục `Part 4 - Branch creation authorization (BR-810)`:
+chạy 01–02 bằng token BRANCH_STAFF, sau đó 03–04 bằng token ADMIN.
+Mỗi cặp kiểm đúng danh tính qua `/admin/accounts/me` trước khi gửi yêu cầu tạo;
+nhân viên nhận 403, ADMIN nhận 201. Mỗi lần chạy thành công tạo thêm một chi nhánh local thử.
+Các request tạo chi nhánh trong collection cũ cũng phải dùng token ADMIN.
+
+Kiểm quyền đọc bằng cùng collection, thư mục `Part 4 - Branch read authorization (BR-810)`:
+chạy 01–03 với ADMIN (xác nhận danh tính, tạo chi nhánh thử, đọc lại); đổi token thư mục sang
+STAFF rồi chạy 04–07 (lấy chi nhánh mình từ `/me`, đọc cùng chi nhánh 200, đọc chéo 403,
+không token 401). STAFF phải đã được gán chi nhánh ở phần gán nhân viên. Mỗi lượt chạy tạo thêm
+một chi nhánh thử, không đổi việc gán STAFF và không yêu cầu copy mã. Không chạy cả thư mục
+bằng một token; dừng nếu kiểm danh tính không xanh, không tự đặt biến để vượt kiểm tra.
 
 - Import [collection Task 6](../../../postman/task-06-search.postman_collection.json)
   và [environment local](../../../postman/local.postman_environment.json).

@@ -2,6 +2,7 @@ package com.carrental.vehicle.application.service;
 
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchRef;
+import com.carrental.identity.api.CallerRef;
 import com.carrental.shared.code.BusinessCodeGeneratorTestFactory;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
@@ -30,6 +31,7 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 
 import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.*;
@@ -108,7 +110,8 @@ class VehicleCommandServiceTest {
                 read,
                 BusinessCodeGeneratorTestFactory.create(new Random(7)),
                 branches,
-                CLOCK
+                CLOCK,
+                () -> new CallerRef("TK-ADMIN1", Set.of("ADMIN"), null)
         );
     }
 

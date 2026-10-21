@@ -1,6 +1,8 @@
 package com.carrental.vehicle.application.service;
 
 import com.carrental.PostgresTestConfiguration;
+import com.carrental.identity.adapter.in.internal.ServiceCallerTestScope;
+import com.carrental.identity.api.CallerRef;
 import com.carrental.branch.application.command.CreateBranchCommand;
 import com.carrental.branch.application.port.in.CreateBranchUseCase;
 import com.carrental.shared.error.DomainException;
@@ -24,6 +26,7 @@ import com.carrental.vehicle.domain.OwnershipType;
 import com.carrental.vehicle.domain.Vehicle;
 import com.carrental.vehicle.domain.VehicleStatus;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -45,6 +48,7 @@ import java.time.ZoneId;
 import java.util.Optional;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
 
 import static com.carrental.vehicle.VehicleTestFixtures.SPECIFICATIONS;
 import static org.junit.jupiter.api.Assertions.*;
@@ -64,6 +68,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Execution(ExecutionMode.SAME_THREAD)
 class VehicleServiceIntegrationTest {
+    private ServiceCallerTestScope callerScope;
 
     @Autowired private CreateVehicleUseCase create;
     @Autowired private GetVehicleUseCase get;
@@ -113,9 +118,58 @@ class VehicleServiceIntegrationTest {
     /** Xóa trạng thái probe và bảo đảm test không che lỗi thiếu transaction ở service. */
     @BeforeEach
     void resetProbe() {
+        callerScope = ServiceCallerTestScope.admin();
         probe.reset();
         assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
         assertEquals(ZoneId.of("Asia/Ho_Chi_Minh"), clock.getZone());
+    }
+
+    /** Thu hồi caller sau test, không thay bean identity và không ảnh hưởng transaction. */
+    @AfterEach
+    void closeCallerScope() {
+        if (callerScope != null) callerScope.close();
+    }
+
+    /** BR-810: MANAGER cùng chi nhánh đổi giá commit thật; các thuộc tính còn lại không đổi. */
+    @Test
+    void managerChangesOwnBranchRateWithRealStorage() {
+        var original = create.create(command());
+        probe.reset();
+        try (var manager = ServiceCallerTestScope.open(
+                new CallerRef("TK-MANAG1", Set.of("BRANCH_MANAGER"), original.branchId()))) {
+            var changed = changeRate.changeDailyRate(
+                    com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand.from(
+                            original.code(), java.math.BigDecimal.valueOf(855_000)));
+            assertEquals(855_000L, changed.dailyRate());
+            assertEquals(original.status(), changed.status());
+            assertEquals(original.branchCode(), changed.branchCode());
+            assertEquals(original.plateNumber(), changed.plateNumber());
+            assertTrue(probe.transactionActive);
+            assertFalse(probe.transactionReadOnly);
+            assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+            assertEquals(Optional.of(changed.withBranchCode(null)), actualRead.findByCode(original.code()));
+        }
+    }
+
+    /** BR-810: MANAGER chi nhánh khác nhận 403; đọc độc lập sau rollback thấy toàn bộ xe không đổi. */
+    @Test
+    void managerCannotChangeAnotherBranchRateWithRealStorage() {
+        var original = create.create(command());
+        var otherBranch = createBranch.create(CreateBranchCommand.from(11.0, 107.0,
+                "Other test branch", "Other test address"));
+        assertNotEquals(original.branchId(), otherBranch.id());
+        probe.reset();
+        try (var manager = ServiceCallerTestScope.open(
+                new CallerRef("TK-MANAG1", Set.of("BRANCH_MANAGER"), otherBranch.id()))) {
+            var failure = assertThrowsExactly(DomainException.class, () -> changeRate.changeDailyRate(
+                    com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand.from(
+                            original.code(), java.math.BigDecimal.valueOf(855_000))));
+            assertEquals(ErrorCode.ACCESS_DENIED, failure.errorCode());
+            assertEquals(DomainException.Category.FORBIDDEN, failure.category());
+        }
+        assertEquals(1, probe.readCount, "Denied change must not reload a modified vehicle.");
+        assertFalse(TransactionSynchronizationManager.isActualTransactionActive());
+        assertEquals(Optional.of(original.withBranchCode(null)), actualRead.findByCode(original.code()));
     }
 
     /** Tạo xe commit thật; đọc xe qua service mở transaction chỉ đọc. */

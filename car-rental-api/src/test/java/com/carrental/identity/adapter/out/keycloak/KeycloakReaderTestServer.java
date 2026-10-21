@@ -62,7 +62,7 @@ final class KeycloakReaderTestServer implements AutoCloseable {
                 .withNetwork(network).withEnv("KC_DB", "postgres")
                 .withEnv("KC_DB_URL", "jdbc:postgresql://reader-postgres:5432/keycloak")
                 .withEnv("KC_DB_USERNAME", "keycloak").withEnv("KC_DB_PASSWORD", password)
-                .withCopyToContainer(Transferable.of(realm, 0644), "/opt/keycloak/data/import/reader-realm.json")
+                .withCopyToContainer(Transferable.of(realm, 0644), "/opt/keycloak/data/import/car-rental-realm.json")
                 .withExposedPorts(8080).withCommand("start-dev", "--http-port=8080", "--import-realm")
                 .waitingFor(Wait.forHttp("/realms/car-rental/.well-known/openid-configuration").forStatusCode(200))
                 .withStartupTimeout(Duration.ofMinutes(5));

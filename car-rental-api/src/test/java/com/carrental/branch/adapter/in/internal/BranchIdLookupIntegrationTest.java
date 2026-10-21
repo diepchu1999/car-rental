@@ -1,6 +1,7 @@
 package com.carrental.branch.adapter.in.internal;
 
 import com.carrental.PostgresTestConfiguration;
+import com.carrental.identity.adapter.in.internal.ServiceCallerTestScope;
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchRef;
 import com.carrental.branch.application.command.CreateBranchCommand;
@@ -24,8 +25,10 @@ class BranchIdLookupIntegrationTest {
     /** Hai chi nhánh khác nhau trả đúng mã riêng theo ID và khớp đường tra theo mã. */
     @Test
     void resolvesStoredIdsWithoutMixingBranches() {
-        var first = create.create(CreateBranchCommand.from(10.0, 106.0, "First", "First address"));
-        var second = create.create(CreateBranchCommand.from(11.0, 107.0, "Second", "Second address"));
+        var first = ServiceCallerTestScope.asAdmin(() ->
+                create.create(CreateBranchCommand.from(10.0, 106.0, "First", "First address")));
+        var second = ServiceCallerTestScope.asAdmin(() ->
+                create.create(CreateBranchCommand.from(11.0, 107.0, "Second", "Second address")));
         assertNotEquals(first.id(), second.id());
         assertEquals(Optional.of(new BranchRef(first.id(), first.code())), directory.findById(first.id()));
         assertEquals(Optional.of(new BranchRef(second.id(), second.code())), directory.findById(second.id()));

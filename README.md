@@ -124,8 +124,40 @@ Khi build lại JAR hoặc đổi biến môi trường, từ gốc repo chạy 
 môi trường mới. Đổi các biến mật khẩu/secret import sau lần đầu không đổi credential đang lưu trong realm.
 
 Thông tin các flow, tài khoản thử và cách kiểm provider: [Keycloak provider](car-rental-keycloak/README.md).
-Backend được bảo vệ bằng token chỉ khi phần resource server/identity đã được cấu hình; import realm
-không tự khoá các endpoint Spring Boot.
+Backend xác minh access token của realm bằng chữ ký RS256, issuer, audience `car-rental-api` và hạn dùng.
+Gửi token qua header `Authorization: Bearer <access-token>`; không truyền qua query, cookie hoặc form.
+`/api/v1/public/**` và `GET /actuator/health` không cần token; `/api/v1/client/**` cần vai `CUSTOMER`;
+`/api/v1/admin/**` cần vai nhân viên và token của client `admin-web` (mật khẩu + OTP).
+Thiếu/token sai trả `401 UNAUTHENTICATED`; token hợp lệ nhưng sai quyền namespace trả `403 ACCESS_DENIED`.
+Backend không lưu phiên đăng nhập. Tạo chi nhánh chỉ cho ADMIN, kiểm trong use case theo BR-810.
+Đọc chi nhánh quản trị chỉ cho ADMIN (mọi chi nhánh) hoặc STAFF/MANAGER (chi nhánh mình);
+nhân viên chưa gán chi nhánh nhận `403 STAFF_BRANCH_REQUIRED`, đọc chéo nhận `403 ACCESS_DENIED`.
+Tạo xe chỉ cho ADMIN ở mọi chi nhánh hoặc STAFF/MANAGER ở chi nhánh mình;
+STAFF gửi kèm giá trong yêu cầu hợp lệ nhận `403 ACCESS_DENIED`, không bỏ qua giá.
+Gửi duyệt xe chỉ cho ADMIN ở mọi chi nhánh hoặc STAFF/MANAGER ở chi nhánh mình;
+xe khác chi nhánh bị chặn trước kiểm trạng thái. Xe đúng quyền vẫn phải ở DRAFT để gửi duyệt.
+Duyệt xe chỉ cho ADMIN hoặc MANAGER của chi nhánh có xe; STAFF không được duyệt.
+Người đủ quyền vẫn phải đáp ứng trạng thái chờ duyệt, giấy tờ còn hạn và đã có giá ngày.
+Đọc xe quản trị chỉ cho ADMIN (mọi xe) hoặc STAFF/MANAGER (xe của chi nhánh mình);
+chưa gán chi nhánh nhận `403 STAFF_BRANCH_REQUIRED`, đọc chéo hoặc sai vai nhận `403 ACCESS_DENIED`.
+Đổi giá ngày chỉ cho ADMIN hoặc MANAGER của chi nhánh có xe; STAFF không được đổi giá.
+Giá phải dương, nguyên VND và chia hết cho 1.000; cập nhật không đổi trạng thái hay báo giá cũ.
+Chỉ dùng dữ liệu giả ở local, không dùng bản này với dữ liệu thật.
+Báo giá hiện chưa gắn chủ sở hữu.
+Kiểm bằng thư mục `Part 3 - Backend namespace security` trong
+[collection identity](postman/task-08a-identity.postman_collection.json), environment `Car Rental - Local`.
+Các request OAuth2 dùng **Get New Access Token → Use Token**, không copy token vào file hay bật đồng bộ token.
+
+Đọc tài khoản của chính mình bằng `GET /api/v1/client/accounts/me` (khách) hoặc
+`GET /api/v1/admin/accounts/me` (nhân viên); hợp đồng ở [API tài khoản](car-rental-docs/vi/api/identity.md).
+Thư mục `Part 3 - Current account` trong collection identity tự lưu mã khách và nhân viên vào biến
+collection. Nhân viên chưa gán chi nhánh vẫn lấy được mã `TK-<6>` qua `/me`; đây không phải quyền
+thao tác chi nhánh. Chỉ dùng dữ liệu thử, không export token hoặc response chứa thông tin thật vào Git.
+
+ADMIN gán chi nhánh bằng `PUT /api/v1/admin/accounts/{accountCode}/branch`, body chứa `branchCode`.
+Thư mục `Part 3 - Staff branch assignment` trong collection lấy mã STAFF qua `/me`, tạo chi nhánh
+thử rồi gán. Chọn đúng token ADMIN/STAFF theo mô tả từng request. Chạy lại thư mục này tạo chi nhánh
+thử mới và thay bản gán của nhân viên thử; vai đích được đọc từ Keycloak, không gửi trong body.
 
 Backend tra vai hiện tại bằng client chỉ đọc `identity-reader`. Bổ sung vào `.env`:
 

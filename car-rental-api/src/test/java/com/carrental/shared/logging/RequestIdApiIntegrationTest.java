@@ -1,6 +1,8 @@
 package com.carrental.shared.logging;
 
 import com.carrental.PostgresTestConfiguration;
+import com.carrental.identity.config.HttpIdentityTestConfiguration;
+import com.carrental.identity.config.HttpIdentityTestConfiguration.TestJwtIssuer;
 import com.carrental.shared.api.ApiResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,24 +28,46 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Clock;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Kiểm đăng ký filter và pattern của Boot qua HTTP thật; không dùng datasource local. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import({PostgresTestConfiguration.class, RequestIdApiIntegrationTest.ProbeConfiguration.class})
+@Import({PostgresTestConfiguration.class, HttpIdentityTestConfiguration.class,
+        RequestIdApiIntegrationTest.ProbeConfiguration.class})
 @ExtendWith(OutputCaptureExtension.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class RequestIdApiIntegrationTest {
     @LocalServerPort private int port;
     @Autowired private ObjectMapper objectMapper;
+    @Autowired private TestJwtIssuer tokens;
+    @Autowired private Clock clock;
+
+    /** Probe chỉ tồn tại trong test nhưng vẫn đi qua security thật; request bị chặn cũng có requestId. */
+    @Test
+    void unauthenticatedProbeKeepsCorrelationWithoutExecutingController(CapturedOutput output) throws Exception {
+        String id = "denied-" + UUID.randomUUID();
+        var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                        + "/api/v1/admin/test/request-id/failure"))
+                .timeout(Duration.ofSeconds(10)).header(RequestIdFilter.HEADER_NAME, id).GET().build();
+        try (var client = HttpClient.newHttpClient()) {
+            var response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            assertEquals(401, response.statusCode());
+            assertEquals(id, response.headers().firstValue(RequestIdFilter.HEADER_NAME).orElseThrow());
+            assertEquals("UNAUTHENTICATED", objectMapper.readTree(response.body())
+                    .path("error").path("code").asString());
+            assertFalse(output.getAll().lines().anyMatch(line -> line.contains("[requestId=" + id + "]")
+                    && line.contains("Failure summary:")), "The protected probe must not execute.");
+        }
+    }
 
     /** Hai logger khác nhau đều mang ID client an toàn mà không thêm trường vào JSON. */
     @Test
     void correlatesEveryLogEventAndPreservesResponseShape(CapturedOutput output) throws Exception {
         String requestId = "client-" + UUID.randomUUID();
-        var response = get("/test/request-id/success?secret=query-sentinel", requestId);
+        var response = get("/api/v1/admin/test/request-id/success?secret=query-sentinel", requestId);
         assertEquals(200, response.statusCode());
         assertEquals(requestId, response.headers().firstValue(RequestIdFilter.HEADER_NAME).orElseThrow());
         assertEquals(objectMapper.readTree("{\"success\":true,\"data\":\"ok\",\"error\":null}"),
@@ -66,7 +90,7 @@ class RequestIdApiIntegrationTest {
     @ParameterizedTest
     @ValueSource(strings = {"bad_id", "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdefX"})
     void replacesUnsafeHeaderOverHttp(String suppliedId) throws Exception {
-        var response = get("/test/request-id/success", suppliedId);
+        var response = get("/api/v1/admin/test/request-id/success", suppliedId);
         assertEquals(200, response.statusCode());
         assertGeneratedResponseId(response);
         assertNotEquals(suppliedId, response.headers().firstValue(RequestIdFilter.HEADER_NAME).orElseThrow());
@@ -76,7 +100,7 @@ class RequestIdApiIntegrationTest {
     @Test
     void correlatesUnexpectedFailureWithoutLeakingInternalDetails(CapturedOutput output) throws Exception {
         String requestId = "failure-" + UUID.randomUUID();
-        var response = get("/test/request-id/failure", requestId);
+        var response = get("/api/v1/admin/test/request-id/failure", requestId);
         assertEquals(500, response.statusCode());
         assertEquals(requestId, response.headers().firstValue(RequestIdFilter.HEADER_NAME).orElseThrow());
         assertEquals(objectMapper.readTree("""
@@ -84,18 +108,21 @@ class RequestIdApiIntegrationTest {
                  "message":"An unexpected error occurred."}}
                 """), objectMapper.readTree(response.body()));
         assertTrue(output.getAll().lines().anyMatch(line -> line.contains("[requestId=" + requestId + "]")
-                && line.contains("[api=GET /test/request-id/failure]")
-                && line.contains("api=\"GET /test/request-id/failure\"")
+                && line.contains("[api=GET /api/v1/admin/test/request-id/failure]")
+                && line.contains("api=\"GET /api/v1/admin/test/request-id/failure\"")
                 && line.contains("ERROR")), "The server error event must contain the request ID and API.");
         assertTrue(output.getAll().contains("IllegalStateException: Internal SQL probe failure"));
         assertTrue(output.getAll().lines().anyMatch(line -> line.startsWith("\tat com.carrental.")),
                 "Stack trace continuation must retain its standard format.");
     }
 
-    /** Gửi HTTP tới cổng ngẫu nhiên của context test, có giới hạn thời gian chờ. */
+    /** Gửi JWT ADMIN thật cho probe ở namespace admin; health vẫn là request ẩn danh. */
     private HttpResponse<String> get(String path, String requestId) throws Exception {
         var builder = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                 .timeout(Duration.ofSeconds(10)).GET();
+        if (path.startsWith("/api/v1/admin/")) {
+            builder.header("Authorization", "Bearer " + tokens.adminToken(clock));
+        }
         if (requestId != null) {
             builder.header(RequestIdFilter.HEADER_NAME, requestId);
         }
@@ -108,7 +135,7 @@ class RequestIdApiIntegrationTest {
     private static void assertCorrelatedLog(CapturedOutput output, String requestId, String message) {
         assertTrue(output.getAll().lines().anyMatch(line -> line.contains(message)
                 && line.contains("[requestId=" + requestId + "]")
-                && line.contains("[api=GET /test/request-id/success]")),
+                && line.contains("[api=GET /api/v1/admin/test/request-id/success]")),
                 "The rendered log event must include the response request ID: " + message);
     }
 
@@ -129,12 +156,12 @@ class RequestIdApiIntegrationTest {
         }
     }
 
-    /** TestComponent ngăn component scan thông thường thu nhận controller dò. */
+    /** TestComponent ngăn scan thu nhận probe; namespace admin giữ nguyên security production. */
     @TestComponent
     @RestController
     static class ProbeController {
         /** Phát hai sự kiện từ hai logger, không ghi bất kỳ đầu vào HTTP nào. */
-        @GetMapping("/test/request-id/success")
+        @GetMapping("/api/v1/admin/test/request-id/success")
         ApiResponse<String> success() {
             LoggerFactory.getLogger("com.carrental.requestid.probe.first")
                     .info("Request correlation probe first event");
@@ -144,7 +171,7 @@ class RequestIdApiIntegrationTest {
         }
 
         /** Gây lỗi nội bộ có chủ đích để kiểm handler thật vẫn giấu chi tiết. */
-        @GetMapping("/test/request-id/failure")
+        @GetMapping("/api/v1/admin/test/request-id/failure")
         ApiResponse<String> failure() {
             throw new IllegalStateException("Internal SQL probe failure");
         }

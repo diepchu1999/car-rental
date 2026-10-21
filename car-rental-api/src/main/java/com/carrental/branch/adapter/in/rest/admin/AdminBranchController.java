@@ -26,8 +26,8 @@ import java.net.URI;
  * Controller chỉ chuyển đổi dữ liệu HTTP và gọi các use case,
  * không truy cập cơ sở dữ liệu hoặc kiểm tra quy tắc nghiệp vụ.
  *
- * <p>Namespace admin xác định nhóm API, không tự cung cấp phân quyền.
- * Xác thực và phân quyền được hiện thực ở task riêng.
+ * <p>Security xác thực namespace admin; use case tạo chi nhánh kiểm quyền ADMIN theo BR-810.
+ * Use case đọc kiểm vai và phạm vi chi nhánh theo BR-810, không suy quyền từ tên namespace.
  */
 @RestController
 @RequestMapping(
