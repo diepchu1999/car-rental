@@ -207,7 +207,7 @@ ranh giới sai, dừng lại và hỏi Chief Architect.
 | R5 | `adapter/out/persistence` không import `jakarta.persistence` hay Spring Data JPA | ADR-0003 |
 | R6 | Chỉ `*PolicyResolver` được rẽ nhánh trên `OwnershipType` và `RentalType` | ADR-0004 |
 | R7 | Chỉ module `availability` chứa SQL ghi vào `availability.reservation` | ADR-0005 |
-| R8 | Không có `DELETE`, `TRUNCATE`, hay `DROP TABLE` trong SQL của `handover` và `compliance` | ADR-0015 |
+| R8 | Không có `DELETE`, `TRUNCATE`, hay `DROP TABLE` trong SQL của `handover`, `compliance` và `audit`; riêng `audit` cấm thêm `UPDATE` — chỉ được thêm (mở rộng ở Task 8b) | ADR-0015, security-guideline §3 |
 | R9 | `booking`, `handover`, `payment`, `settlement` không import `ConfigurationPort` — đọc bản sao trong đơn | ADR-0014 |
 | R10 | Module `search` không import `VehicleRef`, và **không kiểu nào** `search` dùng từ `vehicle.api` có trường, thành phần record hay kiểu trả về là `OwnershipType` (mở rộng ở Task 6 — tên `VehicleRef` thôi thì chưa đủ) | BR-112 |
 | R11 | `application` không import web/HTTP/servlet · JDBC/SQL · Jackson · `@Configuration`/`@Bean` | ADR-0004 |

@@ -97,7 +97,7 @@ Cách xây: **lát cắt dọc từng luồng** (ADR-0012), không xây hết ba
 | `if` trên `ownership_type` hoặc `rental_type` ngoài `*PolicyResolver` | Rải rác thì không ai dám sửa |
 | Code quyết toán đọc `config` thay vì bản sao trong đơn | Âm thầm tính lại đơn cũ |
 | `search` biết xe thuộc ai | BR-112 |
-| Xoá cứng dữ liệu trong `handover` và `compliance` | Bằng chứng pháp lý |
+| Xoá cứng dữ liệu trong `handover`, `compliance` và `audit`; sửa dữ liệu `audit` | Bằng chứng pháp lý và nhật ký thao tác nhạy cảm |
 | JPA repository cho truy vấn nghiệp vụ | ADR-0003 |
 | Quy tắc nghiệp vụ trong controller · trả row CSDL làm response | — |
 | Trả khoá chính số trong response hay cursor — tham chiếu ra ngoài bằng mã nghiệp vụ | Số tuần tự mời người ta dò — database-guideline §2 |

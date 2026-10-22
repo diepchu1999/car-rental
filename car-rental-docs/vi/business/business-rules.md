@@ -525,8 +525,10 @@ Khách không thuộc chi nhánh nào, nên việc xác minh không gắn với 
 **CCCD phải còn hạn tới hết chuyến** — cùng cách kiểm với GPLX ở BR-106b: lúc tạo đơn và lúc bàn giao. Hợp
 đồng thuê và hồ sơ phạt nguội (BR-702) dựa trên giấy tờ tuỳ thân còn hiệu lực.
 
-**Ảnh tải lên:** mỗi ảnh tối đa **5 MB**; chỉ nhận **JPEG, PNG, HEIC** (HEIC là mặc định của iPhone). Server
-tự xác định loại file từ nội dung, không tin loại file client khai (security-guideline §5).
+**Ảnh tải lên:** mỗi ảnh tối đa **5 MB = 5.000.000 byte** và **40 triệu pixel** (kiểm trước khi giải mã, chặn
+ảnh nhỏ mà phình to khi mở); chỉ nhận **JPEG, PNG, HEIC** (HEIC là mặc định của iPhone). Server tự xác định
+loại file từ nội dung, không tin loại file client khai (security-guideline §5). Tải lên và xem đều qua **liên
+kết ký có hạn**: tải lên **5 phút**, xem **60 giây**.
 
 **Lý do từ chối** chọn từ danh sách cố định, cộng ghi chú tự do **không bắt buộc**:
 
@@ -544,11 +546,24 @@ Danh sách cố định để ứng dụng hiện đúng hướng dẫn sửa ch
 Số GPLX và số CCCD **băm để tra cứu, mã hoá khi lưu**; ảnh nằm ở kho object, CSDL chỉ giữ khoá
 (security-guideline §3).
 
-**Mỗi lần nhân viên mở ảnh giấy tờ đều ghi audit** — ai mở, của ai, lúc nào (security-guideline §3).
+**Mỗi lần nhân viên mở giấy tờ của khách kèm ảnh đều ghi audit** — ai mở, của ai, lúc nào
+(security-guideline §3). "Mở" là một lần **gọi API lấy chi tiết kèm liên kết xem ảnh**: mỗi lần gọi một dòng
+audit, ghi xong mới trả liên kết. Liên kết ký dùng lại được trong 60 giây, nên hệ thống không đếm được từng
+lượt tải ảnh thật — giới hạn này là có chủ đích, đổi lại bằng hạn liên kết ngắn.
 
-**Khách cập nhật GPLX** — ví dụ sau khi gia hạn — thì **phải xác minh lại**; bản đã xác minh trước không
-tự chuyển sang bản mới.
-*Nguồn: Tech Owner duyệt 22/10/2026 — gồm vai `DOCUMENT_VERIFIER`, hạn CCCD, giới hạn ảnh, danh sách lý do từ chối.*
+**Khách nộp bản mới** — ví dụ GPLX vừa gia hạn — thì bản mới **phải xác minh**. Trong lúc chờ, **bản cũ đã
+xác minh vẫn dùng được** cho tới khi bản mới được duyệt hoặc bản cũ hết hạn; bản mới bị từ chối thì khách
+vẫn còn bản cũ. Mọi bước kiểm (còn hạn tới hết chuyến, hạng phù hợp xe) vẫn áp lên đúng bản đang dùng.
+Không chặn đặt xe chỉ vì khách gia hạn sớm. Áp như nhau cho CCCD và GPLX.
+
+**Một số CCCD chỉ xác minh cho một tài khoản.** CCCD đã xác minh ở tài khoản khác thì **không xác minh
+được** (`IDENTITY_CARD_ALREADY_REGISTERED`), ép bằng ràng buộc CSDL ở bước xác minh. **Không** giữ chỗ số
+CCCD lúc khách tự nhập — nếu giữ, kẻ xấu nhập trước số của nạn nhân để chặn họ. Cho qua thì một người dùng
+hai số điện thoại né được hồ sơ vi phạm (BR-707). Khách đổi số điện thoại đi đường BR-124, không tạo tài
+khoản mới.
+*Nguồn: Tech Owner duyệt 22/10/2026 — gồm vai `DOCUMENT_VERIFIER`, hạn CCCD, giới hạn ảnh, danh sách lý do từ chối.
+Làm rõ cùng ngày theo kế hoạch Task 8b: hạn liên kết, định nghĩa "mở", bản cũ dùng tới khi bản mới được duyệt,
+một CCCD một tài khoản.*
 
 ---
 

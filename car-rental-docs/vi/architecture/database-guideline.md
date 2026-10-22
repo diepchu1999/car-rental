@@ -26,6 +26,8 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;     -- hash số định danh
 | Chi nhánh | `CN-<6>` | `CN-3TR7WK` |
 | Xe | `XE-<6>` | `XE-8KQ4M2` |
 | Khoá lịch | `KL-<6>` | `KL-5HV2QN` |
+| Giấy tờ khách (một lần nộp) | `GT-<6>` | `GT-7PZ2KD` |
+| Lượt tải ảnh giấy tờ | `AN-<6>` | `AN-3WQ9TL` |
 | Báo giá | `BG-<yymm>-<6>` | `BG-2610-7QW3ZR` |
 | Đơn thuê | `DT-<yymm>-<6>` | `DT-2608-3XK9PQ` |
 | Thanh toán | `TT-<yymm>-<8>` | `TT-2608-4M2XK9PQ` |

@@ -90,6 +90,8 @@ Hệ thống lưu CCCD, GPLX, ảnh tình trạng xe, vị trí, và dữ liệu
 - **Không bao giờ bật ở môi trường có dữ liệu thật.** Giá trị tham số là số điện thoại, mã đơn, toạ độ,
   số CCCD đã mã hoá — log là nơi dữ liệu bị đọc bởi người không có quyền đọc bảng gốc. Khi dựng môi
   trường thật, kiểm rằng profile `sql-log` **không thể** được bật ở đó.
+- **Giấy tờ khách không vào log, kể cả ở profile `sql-log`.** Truy vấn chạm số CCCD/GPLX, khoá object ảnh
+  hay liên kết ký phải che giá trị tham số; lỗi JDBC, lỗi SDK và `toString()` cũng không được làm lộ (BR-130).
 - **Lỗi 500: chi tiết chỉ nằm ở log máy chủ.** Stack trace, tên class, số dòng, câu SQL không bao giờ
   vào response gửi khách — response chỉ có mã lỗi chung. Đã khoá bằng test
   `hidesInternalDetailsForUnexpectedFailure`.
