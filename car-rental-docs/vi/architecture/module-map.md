@@ -155,6 +155,8 @@ Các cổng chính:
 | `search` hiện tiền thuê, lọc và xếp theo giá | `pricing` | `pricing.api` — **cùng một cách tính** với báo giá (BR-126) |
 | `booking` lấy báo giá đã đóng băng | `pricing` | `pricing.api` — làm cùng `booking` |
 | Mọi module kiểm người gọi được động vào chi nhánh nào | `identity` | `identity.api` — vai và chi nhánh của người gọi (BR-803, BR-810) |
+| `booking` kiểm khách có được thuê xe này không | `identity` | `identity.api` — GPLX và CCCD đã xác minh, còn hạn tới hết chuyến, hạng GPLX phù hợp số chỗ và hộp số (BR-106, BR-106b, BR-128, BR-130) |
+| Mọi module ghi nhật ký thao tác nhạy cảm | `audit` | `audit.api` — chỉ thêm, không sửa, không xoá (đầu tiên: mở ảnh giấy tờ, BR-130) |
 | `fleet` khoá lịch bảo dưỡng | `availability` | `AvailabilityDirectory.block(...)` |
 | `fleet` tạo khoá giấy tờ **lúc duyệt xe**, không đợi tới ngày hết hạn | `availability` | `AvailabilityDirectory.block(..., COMPLIANCE_HOLD)` |
 | `fleet` dời khoá giấy tờ khi giấy tờ được gia hạn | `availability` | `AvailabilityDirectory.moveComplianceHoldStart(...)` |

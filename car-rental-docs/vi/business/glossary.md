@@ -143,6 +143,7 @@
 | `ACCOUNTANT` | Kế toán | 1 |
 | `OPERATIONS_MANAGER` | Quản lý vận hành — duyệt điều chuyển xe | 1 |
 | `ADMIN` | Toàn quyền | 1 |
+| `DOCUMENT_VERIFIER` | Nhân viên xác minh giấy tờ khách, chỉ có quyền xác minh (BR-130) | 1 |
 | `HOST` | Đối tác cá nhân | 2 |
 | `BUSINESS_PARTNER` | Đối tác doanh nghiệp | 3 |
 | `BUSINESS_PARTNER_STAFF` | Tài khoản con của đối tác doanh nghiệp | 3 |

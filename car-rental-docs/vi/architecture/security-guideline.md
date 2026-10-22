@@ -35,7 +35,7 @@ Keycloak không hỗ trợ sẵn — phải viết Authenticator SPI bằng Java
 
 ## 2. Phân quyền
 
-Keycloak giữ vai thô (12 vai, BR-801). Phân quyền theo dữ liệu nằm ở tầng ứng dụng.
+Keycloak giữ vai thô (13 vai, BR-801). Phân quyền theo dữ liệu nằm ở tầng ứng dụng.
 
 - Phạm vi của từng vai — một chi nhánh, cấp công ty, hay toàn quyền: **BR-803**.
 - Ai được gọi thao tác nào trên chi nhánh và danh mục xe: **BR-810**.
@@ -111,7 +111,8 @@ Chính sách dữ liệu cá nhân phải nêu rõ ngoại lệ này để khác
 
 ## 5. Upload file
 
-- Giới hạn kích thước và kiểu MIME ở server, **không tin `Content-Type` client gửi**.
+- Giới hạn kích thước và kiểu MIME ở server, **không tin `Content-Type` client gửi**. Ảnh giấy tờ khách:
+  5 MB, JPEG/PNG/HEIC (BR-130).
 - Sinh lại tên file, không dùng tên client đặt.
 - Ảnh bàn giao: **giữ mốc thời gian và toạ độ** — đó là phần giá trị pháp lý (ADR-0015).
 - Kiểm kích thước ảnh trước khi giải nén, tránh ảnh phình.
