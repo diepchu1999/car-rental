@@ -15,6 +15,7 @@ car-rental/
 ├── AGENTS.md              contract cho codex (Principal Engineer)
 ├── car-rental-docs/       tài liệu — nguồn sự thật duy nhất
 ├── car-rental-api/        backend Spring Boot
+├── car-rental-keycloak/   provider OTP, Java 21, nạp vào Keycloak local
 ├── customer-web/          web khách thuê             (chưa tạo)
 ├── admin-web/             web vận hành               (chưa tạo)
 ├── mobile/                React Native               (chưa tạo)
@@ -80,12 +81,131 @@ không tự suy ngày nghỉ liền kề. Trước khi chạy với khách thậ
 
 ### 2. Khởi động hạ tầng
 
+**Build provider trước khi chạy Keycloak** (bytecode Java 21, dùng được JDK 25 ở trên):
+
 ```bash
+cd car-rental-keycloak
+./mvnw clean verify
+cd ..
+```
+
+Trong `.env`, bổ sung đủ khối **Keycloak OTP** từ `.env.example`. Giữ các tham số BR-129 theo mẫu.
+Sáu biến secret đang để trống phải được điền riêng; không lấy secret công khai của test:
+
+- `CAR_RENTAL_OTP_HMAC_SECRET`: dùng `openssl rand -base64 32`; giữ nguyên qua restart để không đổi
+  khoá HMAC của dữ liệu OTP/hạn mức đã lưu.
+- `CAR_RENTAL_KEYCLOAK_READER_SECRET`: dùng một giá trị riêng từ `openssl rand -hex 32`.
+- Bốn biến `CAR_RENTAL_LOCAL_*_PASSWORD`: mỗi biến dùng một giá trị riêng từ `openssl rand -hex 16`.
+  Đây là mật khẩu tạm, tối thiểu 12 ký tự, phải đổi sau mật khẩu + SMS ở lần đăng nhập đầu (BR-809).
+
+Chỉ chạy các lệnh sinh secret trên máy mình, không dán kết quả vào chat/log chia sẻ hoặc commit.
+`CAR_RENTAL_TERMS_VERSION=local-test-v1` chỉ định văn bản **thử**, không phải điều khoản dùng cho khách thật.
+
+```bash
+docker compose config --quiet
 docker compose up -d
 docker compose ps
 ```
 
 PostgreSQL, Keycloak và MinIO phải cùng hiện trạng thái `(healthy)`.
+`config --quiet` kiểm cấu hình mà không in giá trị secret; thiếu biến sẽ báo đúng tên biến.
+
+Compose chỉ mount provider lõi và JAR SMS local, không mount JAR `*-tests.jar`. Nếu chưa build,
+mount phải báo thiếu file, không tự tạo thư mục giả mang tên `.jar`. Không đổi image/platform.
+
+Realm `car-rental` được import từ `infra/keycloak/realm-export.json`; các bảng OTP được Liquibase
+của Keycloak tạo trong **database `keycloak`**, không thuộc Flyway/backend. Import lúc khởi động
+[bỏ qua realm đã tồn tại](https://www.keycloak.org/server/importExport#_importing_a_realm_during_startup):
+restart không xoá user, không đặt lại mật khẩu và không áp lại nội dung JSON lên realm cũ.
+Nếu local đã có realm `car-rental` từ cấu hình khác, dừng để đối chiếu trước; **không xoá realm hoặc volume**.
+
+**Chống đoán mật khẩu nhân viên (BR-809).** Realm mới import bật khoá tạm: 5 lần sai → 15 phút,
+mỗi nhóm 5 lần sai tăng thêm 15 phút, trần 1 giờ; không khoá vĩnh viễn. OTP vẫn dùng giới hạn riêng
+BR-129. Đăng nhập nhân viên thành công **đầy đủ mật khẩu + SMS** xoá bộ đếm; chỉ hết thời gian khoá
+không xoá bộ đếm. Mặc định Keycloak 26.7.2 đặt `maxDeltaTimeSeconds=43200`: nếu lần sai tiếp theo
+cách lần sai trước **hơn 12 giờ**, bộ đếm được đặt lại rồi tính lần sai mới là 1.
+
+Để áp lên realm local **đã tồn tại**, không import đè, không xoá volume và không cần restart:
+
+1. Vào `http://localhost:8080/admin/master/console/`, đăng nhập bằng quản trị hạ tầng đã tạo từ `.env`.
+   Chọn realm **car-rental**, không sửa realm `master`. ADMIN nghiệp vụ chỉ có quyền quản lý người dùng,
+   không có `manage-realm`; không cấp thêm quyền này chỉ để làm bước cấu hình.
+2. Mở **Realm settings → Security defenses → Brute force detection**, đặt các giá trị sau rồi **Save**:
+
+   | Trường giao diện | Giá trị | Thuộc tính realm |
+   |---|---|---|
+   | Brute Force Mode | Lockout temporarily | `bruteForceProtected=true`, `permanentLockout=false` |
+   | Max login failures | 5 | `failureFactor=5` |
+   | Wait increment | 15 Minutes (900 giây) | `waitIncrementSeconds=900` |
+   | Max wait | 1 Hour (3600 giây) | `maxFailureWaitSeconds=3600` |
+
+3. Giữ các tham số khác ở mặc định Keycloak: strategy **Multiple**, failure reset **12 Hours**,
+   quick login check **1000 ms**, minimum quick login wait **1 Minute**,
+   `maxTemporaryLockouts=0`, `maxSecondaryAuthFailures=0`. Nếu realm cũ khác các giá trị này,
+   đối chiếu trước khi tiếp tục; không coi restart là đã áp cấu hình.
+4. Tải lại trang, kiểm các giá trị đã lưu. Thay đổi có hiệu lực ngay và tồn tại qua restart.
+
+Quick-login là bảo vệ mặc định bổ sung: hai lần sai cách nhau dưới 1 giây có thể bị khoá 60 giây
+ngay trước ngưỡng 5 lần. Khi kiểm ngưỡng 5 lần bằng tay, giãn mỗi lần sai ít nhất 2 giây.
+
+**ADMIN mở khoá sớm:** vào `http://localhost:8080/admin/car-rental/console/`, đăng nhập ADMIN bằng
+mật khẩu + OTP; chọn **Users → nhân viên cần mở → Details → Temporarily locked**, chuyển sang **Off**.
+Tải lại để kiểm trạng thái đã hết khoá, rồi nhân viên đăng nhập lại bằng cả hai yếu tố.
+Không đổi mật khẩu, không xoá user, không dùng **Unlock all users**. Thao tác này chỉ xoá khoá/bộ đếm
+mật khẩu của người được chọn, **không** xoá hạn mức OTP BR-129.
+
+Khi build lại JAR hoặc đổi biến môi trường, từ gốc repo chạy `docker compose up -d --force-recreate keycloak`
+để nạp lại đúng file mount/cấu hình. Không dùng `down -v`. `docker compose restart` không cập nhật biến
+môi trường mới. Đổi các biến mật khẩu/secret import sau lần đầu không đổi credential đang lưu trong realm.
+
+Thông tin các flow, tài khoản thử và cách kiểm provider: [Keycloak provider](car-rental-keycloak/README.md).
+Backend xác minh access token của realm bằng chữ ký RS256, issuer, audience `car-rental-api` và hạn dùng.
+Gửi token qua header `Authorization: Bearer <access-token>`; không truyền qua query, cookie hoặc form.
+`/api/v1/public/**` và `GET /actuator/health` không cần token; `/api/v1/client/**` cần vai `CUSTOMER`;
+`/api/v1/admin/**` cần vai nhân viên và token của client `admin-web` (mật khẩu + OTP).
+Thiếu/token sai trả `401 UNAUTHENTICATED`; token hợp lệ nhưng sai quyền namespace trả `403 ACCESS_DENIED`.
+Backend không lưu phiên đăng nhập. Tạo chi nhánh chỉ cho ADMIN, kiểm trong use case theo BR-810.
+Đọc chi nhánh quản trị chỉ cho ADMIN (mọi chi nhánh) hoặc STAFF/MANAGER (chi nhánh mình);
+nhân viên chưa gán chi nhánh nhận `403 STAFF_BRANCH_REQUIRED`, đọc chéo nhận `403 ACCESS_DENIED`.
+Tạo xe chỉ cho ADMIN ở mọi chi nhánh hoặc STAFF/MANAGER ở chi nhánh mình;
+STAFF gửi kèm giá trong yêu cầu hợp lệ nhận `403 ACCESS_DENIED`, không bỏ qua giá.
+Gửi duyệt xe chỉ cho ADMIN ở mọi chi nhánh hoặc STAFF/MANAGER ở chi nhánh mình;
+xe khác chi nhánh bị chặn trước kiểm trạng thái. Xe đúng quyền vẫn phải ở DRAFT để gửi duyệt.
+Duyệt xe chỉ cho ADMIN hoặc MANAGER của chi nhánh có xe; STAFF không được duyệt.
+Người đủ quyền vẫn phải đáp ứng trạng thái chờ duyệt, giấy tờ còn hạn và đã có giá ngày.
+Đọc xe quản trị chỉ cho ADMIN (mọi xe) hoặc STAFF/MANAGER (xe của chi nhánh mình);
+chưa gán chi nhánh nhận `403 STAFF_BRANCH_REQUIRED`, đọc chéo hoặc sai vai nhận `403 ACCESS_DENIED`.
+Đổi giá ngày chỉ cho ADMIN hoặc MANAGER của chi nhánh có xe; STAFF không được đổi giá.
+Giá phải dương, nguyên VND và chia hết cho 1.000; cập nhật không đổi trạng thái hay báo giá cũ.
+Chỉ dùng dữ liệu giả ở local, không dùng bản này với dữ liệu thật.
+Báo giá hiện chưa gắn chủ sở hữu.
+Kiểm bằng thư mục `Part 3 - Backend namespace security` trong
+[collection identity](postman/task-08a-identity.postman_collection.json), environment `Car Rental - Local`.
+Các request OAuth2 dùng **Get New Access Token → Use Token**, không copy token vào file hay bật đồng bộ token.
+
+Đọc tài khoản của chính mình bằng `GET /api/v1/client/accounts/me` (khách) hoặc
+`GET /api/v1/admin/accounts/me` (nhân viên); hợp đồng ở [API tài khoản](car-rental-docs/vi/api/identity.md).
+Thư mục `Part 3 - Current account` trong collection identity tự lưu mã khách và nhân viên vào biến
+collection. Nhân viên chưa gán chi nhánh vẫn lấy được mã `TK-<6>` qua `/me`; đây không phải quyền
+thao tác chi nhánh. Chỉ dùng dữ liệu thử, không export token hoặc response chứa thông tin thật vào Git.
+
+ADMIN gán chi nhánh bằng `PUT /api/v1/admin/accounts/{accountCode}/branch`, body chứa `branchCode`.
+Thư mục `Part 3 - Staff branch assignment` trong collection lấy mã STAFF qua `/me`, tạo chi nhánh
+thử rồi gán. Chọn đúng token ADMIN/STAFF theo mô tả từng request. Chạy lại thư mục này tạo chi nhánh
+thử mới và thay bản gán của nhân viên thử; vai đích được đọc từ Keycloak, không gửi trong body.
+
+Backend tra vai hiện tại bằng client chỉ đọc `identity-reader`. Bổ sung vào `.env`:
+
+```dotenv
+CAR_RENTAL_KEYCLOAK_BASE_URL=http://localhost:8080
+CAR_RENTAL_KEYCLOAK_REALM=car-rental
+CAR_RENTAL_KEYCLOAK_READER_CLIENT_ID=identity-reader
+```
+
+Cổng trong URL phải khớp `KEYCLOAK_PORT`. Backend dùng lại `CAR_RENTAL_KEYCLOAK_READER_SECRET`
+đã khai báo ở trên; phải khớp credential đang lưu trong realm, không sinh lại mỗi lần chạy.
+Thiếu cấu hình làm backend dừng ngay khi khởi động; lỗi kết nối/quyền client lúc đọc vai không được
+coi như người dùng không tồn tại. Kết nối có timeout, không đi theo redirect, không cache vai.
 
 ### 3. Nạp biến môi trường
 

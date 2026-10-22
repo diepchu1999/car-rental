@@ -2,6 +2,8 @@ package com.carrental.vehicle.application.service;
 
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchRef;
+import com.carrental.identity.api.CallerRef;
+import java.util.Set;
 import com.carrental.vehicle.application.port.out.ReadVehiclePort;
 import com.carrental.vehicle.application.query.GetVehicleQuery;
 import com.carrental.vehicle.application.view.VehicleDetail;
@@ -43,7 +45,7 @@ class VehicleDetailEnricherTest {
         var read = mock(ReadVehiclePort.class);
         when(read.findByCode("XE-TEST01")).thenReturn(Optional.of(detail(42L)));
         when(branches.findById(42)).thenReturn(Optional.empty());
-        var service = new VehicleQueryService(read, branches);
+        var service = new VehicleQueryService(read, branches, () -> new CallerRef("TK-ADMIN1", Set.of("ADMIN"), null));
         var failure = assertThrowsExactly(IllegalStateException.class,
                 () -> service.get(GetVehicleQuery.from("XE-TEST01")));
         assertTrue(failure.getMessage().contains("missing branch"));
@@ -59,7 +61,7 @@ class VehicleDetailEnricherTest {
         var failure = new IllegalStateException("Branch read failed.");
         when(read.findByCode("XE-TEST01")).thenReturn(Optional.of(detail(42L)));
         when(branches.findById(42)).thenThrow(failure);
-        var service = new VehicleQueryService(read, branches);
+        var service = new VehicleQueryService(read, branches, () -> new CallerRef("TK-ADMIN1", Set.of("ADMIN"), null));
         assertSame(failure, assertThrowsExactly(IllegalStateException.class,
                 () -> service.get(GetVehicleQuery.from("XE-TEST01"))));
         verify(branches).findById(42);

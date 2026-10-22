@@ -2,6 +2,8 @@ package com.carrental.vehicle.application.service;
 
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchRef;
+import com.carrental.identity.api.CallerDirectory;
+import com.carrental.identity.api.CallerRef;
 import com.carrental.shared.code.BusinessCodeGenerator;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
@@ -59,6 +61,7 @@ class VehicleCommandService implements CreateVehicleUseCase,
     private final BranchDirectory branchDirectory;
 
     private final Clock clock;
+    private final CallerDirectory callers;
 
     /**
      * Nhận các cổng lưu trữ, bộ sinh mã và cổng tra cứu chi nhánh.
@@ -71,23 +74,30 @@ class VehicleCommandService implements CreateVehicleUseCase,
      * @param businessCodeGenerator bộ sinh mã nghiệp vụ
      * @param branchDirectory cổng tra cứu chi nhánh giữa các module
      * @param clock đồng hồ dùng chung, xác định ngày duyệt theo múi giờ cấu hình
+     * @param callers danh tính đã xác thực, kiểm quyền tạo, gửi duyệt, duyệt và đổi giá xe theo BR-810
      */
     VehicleCommandService(
             WriteVehiclePort writeVehiclePort,
             ReadVehiclePort readVehiclePort,
             BusinessCodeGenerator businessCodeGenerator,
             BranchDirectory branchDirectory,
-            Clock clock
+            Clock clock,
+            CallerDirectory callers
     ) {
         this.writeVehiclePort = writeVehiclePort;
         this.readVehiclePort = readVehiclePort;
         this.businessCodeGenerator = businessCodeGenerator;
         this.branchDirectory = branchDirectory;
         this.clock = clock;
+        this.callers = callers;
     }
 
     /**
      * Tạo hồ sơ xe bản nháp gắn với chi nhánh đã tồn tại.
+     *
+     * <p>BR-810: ADMIN tạo ở mọi chi nhánh; STAFF/MANAGER chỉ tạo ở chi nhánh mình.
+     * STAFF gửi giá bị từ chối, không âm thầm bỏ giá. Kiểm vai, quyền nhập giá và
+     * việc gán trước khi tra chi nhánh; kiểm phạm vi trước sinh mã và ghi xe.
      *
      * <p>Tra cứu chi nhánh một lần trước khi sinh mã và chèn xe.
      * Loại sở hữu được truyền nguyên từ command, không phân nhánh.
@@ -106,16 +116,32 @@ class VehicleCommandService implements CreateVehicleUseCase,
      * @param command yêu cầu tạo xe đã được kiểm tra, không được null
      * @return thông tin xe được đọc lại sau khi chèn thành công
      * @throws DomainException nếu chi nhánh không tồn tại
-     *                         hoặc biển số đã được sử dụng
+     *                         hoặc biển số đã được sử dụng, chưa xác thực hay không đủ quyền
      * @throws IllegalStateException nếu hết lượt thử mã
      *                               hoặc không đọc lại được xe vừa chèn
      */
     @Override
     @Transactional
     public VehicleDetail create(CreateVehicleCommand command) {
+        CallerRef caller = callers.current();
+        boolean admin = caller.hasRole("ADMIN");
+        if (!admin) {
+            if (!caller.hasRole("BRANCH_STAFF") && !caller.hasRole("BRANCH_MANAGER")) {
+                throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+            }
+            if (caller.hasRole("BRANCH_STAFF") && command.dailyRate() != null) {
+                throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+            }
+            if (caller.branchId() == null) {
+                throw DomainException.forbidden(ErrorCode.STAFF_BRANCH_REQUIRED);
+            }
+        }
         BranchRef branch = branchDirectory.findByCode(command.branchCode())
                 .orElseThrow(() ->
                         DomainException.notFound(ErrorCode.BRANCH_NOT_FOUND));
+        if (!admin && caller.branchId().longValue() != branch.id()) {
+            throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+        }
 
         for (int attempt = 0;
              attempt < MAX_CODE_GENERATION_ATTEMPTS;
@@ -165,14 +191,32 @@ class VehicleCommandService implements CreateVehicleUseCase,
     /**
      * Gửi hồ sơ từ DRAFT sang PENDING_APPROVAL theo status-flow mục 4.
      *
+     * <p>BR-810: ADMIN thao tác mọi chi nhánh; STAFF/MANAGER chỉ thao tác xe
+     * của chi nhánh mình. Kiểm phạm vi từ aggregate đã lưu trước kiểm trạng thái,
+     * không dùng chi nhánh hoặc vai do client tự khai.
+     *
      * @param command yêu cầu gửi duyệt đã kiểm tra đầu vào
      * @return dữ liệu đọc lại sau cập nhật
-     * @throws DomainException nếu không tìm thấy, sai trạng thái hoặc có tranh chấp
+     * @throws DomainException nếu không đủ quyền, chưa gán chi nhánh, không tìm thấy,
+     *                         sai trạng thái hoặc có tranh chấp
      */
     @Override
     @Transactional
     public VehicleDetail submitForApproval(SubmitVehicleForApprovalCommand command) {
+        CallerRef caller = callers.current();
+        boolean admin = caller.hasRole("ADMIN");
+        if (!admin) {
+            if (!caller.hasRole("BRANCH_STAFF") && !caller.hasRole("BRANCH_MANAGER")) {
+                throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+            }
+            if (caller.branchId() == null) {
+                throw DomainException.forbidden(ErrorCode.STAFF_BRANCH_REQUIRED);
+            }
+        }
         Vehicle original = loadVehicle(command.code());
+        if (!admin && !caller.branchId().equals(original.branchId())) {
+            throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+        }
         Vehicle submitted = original.submitForApproval();
         return saveTransition(original, submitted);
     }
@@ -182,15 +226,31 @@ class VehicleCommandService implements CreateVehicleUseCase,
      *
      * <p>Ngày duyệt lấy từ đồng hồ server, không nhận từ request.
      * Domain quyết định chuyển trạng thái; service chỉ điều phối lưu trữ.
+     * BR-810: chỉ ADMIN hoặc MANAGER của chi nhánh có xe được duyệt;
+     * kiểm quyền trước trạng thái, giấy tờ và giá, không suy quyền từ namespace.
      *
      * @param command yêu cầu phê duyệt đã kiểm tra đầu vào
      * @return dữ liệu đọc lại sau cập nhật
-     * @throws DomainException nếu không tìm thấy, sai trạng thái, giấy tờ lỗi hoặc tranh chấp
+     * @throws DomainException nếu không đủ quyền, chưa gán chi nhánh, không tìm thấy,
+     *                         sai trạng thái, giấy tờ/giá lỗi hoặc có tranh chấp
      */
     @Override
     @Transactional
     public VehicleDetail approve(ApproveVehicleCommand command) {
+        CallerRef caller = callers.current();
+        boolean admin = caller.hasRole("ADMIN");
+        if (!admin) {
+            if (!caller.hasRole("BRANCH_MANAGER")) {
+                throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+            }
+            if (caller.branchId() == null) {
+                throw DomainException.forbidden(ErrorCode.STAFF_BRANCH_REQUIRED);
+            }
+        }
         Vehicle original = loadVehicle(command.code());
+        if (!admin && !caller.branchId().equals(original.branchId())) {
+            throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+        }
         Vehicle approved = original.approve(LocalDate.now(clock));
         return saveTransition(original, approved);
     }
@@ -212,11 +272,34 @@ class VehicleCommandService implements CreateVehicleUseCase,
                         DomainException.notFound(ErrorCode.VEHICLE_NOT_FOUND));
     }
 
-    /** BR-234: gọi domain rồi chỉ ghi cột giá; reload lỗi làm rollback toàn bộ thay đổi. */
+    /**
+     * BR-803/810: chỉ ADMIN hoặc MANAGER của chi nhánh có xe được đổi giá ngày.
+     * Kiểm vai và phân công trước tải xe, kiểm chi nhánh đã lưu trước gọi domain/cổng ghi.
+     * BR-234: chỉ ghi cột giá, không đổi trạng thái hoặc báo giá cũ; reload lỗi làm rollback.
+     *
+     * @param command mã xe và giá ngày đã kiểm tra đầu vào
+     * @return chi tiết xe đọc lại sau cập nhật, bổ sung mã chi nhánh qua branch.api
+     * @throws DomainException nếu không đủ quyền, chưa gán chi nhánh hoặc không tìm thấy xe
+     * @throws IllegalStateException nếu không đọc lại được xe hoặc mất tham chiếu chi nhánh
+     */
     @Override
     @Transactional
     public VehicleDetail changeDailyRate(ChangeVehicleDailyRateCommand command) {
-        Vehicle changed = loadVehicle(command.code()).changeDailyRate(command.dailyRate());
+        CallerRef caller = callers.current();
+        boolean admin = caller.hasRole("ADMIN");
+        if (!admin) {
+            if (!caller.hasRole("BRANCH_MANAGER")) {
+                throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+            }
+            if (caller.branchId() == null) {
+                throw DomainException.forbidden(ErrorCode.STAFF_BRANCH_REQUIRED);
+            }
+        }
+        Vehicle original = loadVehicle(command.code());
+        if (!admin && !caller.branchId().equals(original.branchId())) {
+            throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+        }
+        Vehicle changed = original.changeDailyRate(command.dailyRate());
         if (!writeVehiclePort.updateDailyRate(changed.code(), changed.dailyRate())) {
             throw DomainException.notFound(ErrorCode.VEHICLE_NOT_FOUND);
         }

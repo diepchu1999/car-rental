@@ -1,11 +1,78 @@
 {
   "info": {
     "name": "Car Rental - Task 06 - Search",
-    "description": "Task 6: Phần 1 (BR-018), Phần 2 (BR-808), Phần 6 tìm xe public (BR-125/126). Backend local áp dụng V007; chọn environment Car Rental - Local. Các nhóm không có chữ Manual tự tạo dữ liệu riêng, chạy lại được; không tự xóa dữ liệu. Các nhóm Manual cần chạy SQL fixture riêng và theo thứ tự nghiệm thu: rental and daily buffer, compliance hold, hourly buffer. Đọc mô tả từng nhóm trước khi chạy; trạng thái fixture thay đổi giữa các bước. Không chạy cả collection một lượt. Search chưa giữ chỗ, không có giá hoặc ảnh.",
+    "description": "BR-018/808/125/126: kiểm thuộc tính xe, chi nhánh và tìm xe public trên backend hiện tại; chọn Car Rental - Local. Kết quả tìm xe có rentalAmount nhưng không giữ chỗ hay trả thông tin sở hữu. BR-803/809/810: chọn token ADMIN local +84910000001 qua OAuth2 admin-web tại Authorization của COLLECTION, Use Token, tắt Share/Sync Token. Dùng lại token còn hạn; không xin OTP cho từng request. Chạy Part 0 trước. Request /admin kế thừa token collection; mọi request /public đặt No Auth tường minh để kiểm tìm xe không cần đăng nhập. Không lưu token vào file hoặc Git. Các nhóm tự tạo fixture chạy theo thứ tự trong từng nhóm, một iteration; không cần xoá dữ liệu. Không chạy cả collection một lượt: các nhóm Manual dùng bộ xe T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799 ngày 22/10/2026, không phụ thuộc biến p6*. Chạy xen kẽ theo thứ tự: manual_search_rental_fixture.sql → Manual rental and daily buffer (3 GET); manual_search_compliance_fixture.sql → Manual compliance hold (2 GET); manual_search_hourly_fixture.sql → Manual hourly buffer (3 GET). Chỉ chạy mỗi file SQL ngay trước nhóm tương ứng, không chèn cả ba trước nhóm đầu. Sau cùng có thể dọn đúng ba khoá KL-T8M001/002/003 bằng cleanup_manual_search_fixtures.sql. Chạy lại toàn bộ chuỗi phải dọn ba fixture trước; không dùng file này để dọn khoá cũ KL-T6M001/002/003. Ngày thuê phải còn trong tương lai theo BR-121; quá hạn thì chuẩn bị lại đồng bộ SQL và collection.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
-    "type": "noauth"
+    "type": "oauth2",
+    "oauth2": [
+      {
+        "key": "grant_type",
+        "value": "authorization_code_with_pkce",
+        "type": "string"
+      },
+      {
+        "key": "authUrl",
+        "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+        "type": "string"
+      },
+      {
+        "key": "accessTokenUrl",
+        "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+        "type": "string"
+      },
+      {
+        "key": "clientId",
+        "value": "admin-web",
+        "type": "string"
+      },
+      {
+        "key": "clientSecret",
+        "value": "",
+        "type": "string"
+      },
+      {
+        "key": "redirect_uri",
+        "value": "https://oauth.pstmn.io/v1/callback",
+        "type": "string"
+      },
+      {
+        "key": "scope",
+        "value": "openid",
+        "type": "string"
+      },
+      {
+        "key": "challengeAlgorithm",
+        "value": "S256",
+        "type": "string"
+      },
+      {
+        "key": "state",
+        "value": "{{$guid}}",
+        "type": "string"
+      },
+      {
+        "key": "client_authentication",
+        "value": "body",
+        "type": "string"
+      },
+      {
+        "key": "addTokenTo",
+        "value": "header",
+        "type": "string"
+      },
+      {
+        "key": "tokenName",
+        "value": "Car Rental Local ADMIN",
+        "type": "string"
+      },
+      {
+        "key": "useBrowser",
+        "value": false,
+        "type": "boolean"
+      }
+    ]
   },
   "variable": [
     {
@@ -37,9 +104,69 @@
       "key": "p2CreatedBranch",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "keycloakBaseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "realm",
+      "value": "car-rental",
+      "type": "string"
     }
   ],
   "item": [
+    {
+      "name": "Part 0 - Verify ADMIN (BR-803, BR-810)",
+      "description": "BR-803/809/810: xác nhận đúng tài khoản ADMIN local trước khi kiểm log endpoint quản trị. Giữ token này ở collection trong toàn bộ lượt kiểm.",
+      "item": [
+        {
+          "name": "01 - Verify local ADMIN identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-803/809/810: phải là ADMIN +84910000001, không dùng token quản lý hoặc STAFF cho các fixture tạo chi nhánh."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is safe', () => pm.expect(pm.response.headers.get('X-Request-Id')).to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Expected local ADMIN account', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b).to.have.all.keys('success','data','error');",
+                  "  pm.expect(b.success).to.eql(true);",
+                  "  pm.expect(b.error).to.eql(null);",
+                  "  pm.expect(b.data.code).to.match(/^TK-[A-Z0-9]{6}$/);",
+                  "  pm.expect(b.data.phoneNumber).to.eql('+84910000001');",
+                  "  pm.expect(b.data.roles).to.include('ADMIN');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "Part 1 - Vehicle attributes (BR-018)",
       "description": "Chạy 18 request theo thứ tự. Mã chi nhánh/xe tự lưu vào collection; biển số và tên chi nhánh ngẫu nhiên. Request chi nhánh đã cập nhật BR-808; không ghi lịch xe.",
@@ -2708,7 +2835,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
-            "description": "BR-010/110/112/125/126: Find nearby active vehicles."
+            "description": "BR-010/110/112/125/126: Find nearby active vehicles.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -2755,7 +2885,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&seats=5&transmission=AUTOMATIC&fuelType=PETROL&make=%20tOyOtA%20&collateralFree=true",
-            "description": "BR-010/110/112/125/126: Filter all supported attributes."
+            "description": "BR-010/110/112/125/126: Filter all supported attributes.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -2801,7 +2934,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&radiusKm=0.05",
-            "description": "BR-010/110/112/125/126: Restrict radius to 50 meters."
+            "description": "BR-010/110/112/125/126: Restrict radius to 50 meters.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -2847,7 +2983,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&seats=7",
-            "description": "BR-010/110/112/125/126: Nonmatching seats."
+            "description": "BR-010/110/112/125/126: Nonmatching seats.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -2893,7 +3032,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&collateralFree=false",
-            "description": "BR-010/110/112/125/126: Require collateral."
+            "description": "BR-010/110/112/125/126: Require collateral.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -2939,7 +3081,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=HOURLY&driveMode=SELF_DRIVE&model={{p6Model}}",
-            "description": "BR-010/110/112/125/126: Hourly search."
+            "description": "BR-010/110/112/125/126: Hourly search.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -2985,7 +3130,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&limit=1",
-            "description": "BR-010/110/112/125/126: Cursor page one."
+            "description": "BR-010/110/112/125/126: Cursor page one.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3042,7 +3190,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&limit=2&cursor={{p6Cursor}}",
-            "description": "BR-010/110/112/125/126: Cursor page two."
+            "description": "BR-010/110/112/125/126: Cursor page two.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3098,7 +3249,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&radiusKm=31",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3134,7 +3288,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3170,7 +3327,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3206,7 +3366,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6ThreeHourEnd}}&rentalType=HOURLY&driveMode=SELF_DRIVE&model={{p6Model}}",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3242,7 +3405,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6EarlyStart}}&endExclusive={{p6EarlyEnd}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3278,7 +3444,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6LateStart}}&endExclusive={{p6LateEnd}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3314,7 +3483,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=WITH_DRIVER&model={{p6Model}}",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3350,7 +3522,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=MONTHLY&driveMode=SELF_DRIVE&model={{p6Model}}",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3386,7 +3561,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&pickupMethod=DELIVERY",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3422,7 +3600,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&sort=PRICE_ASC",
-            "description": "BR-126: hỗ trợ PRICE_ASC, thứ tự giá, khoảng cách rồi mã xe; không cộng bảo hiểm."
+            "description": "BR-126: hỗ trợ PRICE_ASC, thứ tự giá, khoảng cách rồi mã xe; không cộng bảo hiểm.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3458,7 +3639,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&sort=RATING_DESC",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3494,7 +3678,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&limit=101",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3530,7 +3717,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&limit=",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3566,7 +3756,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&seats=6",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3602,7 +3795,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&ownershipType=COMPANY",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3638,7 +3834,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&minPrice=100",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3674,7 +3873,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&cursor=broken",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3710,7 +3912,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&cursor={{p6Cursor}}&radiusKm=5",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3746,7 +3951,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6Start}}&endExclusive={{p6End}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}&collateralFree=maybe",
-            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback."
+            "description": "BR-125/126 và hợp đồng HTTP: từ chối đúng mã, không fallback.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3782,7 +3990,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive={{p6SoonStart}}&endExclusive={{p6SoonEnd}}&rentalType=DAILY&driveMode=SELF_DRIVE&model={{p6Model}}",
-            "description": "BR-121: đặt trước 30 phút bị từ chối; nếu giờ nhận/trả ngoài 06–23h thì BR-119 được kiểm trước. Test Clock cố định kiểm riêng mã BOOKING_WINDOW_VIOLATION."
+            "description": "BR-121: đặt trước 30 phút bị từ chối; nếu giờ nhận/trả ngoài 06–23h thì BR-119 được kiểm trước. Test Clock cố định kiểm riêng mã BOOKING_WINDOW_VIOLATION.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3815,11 +4026,11 @@
       ]
     },
     {
-      "name": "Part 6 - Manual hourly buffer",
-      "description": "BR-104/109/113/116: chỉ chạy sau khi COMMIT cả ba file manual_search_rental_fixture.sql, manual_search_compliance_fixture.sql và manual_search_hourly_fixture.sql trong SQL Console IntelliJ. GET chỉ đọc fixture ngày 09/10/2026, không phụ thuộc biến p6*. Chạy lại được khi fixture còn nguyên và ngày còn hợp lệ theo BR-121. Không chạy cả collection. Với bộ fixture khác, cập nhật đồng bộ SQL và URL/assertion.",
+      "name": "Part 6 - Manual rental and daily buffer",
+      "description": "Chỉ chạy sau khi Tech Owner đã chạy và COMMIT src/test/resources/sql/availability/manual_search_rental_fixture.sql trong SQL Console IntelliJ. Ba GET chỉ đọc fixture đã xác nhận ngày 22/10/2026, không tạo dữ liệu và không đè biến Runner. Chạy lại được khi fixture vẫn nguyên trạng và ngày thuê còn hợp lệ theo BR-121. Không chạy cùng nhóm 44 request tạo dữ liệu. Khi dùng bộ fixture khác, cập nhật đồng bộ SQL và URL/assertion của nhóm này.",
       "item": [
         {
-          "name": "01 - Hourly buffer blocks at 10",
+          "name": "01 - Rental overlap at 10",
           "request": {
             "method": "GET",
             "header": [
@@ -3836,8 +4047,11 @@
                 "value": "0.0.1"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T03:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=HOURLY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
-            "description": "BR-104/116: tìm 10:00–16:00 giờ Việt Nam; cả hai khóa thuê còn đệm, xe thứ ba bị khóa giấy tờ, nên danh sách rỗng."
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-22T03:00:00.000Z&endExclusive=2026-10-22T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799",
+            "description": "BR-104: tìm 10:00–16:00 ngày 22/10/2026 (giờ Việt Nam); XE-GPQFVV đang có khóa KL-T8M001 nên không xuất hiện. Chạy sau manual_search_rental_fixture.sql và COMMIT. Request chỉ đọc, dùng fixture đã xác nhận; không phụ thuộc biến p6* của Runner.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3854,13 +4068,12 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(body.data.nextCursor).to.eql(null);",
                   "});",
-                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([]));",
-                  "pm.test(\"Compliance-blocked vehicle stays absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-09Z3NS\"));",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-YYZEY6\",\"XE-QWFS1I\"]));",
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
                   "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
-                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
                   "  });",
@@ -3871,7 +4084,7 @@
           ]
         },
         {
-          "name": "02 - Hourly buffer ends at 11",
+          "name": "02 - Daily buffer blocks at 11",
           "request": {
             "method": "GET",
             "header": [
@@ -3888,8 +4101,11 @@
                 "value": "0.0.1"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T04:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=HOURLY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
-            "description": "BR-109/116, ADR-0005: tìm 11:00–16:00; XE-TTJ8LW hết đệm một giờ, XE-B76A44 còn đệm hai giờ tới 12:00."
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-22T04:00:00.000Z&endExclusive=2026-10-22T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799",
+            "description": "BR-109: chuyến mẫu trả lúc 10:00, đệm tới 12:00; tìm từ 11:00 vẫn không thấy XE-GPQFVV. Chạy sau manual_search_rental_fixture.sql và COMMIT. Request chỉ đọc, dùng fixture đã xác nhận; không phụ thuộc biến p6* của Runner.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3906,13 +4122,12 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(body.data.nextCursor).to.eql(null);",
                   "});",
-                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-TTJ8LW\"]));",
-                  "pm.test(\"Compliance-blocked vehicle stays absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-09Z3NS\"));",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-YYZEY6\",\"XE-QWFS1I\"]));",
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
                   "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
-                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
                   "  });",
@@ -3923,7 +4138,7 @@
           ]
         },
         {
-          "name": "03 - Both stored rental buffers end at 12",
+          "name": "03 - Daily buffer ends at 12",
           "request": {
             "method": "GET",
             "header": [
@@ -3940,8 +4155,11 @@
                 "value": "0.0.1"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T05:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=HOURLY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
-            "description": "BR-109/113/116: tìm 12:00–16:00 đủ bốn giờ; hai khóa thuê đã hết đệm, khóa giấy tờ vẫn chặn."
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-22T05:00:00.000Z&endExclusive=2026-10-22T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799",
+            "description": "BR-109, ADR-0005: tìm từ đúng cận cuối 12:00 thấy lại XE-GPQFVV; khoảng [) không chồng khi chỉ chạm biên. Chạy sau manual_search_rental_fixture.sql và COMMIT. Request chỉ đọc, dùng fixture đã xác nhận; không phụ thuộc biến p6* của Runner.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -3958,13 +4176,12 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(body.data.nextCursor).to.eql(null);",
                   "});",
-                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-B76A44\",\"XE-TTJ8LW\"]));",
-                  "pm.test(\"Compliance-blocked vehicle stays absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-09Z3NS\"));",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-GPQFVV\",\"XE-YYZEY6\",\"XE-QWFS1I\"]));",
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
                   "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
-                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
                   "  });",
@@ -3998,8 +4215,11 @@
                 "value": "0.0.1"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T05:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
-            "description": "BR-015/109: tìm 12:00–16:00 ngày 09/10/2026 (giờ Việt Nam); XE-B76A44 hết đệm xuất hiện lại, XE-09Z3NS vẫn bị khóa giấy tờ."
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-22T05:00:00.000Z&endExclusive=2026-10-22T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799",
+            "description": "BR-015/109: tìm 12:00–16:00 ngày 22/10/2026 (giờ Việt Nam); XE-GPQFVV hết đệm xuất hiện lại, XE-YYZEY6 vẫn bị khóa giấy tờ.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -4016,13 +4236,13 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(body.data.nextCursor).to.eql(null);",
                   "});",
-                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-B76A44\", \"XE-TTJ8LW\"]));",
-                  "pm.test(\"Compliance-blocked vehicle is absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-09Z3NS\"));",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-GPQFVV\", \"XE-QWFS1I\"]));",
+                  "pm.test(\"Compliance-blocked vehicle is absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-YYZEY6\"));",
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
                   "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
-                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
                   "  });",
@@ -4050,8 +4270,11 @@
                 "value": "0.0.1"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-10T05:00:00.000Z&endExclusive=2026-10-10T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
-            "description": "BR-015: tìm 12:00–16:00 ngày 10/10/2026 (giờ Việt Nam); khóa giấy tờ không có cận trên vẫn loại XE-09Z3NS."
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-23T05:00:00.000Z&endExclusive=2026-10-23T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799",
+            "description": "BR-015: tìm 12:00–16:00 ngày 23/10/2026 (giờ Việt Nam); khóa giấy tờ không có cận trên vẫn loại XE-YYZEY6.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -4068,13 +4291,13 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(body.data.nextCursor).to.eql(null);",
                   "});",
-                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-B76A44\", \"XE-TTJ8LW\"]));",
-                  "pm.test(\"Compliance-blocked vehicle is absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-09Z3NS\"));",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-GPQFVV\", \"XE-QWFS1I\"]));",
+                  "pm.test(\"Compliance-blocked vehicle is absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-YYZEY6\"));",
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
                   "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
-                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
                   "  });",
@@ -4087,11 +4310,11 @@
       ]
     },
     {
-      "name": "Part 6 - Manual rental and daily buffer",
-      "description": "Chỉ chạy sau khi Tech Owner đã chạy và COMMIT src/test/resources/sql/availability/manual_search_rental_fixture.sql trong SQL Console IntelliJ. Ba GET chỉ đọc fixture đã xác nhận ngày 09/10/2026, không tạo dữ liệu và không đè biến Runner. Chạy lại được khi fixture vẫn nguyên trạng và ngày thuê còn hợp lệ theo BR-121. Không chạy cùng nhóm 44 request tạo dữ liệu. Khi dùng bộ fixture khác, cập nhật đồng bộ SQL và URL/assertion của nhóm này.",
+      "name": "Part 6 - Manual hourly buffer",
+      "description": "BR-104/109/113/116: chỉ chạy sau khi COMMIT cả ba file manual_search_rental_fixture.sql, manual_search_compliance_fixture.sql và manual_search_hourly_fixture.sql trong SQL Console IntelliJ. GET chỉ đọc fixture ngày 22/10/2026, không phụ thuộc biến p6*. Chạy lại được khi fixture còn nguyên và ngày còn hợp lệ theo BR-121. Không chạy cả collection. Với bộ fixture khác, cập nhật đồng bộ SQL và URL/assertion.",
       "item": [
         {
-          "name": "01 - Rental overlap at 10",
+          "name": "01 - Hourly buffer blocks at 10",
           "request": {
             "method": "GET",
             "header": [
@@ -4108,8 +4331,11 @@
                 "value": "0.0.1"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T03:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
-            "description": "BR-104: tìm 10:00–16:00 ngày 09/10/2026 (giờ Việt Nam); XE-B76A44 đang có khóa KL-T6M001 nên không xuất hiện. Chạy sau manual_search_rental_fixture.sql và COMMIT. Request chỉ đọc, dùng fixture đã xác nhận; không phụ thuộc biến p6* của Runner."
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-22T03:00:00.000Z&endExclusive=2026-10-22T09:00:00.000Z&rentalType=HOURLY&driveMode=SELF_DRIVE&model=T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799",
+            "description": "BR-104/116: tìm 10:00–16:00 giờ Việt Nam; cả hai khóa thuê còn đệm, xe thứ ba bị khóa giấy tờ, nên danh sách rỗng.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -4126,12 +4352,13 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(body.data.nextCursor).to.eql(null);",
                   "});",
-                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-09Z3NS\",\"XE-TTJ8LW\"]));",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([]));",
+                  "pm.test(\"Compliance-blocked vehicle stays absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-YYZEY6\"));",
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
                   "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
-                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
                   "  });",
@@ -4142,7 +4369,7 @@
           ]
         },
         {
-          "name": "02 - Daily buffer blocks at 11",
+          "name": "02 - Hourly buffer ends at 11",
           "request": {
             "method": "GET",
             "header": [
@@ -4159,8 +4386,11 @@
                 "value": "0.0.1"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T04:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
-            "description": "BR-109: chuyến mẫu trả lúc 10:00, đệm tới 12:00; tìm từ 11:00 vẫn không thấy XE-B76A44. Chạy sau manual_search_rental_fixture.sql và COMMIT. Request chỉ đọc, dùng fixture đã xác nhận; không phụ thuộc biến p6* của Runner."
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-22T04:00:00.000Z&endExclusive=2026-10-22T09:00:00.000Z&rentalType=HOURLY&driveMode=SELF_DRIVE&model=T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799",
+            "description": "BR-109/116, ADR-0005: tìm 11:00–16:00; XE-QWFS1I hết đệm một giờ, XE-GPQFVV còn đệm hai giờ tới 12:00.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -4177,12 +4407,13 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(body.data.nextCursor).to.eql(null);",
                   "});",
-                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-09Z3NS\",\"XE-TTJ8LW\"]));",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-QWFS1I\"]));",
+                  "pm.test(\"Compliance-blocked vehicle stays absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-YYZEY6\"));",
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
                   "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
-                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
                   "  });",
@@ -4193,7 +4424,7 @@
           ]
         },
         {
-          "name": "03 - Daily buffer ends at 12",
+          "name": "03 - Both stored rental buffers end at 12",
           "request": {
             "method": "GET",
             "header": [
@@ -4210,8 +4441,11 @@
                 "value": "0.0.1"
               }
             ],
-            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-09T05:00:00.000Z&endExclusive=2026-10-09T09:00:00.000Z&rentalType=DAILY&driveMode=SELF_DRIVE&model=T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042",
-            "description": "BR-109, ADR-0005: tìm từ đúng cận cuối 12:00 thấy lại XE-B76A44; khoảng [) không chồng khi chỉ chạm biên. Chạy sau manual_search_rental_fixture.sql và COMMIT. Request chỉ đọc, dùng fixture đã xác nhận; không phụ thuộc biến p6* của Runner."
+            "url": "{{baseUrl}}/api/v1/public/vehicles?latitude=10.76&longitude=106.66&startInclusive=2026-10-22T05:00:00.000Z&endExclusive=2026-10-22T09:00:00.000Z&rentalType=HOURLY&driveMode=SELF_DRIVE&model=T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799",
+            "description": "BR-109/113/116: tìm 12:00–16:00 đủ bốn giờ; hai khóa thuê đã hết đệm, khóa giấy tờ vẫn chặn.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -4228,12 +4462,13 @@
                   "  pm.expect(body.data).to.have.all.keys(\"items\", \"nextCursor\");",
                   "  pm.expect(body.data.nextCursor).to.eql(null);",
                   "});",
-                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-09Z3NS\",\"XE-B76A44\",\"XE-TTJ8LW\"]));",
+                  "pm.test(\"Exact available vehicles in order\", () => pm.expect(body.data.items.map(item => item.code)).to.eql([\"XE-GPQFVV\",\"XE-QWFS1I\"]));",
+                  "pm.test(\"Compliance-blocked vehicle stays absent\", () => pm.expect(body.data.items.map(item => item.code)).not.to.include(\"XE-YYZEY6\"));",
                   "pm.test(\"Public fields and fixture identity\", () => {",
                   "  pm.expect(pm.response.text().toLowerCase()).not.to.include(\"ownership\");",
                   "  body.data.items.forEach(item => {",
                   "    pm.expect(item).to.have.all.keys(\"code\", \"make\", \"model\", \"seats\", \"transmission\", \"fuelType\", \"collateralFree\", \"branch\", \"distanceMeters\",\"rentalAmount\");",
-                  "    pm.expect(item.model).to.eql(\"T06-Search-7fa9992b-83b8-4993-8928-ded8c0f0d042\");",
+                  "    pm.expect(item.model).to.eql(\"T06-Search-ff9d534b-d760-4e90-b87d-2d0ffac26799\");",
                   "    pm.expect(item.collateralFree).to.eql(true);",
                   "    pm.expect(item.branch).to.have.all.keys(\"code\", \"name\", \"address\");",
                   "  });",

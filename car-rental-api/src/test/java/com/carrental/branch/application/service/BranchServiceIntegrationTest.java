@@ -1,6 +1,7 @@
 package com.carrental.branch.application.service;
 
 import com.carrental.PostgresTestConfiguration;
+import com.carrental.identity.adapter.in.internal.ServiceCallerTestScope;
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchRef;
 import com.carrental.branch.application.command.CreateBranchCommand;
@@ -14,6 +15,7 @@ import com.carrental.branch.application.view.BranchDetail;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.parallel.Execution;
 import org.junit.jupiter.api.parallel.ExecutionMode;
@@ -58,6 +60,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 @Execution(ExecutionMode.SAME_THREAD)
 class BranchServiceIntegrationTest {
+    private ServiceCallerTestScope callerScope;
 
     @Autowired
     private CreateBranchUseCase createBranchUseCase;
@@ -83,12 +86,19 @@ class BranchServiceIntegrationTest {
      */
     @BeforeEach
     void resetProbe() {
+        callerScope = ServiceCallerTestScope.admin();
         readBranchProbe.reset();
 
         assertFalse(
                 TransactionSynchronizationManager.isActualTransactionActive(),
                 "The test must not start its own transaction."
         );
+    }
+
+    /** Thu hồi người gọi thử; không để ADMIN tồn tại trên thread của test kế tiếp. */
+    @AfterEach
+    void closeCallerScope() {
+        if (callerScope != null) callerScope.close();
     }
 
     /**

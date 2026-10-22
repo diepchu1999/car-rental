@@ -4,7 +4,7 @@
 
 ## Bối cảnh
 BR-120: tài khoản khách đăng ký bằng **số điện thoại**, một số một tài khoản. Đăng nhập bằng OTP qua
-SMS. Hệ thống có 12 vai (BR-801) và ba loại client, trong đó có mobile.
+SMS. Hệ thống có 12 vai (BR-801; 13 vai từ 22/10/2026, thêm `DOCUMENT_VERIFIER`) và ba loại client, trong đó có mobile.
 
 Keycloak **không hỗ trợ sẵn OTP qua SMS** — nó chỉ có TOTP kiểu ứng dụng xác thực.
 

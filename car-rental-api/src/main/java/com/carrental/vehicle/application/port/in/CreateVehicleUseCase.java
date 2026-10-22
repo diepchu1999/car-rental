@@ -18,6 +18,9 @@ public interface CreateVehicleUseCase {
     /**
      * Tạo xe từ dữ liệu đầu vào đã được kiểm tra.
      *
+     * <p>BR-810: ADMIN tạo ở mọi chi nhánh; STAFF/MANAGER chỉ tạo ở chi nhánh mình.
+     * STAFF không được gửi kèm giá. Chưa gán chi nhánh thì không được thao tác theo phạm vi.
+     *
      * <p>Phần hiện thực tra cứu chi nhánh, sinh mã nghiệp vụ,
      * tạo aggregate ở DRAFT, lưu và đọc lại dữ liệu trước khi trả kết quả.
      *
@@ -27,7 +30,8 @@ public interface CreateVehicleUseCase {
      * @param command yêu cầu tạo xe đã được kiểm tra, không được null
      * @return thông tin chi tiết của xe đã được lưu
      * @throws DomainException với BRANCH_NOT_FOUND nếu chi nhánh không tồn tại,
-     *                         hoặc VEHICLE_PLATE_ALREADY_EXISTS nếu biển số bị trùng
+     *                         hoặc VEHICLE_PLATE_ALREADY_EXISTS nếu biển số bị trùng;
+     *                         từ chối nếu chưa xác thực, sai quyền hoặc chưa được gán chi nhánh
      */
     VehicleDetail create(CreateVehicleCommand command);
 }

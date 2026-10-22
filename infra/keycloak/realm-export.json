@@ -1,0 +1,148 @@
+{
+  "realm": "car-rental",
+  "displayName": "Car Rental — LOCAL TEST ONLY",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "rememberMe": false,
+  "loginTheme": "car-rental",
+  "internationalizationEnabled": true,
+  "supportedLocales": ["vi", "en"],
+  "defaultLocale": "vi",
+  "passwordPolicy": "length(12) and passwordHistory(5)",
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 900,
+  "maxFailureWaitSeconds": 3600,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "eventsEnabled": false,
+  "eventsListeners": [],
+  "adminEventsEnabled": false,
+  "adminEventsDetailsEnabled": false,
+  "browserFlow": "car-rental-employee",
+  "defaultDefaultClientScopes": [],
+  "defaultOptionalClientScopes": [],
+  "roles": {
+    "realm": [
+      {"name": "CUSTOMER"}, {"name": "BRANCH_STAFF"}, {"name": "BRANCH_MANAGER"},
+      {"name": "DELIVERY_STAFF"}, {"name": "DRIVER"}, {"name": "ACCOUNTANT"},
+      {"name": "OPERATIONS_MANAGER"}, {"name": "ADMIN"}, {"name": "HOST"},
+      {"name": "BUSINESS_PARTNER"}, {"name": "BUSINESS_PARTNER_STAFF"}, {"name": "FREELANCE_DRIVER"}
+    ]
+  },
+  "authenticationFlows": [
+    {
+      "id": "b8e01000-0000-4000-8000-000000000001", "alias": "car-rental-customer",
+      "description": "BR-120/129: SMS then explicit consent for new customers",
+      "providerId": "basic-flow", "topLevel": true, "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "car-rental-customer-otp", "requirement": "REQUIRED", "priority": 10, "authenticatorFlow": false, "userSetupAllowed": false}
+      ]
+    },
+    {
+      "id": "b8e01000-0000-4000-8000-000000000002", "alias": "car-rental-employee",
+      "description": "BR-809: password and SMS without cookie or passwordless alternatives",
+      "providerId": "basic-flow", "topLevel": true, "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "car-rental-employee-password", "requirement": "REQUIRED", "priority": 10, "authenticatorFlow": false, "userSetupAllowed": false},
+        {"authenticator": "car-rental-employee-sms", "requirement": "REQUIRED", "priority": 20, "authenticatorFlow": false, "userSetupAllowed": false}
+      ]
+    }
+  ],
+  "requiredActions": [
+    {"alias": "UPDATE_PASSWORD", "name": "Employee password update", "providerId": "UPDATE_PASSWORD", "enabled": true, "defaultAction": false, "priority": 30, "config": {"car-rental.employee-mfa-required": "true"}},
+    {"alias": "VERIFY_PROFILE", "name": "Verify Profile", "providerId": "VERIFY_PROFILE", "enabled": false, "defaultAction": false, "priority": 90, "config": {}}
+  ],
+  "clientScopes": [
+    {
+      "name": "car-rental-access", "protocol": "openid-connect",
+      "attributes": {"include.in.token.scope": "true", "display.on.consent.screen": "false"},
+      "protocolMappers": [
+        {"name": "subject", "protocol": "openid-connect", "protocolMapper": "oidc-sub-mapper", "config": {"access.token.claim": "true", "introspection.token.claim": "true"}},
+        {"name": "realm-roles", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-realm-role-mapper", "config": {"claim.name": "realm_access.roles", "jsonType.label": "String", "multivalued": "true", "access.token.claim": "true", "id.token.claim": "false"}},
+        {"name": "phone-number", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-property-mapper", "config": {"user.attribute": "username", "claim.name": "phone_number", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true"}},
+        {"name": "terms-version", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "config": {"user.attribute": "terms_version", "claim.name": "terms_version", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true"}},
+        {"name": "consented-at", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper", "config": {"user.attribute": "consented_at", "claim.name": "consented_at", "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "true"}},
+        {"name": "backend-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "config": {"included.custom.audience": "car-rental-api", "access.token.claim": "true", "id.token.claim": "false"}}
+      ]
+    },
+    {
+      "name": "car-rental-management", "protocol": "openid-connect",
+      "protocolMappers": [
+        {"name": "subject", "protocol": "openid-connect", "protocolMapper": "oidc-sub-mapper", "config": {"access.token.claim": "true", "introspection.token.claim": "true"}},
+        {"name": "management-roles", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-client-role-mapper", "config": {"usermodel.clientRoleMapping.clientId": "realm-management", "claim.name": "resource_access.realm-management.roles", "jsonType.label": "String", "multivalued": "true", "access.token.claim": "true", "id.token.claim": "false"}}
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "customer-web", "protocol": "openid-connect", "enabled": true, "publicClient": true,
+      "standardFlowEnabled": true, "implicitFlowEnabled": false, "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false, "fullScopeAllowed": false,
+      "redirectUris": ["https://oauth.pstmn.io/v1/callback"], "webOrigins": [],
+      "attributes": {"pkce.code.challenge.method": "S256"},
+      "authenticationFlowBindingOverrides": {"browser": "b8e01000-0000-4000-8000-000000000001"},
+      "defaultClientScopes": ["car-rental-access"], "optionalClientScopes": []
+    },
+    {
+      "clientId": "admin-web", "protocol": "openid-connect", "enabled": true, "publicClient": true,
+      "standardFlowEnabled": true, "implicitFlowEnabled": false, "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false, "fullScopeAllowed": false,
+      "redirectUris": ["https://oauth.pstmn.io/v1/callback"], "webOrigins": [],
+      "attributes": {"pkce.code.challenge.method": "S256"},
+      "authenticationFlowBindingOverrides": {"browser": "b8e01000-0000-4000-8000-000000000002"},
+      "defaultClientScopes": ["car-rental-access"], "optionalClientScopes": []
+    },
+    {
+      "clientId": "mobile", "protocol": "openid-connect", "enabled": true, "publicClient": true,
+      "standardFlowEnabled": true, "implicitFlowEnabled": false, "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false, "fullScopeAllowed": false,
+      "redirectUris": ["https://oauth.pstmn.io/v1/callback"], "webOrigins": [],
+      "attributes": {"pkce.code.challenge.method": "S256"},
+      "authenticationFlowBindingOverrides": {"browser": "b8e01000-0000-4000-8000-000000000001"},
+      "defaultClientScopes": ["car-rental-access"], "optionalClientScopes": []
+    },
+    {
+      "clientId": "identity-reader", "protocol": "openid-connect", "enabled": true,
+      "publicClient": false, "clientAuthenticatorType": "client-secret", "secret": "${CAR_RENTAL_KEYCLOAK_READER_SECRET}",
+      "standardFlowEnabled": false, "implicitFlowEnabled": false, "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true, "fullScopeAllowed": false,
+      "defaultClientScopes": ["car-rental-management"], "optionalClientScopes": []
+    },
+    {
+      "clientId": "security-admin-console", "protocol": "openid-connect", "enabled": true,
+      "publicClient": true, "standardFlowEnabled": true, "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false, "serviceAccountsEnabled": false, "fullScopeAllowed": false,
+      "baseUrl": "/admin/car-rental/console/", "redirectUris": ["/admin/car-rental/console/*"], "webOrigins": ["+"],
+      "attributes": {"pkce.code.challenge.method": "S256"},
+      "defaultClientScopes": ["car-rental-management"], "optionalClientScopes": []
+    },
+    {"clientId": "account", "enabled": false},
+    {"clientId": "account-console", "enabled": false},
+    {"clientId": "admin-cli", "enabled": false}
+  ],
+  "scopeMappings": [
+    {"client": "customer-web", "roles": ["CUSTOMER"]},
+    {"client": "mobile", "roles": ["CUSTOMER"]},
+    {"client": "admin-web", "roles": ["BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN"]}
+  ],
+  "clientScopeMappings": {
+    "realm-management": [
+      {"client": "identity-reader", "roles": ["query-users", "view-users"]},
+      {"client": "security-admin-console", "roles": ["manage-users", "view-users", "query-users", "view-realm"]}
+    ]
+  },
+  "users": [
+    {"username": "+84910000001", "enabled": true, "realmRoles": ["ADMIN"], "clientRoles": {"realm-management": ["manage-users", "view-users", "query-users", "view-realm"]}, "credentials": [{"type": "password", "value": "${CAR_RENTAL_LOCAL_ADMIN_PASSWORD}", "temporary": true}], "requiredActions": ["UPDATE_PASSWORD"]},
+    {"username": "+84910000002", "enabled": true, "realmRoles": ["BRANCH_STAFF"], "credentials": [{"type": "password", "value": "${CAR_RENTAL_LOCAL_STAFF_PASSWORD}", "temporary": true}], "requiredActions": ["UPDATE_PASSWORD"]},
+    {"username": "+84910000003", "enabled": true, "realmRoles": ["BRANCH_MANAGER"], "credentials": [{"type": "password", "value": "${CAR_RENTAL_LOCAL_MANAGER_A_PASSWORD}", "temporary": true}], "requiredActions": ["UPDATE_PASSWORD"]},
+    {"username": "+84910000004", "enabled": true, "realmRoles": ["BRANCH_MANAGER"], "credentials": [{"type": "password", "value": "${CAR_RENTAL_LOCAL_MANAGER_B_PASSWORD}", "temporary": true}], "requiredActions": ["UPDATE_PASSWORD"]},
+    {"username": "service-account-identity-reader", "enabled": true, "serviceAccountClientId": "identity-reader", "clientRoles": {"realm-management": ["query-users", "view-users"]}}
+  ]
+}

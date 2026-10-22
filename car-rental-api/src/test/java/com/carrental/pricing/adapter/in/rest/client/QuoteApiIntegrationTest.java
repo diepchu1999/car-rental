@@ -1,11 +1,14 @@
 package com.carrental.pricing.adapter.in.rest.client;
 
 import com.carrental.PostgresTestConfiguration;
+import com.carrental.identity.config.HttpIdentityTestConfiguration;
+import com.carrental.identity.config.HttpIdentityTestConfiguration.TestJwtIssuer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -22,15 +25,32 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** HTTP thật đi qua controller, booking/vehicle API, pricing và PostgreSQL; không dùng transaction bao ngoài test. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import({PostgresTestConfiguration.class, QuoteApiIntegrationTest.ApiConfiguration.class})
+@Import({PostgresTestConfiguration.class, HttpIdentityTestConfiguration.class,
+        QuoteApiIntegrationTest.ApiConfiguration.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class QuoteApiIntegrationTest {
     private static final String PATH = "/api/v1/client/quotes";
     @LocalServerPort private int port;
-    @Autowired private HttpClient client;
+    @Autowired @Qualifier("quoteApiHttpClient") private HttpClient client;
+    @Autowired private TestJwtIssuer tokens;
+    @Autowired private Clock clock;
     @Autowired private ObjectMapper mapper;
     @Autowired private com.carrental.vehicle.application.port.out.ReadVehiclePort vehicleReads;
     @Autowired private com.carrental.availability.api.AvailabilityDirectory availability;
+
+    /** BR-120: báo giá cần CUSTOMER; ADMIN thuần không có quyền khách và không tự nhận thêm vai. */
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "admin"})
+    void quoteRequiresCustomerIdentity(String variant) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + PATH + "/missing-quote"))
+                .timeout(Duration.ofSeconds(10)).GET();
+        if (variant.equals("admin")) {
+            request.header("Authorization", "Bearer " + tokens.adminToken(clock));
+        }
+        error(client.send(request.build(), HttpResponse.BodyHandlers.ofString()),
+                variant.equals("admin") ? 403 : 401,
+                variant.equals("admin") ? "ACCESS_DENIED" : "UNAUTHENTICATED");
+    }
 
     /** Toàn bộ ví dụ a–k2 phải đúng sau khi qua JSON, validation, JDBC và reload; tiền bảo hiểm là khoản riêng. */
     @ParameterizedTest(name = "HTTP example {0}")
@@ -234,10 +254,15 @@ class QuoteApiIntegrationTest {
         return send("POST", path, mapper.writeValueAsString(body), "application/json");
     }
 
-    /** Dùng một client quản lý bởi context; request có timeout và header theo api-guideline. */
+    /** ADMIN chuẩn bị xe, CUSTOMER gọi báo giá; tìm kiếm public không gửi token, không gộp hai vai. */
     private HttpResponse<String> send(String method, String path, String body, String contentType) throws Exception {
         var builder = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path)).timeout(Duration.ofSeconds(10))
                 .header("Accept", "application/json").header("X-Client-Platform", "web").header("X-Client-Version", "0.0.1");
+        if (path.startsWith("/api/v1/admin/")) {
+            builder.header("Authorization", "Bearer " + tokens.adminToken(clock));
+        } else if (path.startsWith("/api/v1/client/")) {
+            builder.header("Authorization", "Bearer " + tokens.customerToken(clock));
+        }
         if (contentType != null) builder.header("Content-Type", contentType);
         builder.method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
         return client.send(builder.build(), HttpResponse.BodyHandlers.ofString());

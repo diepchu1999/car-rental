@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.6.xsd">
+    <!-- Chạy bởi JpaEntityProvider của Keycloak; không thuộc Flyway của car_rental. -->
+    <changeSet id="car-rental-otp-001" author="car-rental">
+        <sqlFile path="car-rental-otp-001.sql" relativeToChangelogFile="true" splitStatements="true"/>
+    </changeSet>
+</databaseChangeLog>

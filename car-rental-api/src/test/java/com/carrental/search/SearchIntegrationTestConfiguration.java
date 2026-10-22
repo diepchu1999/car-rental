@@ -1,5 +1,6 @@
 package com.carrental.search;
 
+import com.carrental.identity.adapter.in.internal.ServiceCallerTestScope;
 import com.carrental.branch.application.command.CreateBranchCommand;
 import com.carrental.branch.application.port.in.CreateBranchUseCase;
 import com.carrental.branch.application.view.BranchDetail;
@@ -45,7 +46,10 @@ public class SearchIntegrationTestConfiguration {
         return new Fixtures(branches, vehicles, submissions, approvals);
     }
 
-    /** Setup dữ liệu của test qua vòng đời DRAFT → PENDING_APPROVAL → ACTIVE theo BR-010. */
+    /**
+     * Setup qua vòng đời thật BR-010 với ADMIN tường minh theo BR-810.
+     * Chỉ giữ caller trong lúc setup; search/hold sau đó không được thừa hưởng danh tính quản trị.
+     */
     public static final class Fixtures {
         private final CreateBranchUseCase branches;
         private final CreateVehicleUseCase vehicles;
@@ -63,23 +67,25 @@ public class SearchIntegrationTestConfiguration {
 
         /** Tạo chi nhánh có tên và địa chỉ để đối chiếu kết quả BR-808. */
         public BranchDetail branch(double latitude, double longitude) {
-            return branches.create(CreateBranchCommand.from(latitude, longitude,
-                    "Search Branch", "123 Search Street"));
+            return ServiceCallerTestScope.asAdmin(() -> branches.create(CreateBranchCommand.from(latitude, longitude,
+                    "Search Branch", "123 Search Street")));
         }
 
         /** Tạo xe hợp lệ; model riêng giúp từng test cô lập tập tìm kiếm mà không xóa dữ liệu. */
         public VehicleDetail draft(String branchCode, String model) {
             LocalDate expiry = LocalDate.of(2031, 1, 1);
-            return vehicles.create(CreateVehicleCommand.from("SEARCH-" + UUID.randomUUID(),
+            return ServiceCallerTestScope.asAdmin(() -> vehicles.create(CreateVehicleCommand.from("SEARCH-" + UUID.randomUUID(),
                     OwnershipType.COMPANY, FuelType.PETROL, branchCode, expiry, expiry,
-                    5, Transmission.AUTOMATIC, "Toyota", model, java.math.BigDecimal.valueOf(1_000_000L)));
+                    5, Transmission.AUTOMATIC, "Toyota", model, java.math.BigDecimal.valueOf(1_000_000L))));
         }
 
         /** Gửi duyệt và duyệt bằng nghiệp vụ thật, không ghi tắt trạng thái vào bảng vehicle. */
         public VehicleDetail active(String branchCode, String model) {
             var vehicle = draft(branchCode, model);
-            submissions.submitForApproval(SubmitVehicleForApprovalCommand.from(vehicle.code()));
-            return approvals.approve(ApproveVehicleCommand.from(vehicle.code()));
+            return ServiceCallerTestScope.asAdmin(() -> {
+                submissions.submitForApproval(SubmitVehicleForApprovalCommand.from(vehicle.code()));
+                return approvals.approve(ApproveVehicleCommand.from(vehicle.code()));
+            });
         }
     }
 }

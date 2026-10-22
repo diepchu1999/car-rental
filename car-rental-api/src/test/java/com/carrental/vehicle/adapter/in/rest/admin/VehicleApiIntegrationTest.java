@@ -1,10 +1,13 @@
 package com.carrental.vehicle.adapter.in.rest.admin;
 
 import com.carrental.PostgresTestConfiguration;
+import com.carrental.identity.config.HttpIdentityTestConfiguration;
+import com.carrental.identity.config.HttpIdentityTestConfiguration.TestJwtIssuer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -39,14 +42,16 @@ import static org.junit.jupiter.api.Assertions.*;
  * Cấu hình riêng tách context/container và đóng sau lớp test.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Import({PostgresTestConfiguration.class, VehicleApiIntegrationTest.HttpClientConfiguration.class})
+@Import({PostgresTestConfiguration.class, HttpIdentityTestConfiguration.class,
+        VehicleApiIntegrationTest.HttpClientConfiguration.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class VehicleApiIntegrationTest {
 
     private static final String PATH = "/api/v1/admin/vehicles";
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
     @LocalServerPort private int port;
-    @Autowired private HttpClient client;
+    @Autowired @Qualifier("vehicleApiHttpClient") private HttpClient client;
+    @Autowired private TestJwtIssuer tokens;
     @Autowired private ObjectMapper mapper;
     @Autowired private Clock clock;
 
@@ -481,7 +486,8 @@ class VehicleApiIntegrationTest {
     private HttpResponse<String> send(String method, String path, String body, String contentType)
             throws IOException, InterruptedException {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
-                .timeout(TIMEOUT).header("Accept", "application/json");
+                .timeout(TIMEOUT).header("Accept", "application/json")
+                .header("Authorization", "Bearer " + tokens.adminToken(clock));
         if (contentType != null) {
             builder.header("Content-Type", contentType);
         }

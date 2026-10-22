@@ -2,9 +2,59 @@
   "info": {
     "name": "Car Rental - SQL Caller",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Security-guideline §3: dữ liệu local giả; không đổi nghiệp vụ. Chọn Car Rental - Local. Mỗi folder độc lập, chạy 01 → 03 một iteration. Part 1 kiểm api/requestId; Part 2 quan sát thêm caller SQL. Có thể chạy lại không cần dọn CSDL. Part 3 kiểm nhãn api đúng/vượt 512 ký tự, độc lập và chỉ đọc."
+    "description": "Security-guideline §3: dữ liệu local giả; không đổi nghiệp vụ. Chọn Car Rental - Local. Mỗi folder độc lập, chạy 01 → 03 một iteration. Part 1 kiểm api/requestId; Part 2 quan sát thêm caller SQL. Có thể chạy lại không cần dọn CSDL. Part 3 kiểm nhãn api đúng/vượt 512 ký tự, độc lập và chỉ đọc.\n\nBR-803/809/810: chọn OAuth2 admin-web ở Authorization của COLLECTION, dùng token ADMIN local +84910000001 còn hạn, Use Token và tắt Share/Sync Token. Có thể dùng lại token đã lấy trong collection Identity, không cần xin OTP mới cho mỗi request. Chạy Part 0 trước; request /admin kế thừa token collection, /public và /actuator/health đặt No Auth tường minh. Không lưu token vào file hay Git. Chỉ bật sql-log với dữ liệu giả; không đặt SPRING_PROFILES_ACTIVE=sql-log trong shell hoặc .env. Postman kiểm response; log máy chủ vẫn phải quan sát trong IntelliJ."
   },
   "item": [
+    {
+      "name": "Part 0 - Verify ADMIN (BR-803, BR-810)",
+      "description": "BR-803/809/810: xác nhận đúng tài khoản ADMIN local trước khi kiểm log endpoint quản trị. Giữ token này ở collection trong toàn bộ lượt kiểm.",
+      "item": [
+        {
+          "name": "01 - Verify local ADMIN identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-803/809/810: phải là ADMIN +84910000001, không dùng token quản lý hoặc STAFF cho các fixture tạo chi nhánh."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is safe', () => pm.expect(pm.response.headers.get('X-Request-Id')).to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Expected local ADMIN account', () => {",
+                  "  pm.response.to.have.status(200);",
+                  "  const b = pm.response.json();",
+                  "  pm.expect(b).to.have.all.keys('success','data','error');",
+                  "  pm.expect(b.success).to.eql(true);",
+                  "  pm.expect(b.error).to.eql(null);",
+                  "  pm.expect(b.data.code).to.match(/^TK-[A-Z0-9]{6}$/);",
+                  "  pm.expect(b.data.phoneNumber).to.eql('+84910000001');",
+                  "  pm.expect(b.data.roles).to.include('ADMIN');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
     {
       "name": "Part 1 - API context",
       "description": "Bật sql-log với dữ liệu local giả để nhìn sự kiện SQL. Chạy 01 → 03. Ở request 02, nhãn api chỉ có GET + path, không có query marker.",
@@ -170,7 +220,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles",
-            "description": "Security-guideline §3: API thiếu tham số vẫn trả 400 INVALID_REQUEST và giữ X-Request-Id; không tạo log ERROR giả cho lỗi đầu vào."
+            "description": "Security-guideline §3: API thiếu tham số vẫn trả 400 INVALID_REQUEST và giữ X-Request-Id; không tạo log ERROR giả cho lỗi đầu vào.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -374,7 +427,10 @@
               }
             ],
             "url": "{{baseUrl}}/api/v1/public/vehicles",
-            "description": "Security-guideline §3: API thiếu tham số vẫn trả 400 INVALID_REQUEST và giữ X-Request-Id; không tạo log ERROR giả cho lỗi đầu vào."
+            "description": "Security-guideline §3: API thiếu tham số vẫn trả 400 INVALID_REQUEST và giữ X-Request-Id; không tạo log ERROR giả cho lỗi đầu vào.",
+            "auth": {
+              "type": "noauth"
+            }
           },
           "event": [
             {
@@ -560,6 +616,88 @@
           ]
         }
       ]
+    }
+  ],
+  "auth": {
+    "type": "oauth2",
+    "oauth2": [
+      {
+        "key": "grant_type",
+        "value": "authorization_code_with_pkce",
+        "type": "string"
+      },
+      {
+        "key": "authUrl",
+        "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+        "type": "string"
+      },
+      {
+        "key": "accessTokenUrl",
+        "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+        "type": "string"
+      },
+      {
+        "key": "clientId",
+        "value": "admin-web",
+        "type": "string"
+      },
+      {
+        "key": "clientSecret",
+        "value": "",
+        "type": "string"
+      },
+      {
+        "key": "redirect_uri",
+        "value": "https://oauth.pstmn.io/v1/callback",
+        "type": "string"
+      },
+      {
+        "key": "scope",
+        "value": "openid",
+        "type": "string"
+      },
+      {
+        "key": "challengeAlgorithm",
+        "value": "S256",
+        "type": "string"
+      },
+      {
+        "key": "state",
+        "value": "{{$guid}}",
+        "type": "string"
+      },
+      {
+        "key": "client_authentication",
+        "value": "body",
+        "type": "string"
+      },
+      {
+        "key": "addTokenTo",
+        "value": "header",
+        "type": "string"
+      },
+      {
+        "key": "tokenName",
+        "value": "Car Rental Local ADMIN",
+        "type": "string"
+      },
+      {
+        "key": "useBrowser",
+        "value": false,
+        "type": "boolean"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "keycloakBaseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "realm",
+      "value": "car-rental",
+      "type": "string"
     }
   ]
 }

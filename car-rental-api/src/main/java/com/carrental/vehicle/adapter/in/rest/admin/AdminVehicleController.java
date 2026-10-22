@@ -32,7 +32,9 @@ import java.net.URI;
  *
  * <p>Chỉ chuyển đổi dữ liệu HTTP và gọi port đầu vào, không truy cập JDBC.
  * API GĐ1 cố định COMPANY, không rẽ nhánh theo loại sở hữu.
- * Namespace admin chưa có xác thực hoặc phân quyền trong Task 4.
+ * Namespace admin yêu cầu xác thực; mọi use case kiểm vai và phạm vi theo BR-810.
+ * Quyền nhập giá lúc tạo được kiểm riêng ở use case tạo.
+ * Không suy quyền dữ liệu từ việc đã qua namespace admin.
  */
 @RestController
 @RequestMapping(path = AdminVehicleController.BASE_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -87,6 +89,7 @@ class AdminVehicleController {
 
     /**
      * Đọc xe theo mã, không áp lại điều kiện giấy tờ của bước duyệt.
+     * Use case kiểm ADMIN hoặc STAFF/MANAGER thuộc chi nhánh có xe theo BR-810.
      *
      * @param code mã nghiệp vụ trên URL
      * @return HTTP 200 cùng dữ liệu xe
@@ -98,7 +101,14 @@ class AdminVehicleController {
         ));
     }
 
-    /** Đổi duy nhất giá ngày theo BR-234, trả cùng hợp đồng chi tiết như GET. */
+    /**
+     * Đổi duy nhất giá ngày theo BR-234, trả cùng hợp đồng chi tiết như GET.
+     * Use case kiểm ADMIN hoặc MANAGER của chi nhánh có xe theo BR-810.
+     *
+     * @param code mã nghiệp vụ của xe trên URL
+     * @param request giá ngày thô cần kiểm tra tại command
+     * @return dữ liệu xe sau cập nhật, không đổi hình dạng response
+     */
     @PutMapping(path = "/{code}/daily-rate", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ApiResponse<VehicleResponse> changeDailyRate(@PathVariable("code") String code,
             @RequestBody ChangeVehicleDailyRateRequest request) {

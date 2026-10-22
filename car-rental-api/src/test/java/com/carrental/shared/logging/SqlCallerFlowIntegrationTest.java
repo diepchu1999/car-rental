@@ -2,6 +2,8 @@ package com.carrental.shared.logging;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import com.carrental.PostgresTestConfiguration;
+import com.carrental.identity.config.HttpIdentityTestConfiguration;
+import com.carrental.identity.config.HttpIdentityTestConfiguration.TestJwtIssuer;
 import com.carrental.availability.application.port.out.ReadReservationPort;
 import com.carrental.availability.application.port.out.WriteReservationPort;
 import com.carrental.availability.domain.Reservation;
@@ -38,6 +40,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -61,6 +64,7 @@ import static org.junit.jupiter.api.Assertions.*;
         properties = {"car-rental.availability.hold-sweep-interval=PT0.25S",
                 "car-rental.pricing.holiday-calendar.declared-through=2031-12-31"}) // Chỉ lịch giả cho fixture 2030.
 @Import({PostgresTestConfiguration.class, SearchIntegrationTestConfiguration.class,
+        HttpIdentityTestConfiguration.class,
         SqlCallerFlowIntegrationTest.GateConfiguration.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class SqlCallerFlowIntegrationTest {
@@ -69,6 +73,8 @@ class SqlCallerFlowIntegrationTest {
     @LocalServerPort private int port;
     @Autowired private Environment environment;
     @Autowired private ObjectMapper mapper;
+    @Autowired private TestJwtIssuer tokens;
+    @Autowired private Clock clock;
     @Autowired private SearchIntegrationTestConfiguration.Fixtures fixtures;
     @Autowired private RequestGate gate;
     @Autowired private WriteReservationPort writes;
@@ -84,7 +90,7 @@ class SqlCallerFlowIntegrationTest {
         try (var logs = new LogEventCapture("p6spy")) {
             JsonNode data = successful(get(path + "?probe=query-sentinel", id), id);
             assertEquals(branch.code(), data.path("code").asString());
-            var events = requestSql(logs, id);
+            var events = branchSql(logs, id, "GET " + path);
             if (!sqlLogEnabled()) {
                 assertTrue(logs.events().isEmpty(), "Without sql-log no request or job SQL may be logged.");
                 return;
@@ -125,7 +131,7 @@ class SqlCallerFlowIntegrationTest {
                 assertTrue(logs.events().isEmpty());
                 return;
             }
-            var events = requestSql(logs, id);
+            var events = branchSql(logs, id, expectedApi);
             assertEquals(1, events.size());
             assertEquals(512, expectedApi.length());
             assertContext(events.getFirst(), id, expectedApi);
@@ -277,6 +283,17 @@ class SqlCallerFlowIntegrationTest {
         return logs.events().stream().filter(event -> id.equals(event.getMDCPropertyMap().get("requestId"))).toList();
     }
 
+    /**
+     * Danh tính thật cũng chạy SQL trước controller. Kiểm MDC của tất cả SQL thuộc request,
+     * rồi chỉ chọn SELECT chi nhánh để giữ khẳng định đúng một lần gọi nghiệp vụ và caller của nó.
+     */
+    private static List<ILoggingEvent> branchSql(LogEventCapture logs, String id, String api) {
+        var events = requestSql(logs, id);
+        events.forEach(event -> assertContext(event, id, api));
+        return events.stream().filter(event -> event.getFormattedMessage()
+                .contains("FROM branch.branch AS b")).toList();
+    }
+
     /** Kiểm API chỉ có method/path hoặc tên job; không đưa query/header vào nhãn. */
     private static void assertContext(ILoggingEvent event, String id, String api) {
         assertEquals(id, event.getMDCPropertyMap().get("requestId"));
@@ -316,13 +333,16 @@ class SqlCallerFlowIntegrationTest {
         return body.path("data");
     }
 
-    /** Gửi HTTP tới cổng ngẫu nhiên, có timeout; không gọi controller hoặc use case thay cho HTTP. */
+    /** HTTP thật: đọc admin có JWT ADMIN, search public vẫn ẩn danh; không tự gắn CallerRef. */
     private HttpResponse<String> get(String path, String id) throws Exception {
         var request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
                 .timeout(Duration.ofSeconds(15)).header("X-Request-Id", id)
-                .header("X-Client-Platform", "web").header("X-Client-Version", "0.0.1").GET().build();
+                .header("X-Client-Platform", "web").header("X-Client-Version", "0.0.1").GET();
+        if (path.startsWith("/api/v1/admin/")) {
+            request.header("Authorization", "Bearer " + tokens.adminToken(clock));
+        }
         try (var client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build()) {
-            return client.send(request, HttpResponse.BodyHandlers.ofString());
+            return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
         }
     }
 

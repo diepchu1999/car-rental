@@ -1,5 +1,6 @@
 package com.carrental.search.adapter.in.rest.publicapi;
 
+import com.carrental.identity.adapter.in.internal.ServiceCallerTestScope;
 import com.carrental.PostgresTestConfiguration;
 import com.carrental.availability.api.AvailabilityDirectory;
 import com.carrental.availability.api.BlockKind;
@@ -11,6 +12,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -52,7 +54,9 @@ import static org.junit.jupiter.api.Assertions.*;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class SearchApiIntegrationTest {
     @LocalServerPort private int port;
-    @Autowired private HttpClient httpClient;
+    @Autowired
+    @Qualifier("searchApiHttpClient")
+    private HttpClient httpClient;
     @Autowired private ObjectMapper mapper;
     @Autowired private SearchIntegrationTestConfiguration.Fixtures fixtures;
     @Autowired private AvailabilityDirectory availability;
@@ -199,8 +203,9 @@ class SearchApiIntegrationTest {
         var expensiveA = fixtures.active(origin.code(), model);
         var expensiveB = fixtures.active(origin.code(), model);
         var cheapFar = fixtures.active(near.code(), model);
-        rates.changeDailyRate(com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand.from(
-                cheapFar.code(), java.math.BigDecimal.valueOf(500_000)));
+        ServiceCallerTestScope.asAdmin(() -> rates.changeDailyRate(
+                com.carrental.vehicle.application.command.ChangeVehicleDailyRateCommand.from(
+                        cheapFar.code(), java.math.BigDecimal.valueOf(500_000))));
         var nearCodes = List.of(expensiveA.code(), expensiveB.code()).stream().sorted().toList();
         parameters.put("sort", "PRICE_ASC");
         parameters.put("limit", "2");

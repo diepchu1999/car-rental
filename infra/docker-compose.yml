@@ -43,6 +43,7 @@ services:
     restart: unless-stopped
     command:
       - start-dev
+      - --import-realm
     environment:
       KC_DB: postgres
       KC_DB_URL_HOST: postgres
@@ -55,8 +56,45 @@ services:
       KC_HTTP_PORT: "${KEYCLOAK_PORT:?KEYCLOAK_PORT is required}"
       KC_HTTP_MANAGEMENT_PORT: "${KEYCLOAK_MANAGEMENT_PORT:?KEYCLOAK_MANAGEMENT_PORT is required}"
       KC_HEALTH_ENABLED: "true"
+      # BR-129: cấu hình vận hành; provider tự kiểm hợp lệ, không có mặc định ngầm.
+      CAR_RENTAL_OTP_DIGITS: "${CAR_RENTAL_OTP_DIGITS:?CAR_RENTAL_OTP_DIGITS is required}"
+      CAR_RENTAL_OTP_LIFETIME: "${CAR_RENTAL_OTP_LIFETIME:?CAR_RENTAL_OTP_LIFETIME is required}"
+      CAR_RENTAL_OTP_MAX_FAILURES: "${CAR_RENTAL_OTP_MAX_FAILURES:?CAR_RENTAL_OTP_MAX_FAILURES is required}"
+      CAR_RENTAL_OTP_RESEND_DELAY: "${CAR_RENTAL_OTP_RESEND_DELAY:?CAR_RENTAL_OTP_RESEND_DELAY is required}"
+      CAR_RENTAL_OTP_PHONE_HOURLY_LIMIT: "${CAR_RENTAL_OTP_PHONE_HOURLY_LIMIT:?CAR_RENTAL_OTP_PHONE_HOURLY_LIMIT is required}"
+      CAR_RENTAL_OTP_PHONE_DAILY_LIMIT: "${CAR_RENTAL_OTP_PHONE_DAILY_LIMIT:?CAR_RENTAL_OTP_PHONE_DAILY_LIMIT is required}"
+      CAR_RENTAL_OTP_IP_SEND_HOURLY_LIMIT: "${CAR_RENTAL_OTP_IP_SEND_HOURLY_LIMIT:?CAR_RENTAL_OTP_IP_SEND_HOURLY_LIMIT is required}"
+      CAR_RENTAL_OTP_IP_FAILURE_HOURLY_LIMIT: "${CAR_RENTAL_OTP_IP_FAILURE_HOURLY_LIMIT:?CAR_RENTAL_OTP_IP_FAILURE_HOURLY_LIMIT is required}"
+      CAR_RENTAL_OTP_HMAC_SECRET: "${CAR_RENTAL_OTP_HMAC_SECRET:?CAR_RENTAL_OTP_HMAC_SECRET is required}"
+      CAR_RENTAL_TERMS_VERSION: "${CAR_RENTAL_TERMS_VERSION:?CAR_RENTAL_TERMS_VERSION is required}"
+      # Secret chỉ lấy từ .env; Keycloak thay placeholder khi import realm lần đầu.
+      CAR_RENTAL_KEYCLOAK_READER_SECRET: "${CAR_RENTAL_KEYCLOAK_READER_SECRET:?CAR_RENTAL_KEYCLOAK_READER_SECRET is required}"
+      CAR_RENTAL_LOCAL_ADMIN_PASSWORD: "${CAR_RENTAL_LOCAL_ADMIN_PASSWORD:?CAR_RENTAL_LOCAL_ADMIN_PASSWORD is required}"
+      CAR_RENTAL_LOCAL_STAFF_PASSWORD: "${CAR_RENTAL_LOCAL_STAFF_PASSWORD:?CAR_RENTAL_LOCAL_STAFF_PASSWORD is required}"
+      CAR_RENTAL_LOCAL_MANAGER_A_PASSWORD: "${CAR_RENTAL_LOCAL_MANAGER_A_PASSWORD:?CAR_RENTAL_LOCAL_MANAGER_A_PASSWORD is required}"
+      CAR_RENTAL_LOCAL_MANAGER_B_PASSWORD: "${CAR_RENTAL_LOCAL_MANAGER_B_PASSWORD:?CAR_RENTAL_LOCAL_MANAGER_B_PASSWORD is required}"
     ports:
       - "${LOCAL_BIND_ADDRESS:?LOCAL_BIND_ADDRESS is required}:${KEYCLOAK_PORT:?KEYCLOAK_PORT is required}:${KEYCLOAK_PORT:?KEYCLOAK_PORT is required}"
+    volumes:
+      # Chỉ mount đúng hai JAR triển khai, tuyệt đối không mount cả target/ có JAR probe.
+      - type: bind
+        source: ../car-rental-keycloak/target/car-rental-keycloak-0.0.1-SNAPSHOT.jar
+        target: /opt/keycloak/providers/car-rental-otp.jar
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ../car-rental-keycloak/target/car-rental-keycloak-0.0.1-SNAPSHOT-local-sms.jar
+        target: /opt/keycloak/providers/car-rental-local-sms.jar
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./keycloak/realm-export.json
+        target: /opt/keycloak/data/import/car-rental-realm.json
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       postgres:
         condition: service_healthy

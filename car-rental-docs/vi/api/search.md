@@ -22,6 +22,9 @@ Hiện chỉ chạy local. Rate limit theo security-guideline chưa được hi�
 
 Áp dụng [header truy vết X-Request-Id](http-headers.md); response JSON không đổi.
 
+Không bắt buộc token. Nếu gửi `Authorization: Bearer ...`, token vẫn phải hợp lệ;
+token hỏng/hết hạn trả `401 UNAUTHENTICATED`, không tự chuyển thành request ẩn danh.
+
 Không có request body. Gửi các trường bằng query parameters, tên phân biệt hoa thường.
 
 Header khuyến nghị:

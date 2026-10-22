@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.carrental.PostgresTestConfiguration;
+import com.carrental.identity.adapter.in.internal.ServiceCallerTestScope;
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.application.command.CreateBranchCommand;
 import com.carrental.branch.application.port.in.CreateBranchUseCase;
@@ -104,8 +105,8 @@ class SqlLoggingIntegrationTest {
     @Test
     void preservesApplicationTransactionAndRollback() {
         var created = Objects.requireNonNull(new TransactionTemplate(transactions).execute(status -> {
-            var branch = createBranch.create(CreateBranchCommand.from(10.76, 106.66,
-                    "SQL logging rollback probe", "Fake local address"));
+            var branch = ServiceCallerTestScope.asAdmin(() -> createBranch.create(CreateBranchCommand.from(10.76, 106.66,
+                    "SQL logging rollback probe", "Fake local address")));
             assertTrue(branches.findByCode(branch.code()).isPresent());
             status.setRollbackOnly();
             return branch;

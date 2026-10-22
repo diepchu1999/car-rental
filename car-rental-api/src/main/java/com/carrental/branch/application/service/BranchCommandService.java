@@ -6,12 +6,15 @@ import com.carrental.branch.application.port.out.ReadBranchPort;
 import com.carrental.branch.application.port.out.WriteBranchPort;
 import com.carrental.branch.application.view.BranchDetail;
 import com.carrental.branch.domain.Branch;
+import com.carrental.identity.api.CallerDirectory;
 import com.carrental.shared.code.BusinessCodeGenerator;
+import com.carrental.shared.error.DomainException;
+import com.carrental.shared.error.ErrorCode;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Điều phối việc tạo danh tính và vị trí chi nhánh trong phạm vi Task 4.
+ * Điều phối việc tạo danh tính và vị trí chi nhánh; chỉ ADMIN được tạo theo BR-810.
  *
  * <p>Vị trí chi nhánh phục vụ BR-003. Mã nghiệp vụ được sinh
  * tại application và được cơ sở dữ liệu bảo vệ tính duy nhất
@@ -39,6 +42,8 @@ class BranchCommandService implements CreateBranchUseCase {
 
     private final BusinessCodeGenerator businessCodeGenerator;
 
+    private final CallerDirectory callers;
+
     /**
      * Nhận các cổng lưu trữ và bộ sinh mã do Spring cung cấp.
      *
@@ -48,19 +53,22 @@ class BranchCommandService implements CreateBranchUseCase {
      * @param writeBranchPort cổng chèn chi nhánh
      * @param readBranchPort cổng đọc lại chi nhánh đã lưu
      * @param businessCodeGenerator bộ sinh mã nghiệp vụ
+     * @param callers cổng danh tính đã xác thực, không lấy vai từ command
      */
     BranchCommandService(
             WriteBranchPort writeBranchPort,
             ReadBranchPort readBranchPort,
-            BusinessCodeGenerator businessCodeGenerator
+            BusinessCodeGenerator businessCodeGenerator,
+            CallerDirectory callers
     ) {
         this.writeBranchPort = writeBranchPort;
         this.readBranchPort = readBranchPort;
         this.businessCodeGenerator = businessCodeGenerator;
+        this.callers = callers;
     }
 
     /**
-     * Sinh mã, chèn chi nhánh và trả dữ liệu đọc lại từ cơ sở dữ liệu.
+     * Kiểm quyền ADMIN theo BR-810 trước khi sinh mã, chèn và đọc lại chi nhánh.
      *
      * <p>Chỉ thử mã khác khi cổng ghi trả false do trùng mã nghiệp vụ.
      * Các lỗi lưu trữ khác được truyền ra ngoài, không bị coi là trùng mã.
@@ -79,6 +87,9 @@ class BranchCommandService implements CreateBranchUseCase {
     @Override
     @Transactional
     public BranchDetail create(CreateBranchCommand command) {
+        if (!callers.current().hasRole("ADMIN")) {
+            throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+        }
         for (int attempt = 0;
              attempt < MAX_CODE_GENERATION_ATTEMPTS;
              attempt++) {

@@ -2,6 +2,8 @@ package com.carrental.vehicle.application.service;
 
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchRef;
+import com.carrental.identity.api.CallerRef;
+import java.util.Set;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
 import com.carrental.vehicle.application.port.out.ReadVehiclePort;
@@ -70,7 +72,7 @@ class VehicleQueryServiceTest {
         );
 
         BranchDirectory branches = mock(BranchDirectory.class);
-        VehicleQueryService service = new VehicleQueryService(readVehiclePort, branches);
+        VehicleQueryService service = new VehicleQueryService(readVehiclePort, branches, () -> new CallerRef("TK-ADMIN1", Set.of("ADMIN"), null));
 
         when(branches.findById(42L)).thenReturn(Optional.of(new BranchRef(42L, "CN-READ01")));
         VehicleDetail actual = service.get(
@@ -108,7 +110,7 @@ class VehicleQueryServiceTest {
         );
 
         BranchDirectory branches = mock(BranchDirectory.class);
-        VehicleQueryService service = new VehicleQueryService(readVehiclePort, branches);
+        VehicleQueryService service = new VehicleQueryService(readVehiclePort, branches, () -> new CallerRef("TK-ADMIN1", Set.of("ADMIN"), null));
 
         GetVehicleQuery query = GetVehicleQuery.from(code);
 
@@ -160,7 +162,7 @@ class VehicleQueryServiceTest {
         );
 
         BranchDirectory branches = mock(BranchDirectory.class);
-        VehicleQueryService service = new VehicleQueryService(readVehiclePort, branches);
+        VehicleQueryService service = new VehicleQueryService(readVehiclePort, branches, () -> new CallerRef("TK-ADMIN1", Set.of("ADMIN"), null));
 
         GetVehicleQuery query = GetVehicleQuery.from(code);
 

@@ -506,6 +506,50 @@ nhập sai chống dò mã.
 Cùng ngày thêm giới hạn nhập sai theo IP, cửa sổ trượt và chỉ nhận số Việt Nam — kế hoạch Task 8a phát
 hiện còn thiếu.*
 
+
+### BR-130 — Xác minh giấy tờ khách ✅ GĐ1
+Khách **tự nhập** thông tin và **tải ảnh hai mặt** của CCCD và GPLX (BR-120). Nhân viên đối chiếu ảnh với
+thông tin rồi ra một trong hai kết quả: **đã xác minh**, hoặc **từ chối kèm lý do** — khách sửa và tải lại.
+
+**Ai xác minh:** một đội riêng mang vai **`DOCUMENT_VERIFIER`** (BR-801), và `ADMIN`. Vai này **chỉ** có
+quyền xác minh giấy tờ — không động vào xe, chi nhánh, đơn hay tiền. Nhân viên chi nhánh **không** xác minh.
+Khách không thuộc chi nhánh nào, nên việc xác minh không gắn với chi nhánh (BR-803: vai cấp công ty).
+
+**Lưu những gì:**
+
+| Giấy tờ | Trường |
+|---|---|
+| GPLX | Số · hạng (BR-128) · ngày hết hạn (BR-106b) · ghi chú "chỉ số tự động" (BR-128) · ảnh hai mặt |
+| CCCD | Số · họ tên · ngày sinh · **ngày hết hạn** · ảnh hai mặt |
+
+**CCCD phải còn hạn tới hết chuyến** — cùng cách kiểm với GPLX ở BR-106b: lúc tạo đơn và lúc bàn giao. Hợp
+đồng thuê và hồ sơ phạt nguội (BR-702) dựa trên giấy tờ tuỳ thân còn hiệu lực.
+
+**Ảnh tải lên:** mỗi ảnh tối đa **5 MB**; chỉ nhận **JPEG, PNG, HEIC** (HEIC là mặc định của iPhone). Server
+tự xác định loại file từ nội dung, không tin loại file client khai (security-guideline §5).
+
+**Lý do từ chối** chọn từ danh sách cố định, cộng ghi chú tự do **không bắt buộc**:
+
+| Mã | Nghĩa |
+|---|---|
+| `ILLEGIBLE` | Ảnh mờ, loá, bị che — không đọc được |
+| `MISSING_SIDE` | Thiếu một mặt |
+| `DATA_MISMATCH` | Thông tin khách nhập không khớp ảnh |
+| `EXPIRED` | Giấy tờ đã hết hạn |
+| `HOLDER_MISMATCH` | CCCD và GPLX không phải của cùng một người |
+| `SUSPECTED_FORGERY` | Nghi giả mạo hoặc không phải giấy tờ thật |
+
+Danh sách cố định để ứng dụng hiện đúng hướng dẫn sửa cho từng lý do, và thống kê được.
+
+Số GPLX và số CCCD **băm để tra cứu, mã hoá khi lưu**; ảnh nằm ở kho object, CSDL chỉ giữ khoá
+(security-guideline §3).
+
+**Mỗi lần nhân viên mở ảnh giấy tờ đều ghi audit** — ai mở, của ai, lúc nào (security-guideline §3).
+
+**Khách cập nhật GPLX** — ví dụ sau khi gia hạn — thì **phải xác minh lại**; bản đã xác minh trước không
+tự chuyển sang bản mới.
+*Nguồn: Tech Owner duyệt 22/10/2026 — gồm vai `DOCUMENT_VERIFIER`, hạn CCCD, giới hạn ảnh, danh sách lý do từ chối.*
+
 ---
 
 ## 2xx — Tiền
@@ -1349,6 +1393,7 @@ Tên vai dùng **tiếng Anh**.
 | `ACCOUNTANT` | Kế toán | 1 |
 | `OPERATIONS_MANAGER` | Quản lý vận hành — duyệt điều chuyển xe | 1 |
 | `ADMIN` | Toàn quyền | 1 |
+| `DOCUMENT_VERIFIER` | Nhân viên xác minh giấy tờ khách — **chỉ** quyền xác minh (BR-130) | 1 |
 | `HOST` | Đối tác cá nhân | 2 |
 | `BUSINESS_PARTNER` | Đối tác doanh nghiệp | 3 |
 | `BUSINESS_PARTNER_STAFF` | Tài khoản con của đối tác doanh nghiệp | 3 |
@@ -1365,7 +1410,7 @@ Ba mức phạm vi:
 | Vai | Phạm vi |
 |---|---|
 | `ADMIN` | Toàn quyền, mọi chi nhánh |
-| `OPERATIONS_MANAGER`, `ACCOUNTANT` | **Cấp công ty** — xem được mọi chi nhánh, nhưng **chỉ trong việc của vai đó** |
+| `OPERATIONS_MANAGER`, `ACCOUNTANT`, `DOCUMENT_VERIFIER` | **Cấp công ty** — xem được mọi chi nhánh, nhưng **chỉ trong việc của vai đó** |
 | `BRANCH_STAFF`, `BRANCH_MANAGER`, `DELIVERY_STAFF`, `DRIVER` | Thuộc **đúng một** chi nhánh, chỉ thấy chi nhánh của mình (BR-802) |
 
 `OPERATIONS_MANAGER` duyệt điều chuyển **giữa hai chi nhánh** (BR-006); `OPERATIONS_MANAGER` cùng
@@ -1462,7 +1507,11 @@ Kết quả tìm kiếm chỉ ghi "cách 3,2 km" thì khách không biết đó 
 - **Mật khẩu nhân viên:** tối thiểu **12 ký tự** · **không** bắt đổi định kỳ · không dùng lại **5** mật
   khẩu gần nhất · mật khẩu tạm do `ADMIN` cấp **phải đổi** ở lần đăng nhập đầu. Bắt đổi định kỳ đẩy người
   dùng tới mật khẩu dễ đoán theo mẫu; mật khẩu dài cộng OTP mới là chỗ bảo vệ.
-*Nguồn: Tech Owner duyệt 12/10/2026.*
+- **Đoán mật khẩu nhân viên:** sai **5 lần liên tiếp** thì **khoá tạm 15 phút**; tiếp tục sai thì thời gian
+  khoá **tăng dần** (mỗi 5 lần sai cộng thêm 15 phút). **Không khoá vĩnh viễn** — khoá vĩnh viễn cho phép
+  người ngoài cố tình làm tê liệt tài khoản nhân viên. Thời gian khoá **tối đa 1 giờ**; `ADMIN` mở khoá
+  sớm được.
+*Nguồn: Tech Owner duyệt 12/10/2026. Khoá khi đoán mật khẩu: duyệt 20/10/2026, review Task 8a phát hiện.*
 
 ### BR-810 — Quyền trên chi nhánh và danh mục xe ✅ GĐ1
 | Thao tác | Vai được phép |

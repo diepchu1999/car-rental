@@ -7,6 +7,8 @@ import com.carrental.branch.application.port.out.WriteBranchPort;
 import com.carrental.branch.application.view.BranchDetail;
 import com.carrental.branch.domain.Branch;
 import com.carrental.branch.domain.BranchLocation;
+import com.carrental.identity.api.CallerDirectory;
+import com.carrental.identity.api.CallerRef;
 import com.carrental.shared.code.BusinessCodeGeneratorTestFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -15,6 +17,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.random.RandomGenerator;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -35,6 +38,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * do đó không kiểm chứng proxy transaction hay rollback.
  */
 class BranchCommandServiceTest {
+
+    private static final CallerDirectory ADMIN = () -> new CallerRef("TK-ADMIN1", Set.of("ADMIN"), null);
 
     private static final BranchLocation LOCATION =
             new BranchLocation(10.762622, 106.660172);
@@ -89,7 +94,7 @@ class BranchCommandServiceTest {
         BranchCommandService service = new BranchCommandService(
                 writeBranchPort,
                 readBranchPort,
-                BusinessCodeGeneratorTestFactory.create(random)
+                BusinessCodeGeneratorTestFactory.create(random), ADMIN
         );
 
         BranchDetail actual = service.create(COMMAND);
@@ -141,7 +146,7 @@ class BranchCommandServiceTest {
         BranchCommandService service = new BranchCommandService(
                 writeBranchPort,
                 readBranchPort,
-                BusinessCodeGeneratorTestFactory.create(random)
+                BusinessCodeGeneratorTestFactory.create(random), ADMIN
         );
 
         IllegalStateException failure = assertThrowsExactly(
@@ -186,7 +191,7 @@ class BranchCommandServiceTest {
         BranchCommandService service = new BranchCommandService(
                 writeBranchPort,
                 readBranchPort,
-                BusinessCodeGeneratorTestFactory.create(random)
+                BusinessCodeGeneratorTestFactory.create(random), ADMIN
         );
 
         IllegalStateException actual = assertThrowsExactly(
@@ -223,7 +228,7 @@ class BranchCommandServiceTest {
         BranchCommandService service = new BranchCommandService(
                 writeBranchPort,
                 readBranchPort,
-                BusinessCodeGeneratorTestFactory.create(random)
+                BusinessCodeGeneratorTestFactory.create(random), ADMIN
         );
 
         IllegalStateException failure = assertThrowsExactly(
@@ -271,7 +276,7 @@ class BranchCommandServiceTest {
         BranchCommandService service = new BranchCommandService(
                 writeBranchPort,
                 readBranchPort,
-                BusinessCodeGeneratorTestFactory.create(random)
+                BusinessCodeGeneratorTestFactory.create(random), ADMIN
         );
 
         IllegalStateException actual = assertThrowsExactly(

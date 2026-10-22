@@ -1,0 +1,5 @@
+#!/bin/sh
+# Dùng cùng bản Maven Wrapper đã ghim của repo, nhưng chọn đúng pom của SPI.
+set -eu
+project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+exec "$project_dir/../car-rental-api/mvnw" -f "$project_dir/pom.xml" "$@"

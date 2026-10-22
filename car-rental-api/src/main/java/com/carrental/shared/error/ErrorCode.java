@@ -15,6 +15,36 @@ package com.carrental.shared.error;
  */
 public enum ErrorCode {
 
+    /** ADR-0006: thiếu token hoặc token không vượt qua kiểm chứng của resource server. */
+    UNAUTHENTICATED("Authentication is required."),
+
+    /** BR-803/809/810: người gọi không đủ vai, phạm vi hoặc mức xác thực cho thao tác. */
+    ACCESS_DENIED("Access is denied."),
+
+    /** BR-803: vai thuộc chi nhánh chưa được gán chi nhánh để thao tác. */
+    STAFF_BRANCH_REQUIRED("A branch assignment is required for this employee."),
+
+    /** ADR-0006: vai hiện tại không khớp vai ghi nhận khi gán chi nhánh. */
+    STAFF_ROLE_MISMATCH("The employee role does not match the branch assignment."),
+
+    /** BR-120/124: không tự đổi số điện thoại của tài khoản từ một token khác số đã lưu. */
+    ACCOUNT_IDENTITY_MISMATCH("The account identity does not match the authenticated identity."),
+
+    /** BR-120: số điện thoại đã gắn với một định danh Keycloak khác. */
+    ACCOUNT_IDENTITY_CONFLICT("The authenticated identity conflicts with an existing account."),
+
+    /** Không tìm thấy tài khoản theo mã nghiệp vụ TK-<6>. */
+    ACCOUNT_NOT_FOUND("Account not found."),
+
+    /** BR-807: CSDL từ chối gán quản lý thứ hai cho cùng một chi nhánh. */
+    BRANCH_MANAGER_ALREADY_ASSIGNED("The branch already has a different manager."),
+
+    /** BR-803: không gán chi nhánh cho vai không thuộc phạm vi một chi nhánh. */
+    STAFF_ROLE_NOT_BRANCH_SCOPED("The employee role is not branch-scoped."),
+
+    /** BR-120: khách thiếu bằng chứng đồng ý điều khoản hợp lệ. */
+    CONSENT_REQUIRED("Valid consent to the terms is required."),
+
     /** Báo giá không tồn tại khi đọc theo BR-122. */
     QUOTE_NOT_FOUND("The requested quote was not found."),
 

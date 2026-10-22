@@ -14,14 +14,16 @@ public interface GetVehicleUseCase {
 
     /**
      * Lấy thông tin chi tiết của xe có mã được yêu cầu.
+     * ADMIN xem mọi xe; STAFF/MANAGER chỉ xem chi nhánh mình theo BR-803/810.
+     * Sai vai hoặc khác chi nhánh trả ACCESS_DENIED; chưa gán trả STAFF_BRANCH_REQUIRED.
+     * Yêu cầu danh tính HTTP qua CallerDirectory, không dùng làm cổng tra cứu cross-module.
      *
      * <p>Mã được giữ nguyên như trong query.
      * Lỗi truy cập dữ liệu không được chuyển thành lỗi không tìm thấy.
      *
      * @param query yêu cầu tra cứu đã được kiểm tra, không được null
      * @return thông tin chi tiết của xe tìm được
-     * @throws DomainException nếu không tìm thấy xe,
-     *                         với mã lỗi VEHICLE_NOT_FOUND
+     * @throws DomainException nếu không có quyền, chưa gán chi nhánh hoặc không tìm thấy xe
      */
     VehicleDetail get(GetVehicleQuery query);
 }

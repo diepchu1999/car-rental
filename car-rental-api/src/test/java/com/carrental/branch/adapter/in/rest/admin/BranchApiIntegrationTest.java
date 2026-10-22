@@ -1,11 +1,14 @@
 package com.carrental.branch.adapter.in.rest.admin;
 
 import com.carrental.PostgresTestConfiguration;
+import com.carrental.identity.config.HttpIdentityTestConfiguration;
+import com.carrental.identity.config.HttpIdentityTestConfiguration.TestJwtIssuer;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -23,6 +26,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Clock;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -50,6 +54,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 )
 @Import({
         PostgresTestConfiguration.class,
+        HttpIdentityTestConfiguration.class,
         BranchApiIntegrationTest.HttpClientConfiguration.class
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
@@ -63,10 +68,34 @@ class BranchApiIntegrationTest {
     private int port;
 
     @Autowired
+    @Qualifier("branchApiHttpClient")
     private HttpClient httpClient;
+
+    @Autowired private TestJwtIssuer tokens;
+    @Autowired private Clock clock;
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    /** ADR-0006/BR-810: fixture không bỏ security; thiếu token, sai chữ ký và CUSTOMER vẫn bị chặn. */
+    @ParameterizedTest
+    @ValueSource(strings = {"missing", "tampered", "customer"})
+    void requiresVerifiedAdminIdentity(String variant) throws IOException, InterruptedException {
+        var builder = HttpRequest.newBuilder(uri(BRANCHES_PATH + "/CN-MISS01"))
+                .timeout(REQUEST_TIMEOUT).GET();
+        if (variant.equals("customer")) {
+            builder.header("Authorization", "Bearer " + tokens.customerToken(clock));
+        } else if (variant.equals("tampered")) {
+            String token = tokens.adminToken(clock);
+            int start = token.lastIndexOf('.') + 1;
+            char replacement = token.charAt(start) == 'A' ? 'B' : 'A';
+            builder.header("Authorization", "Bearer " + token.substring(0, start)
+                    + replacement + token.substring(start + 1));
+        }
+        var response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
+        assertErrorResponse(response, variant.equals("customer") ? 403 : 401,
+                variant.equals("customer") ? "ACCESS_DENIED" : "UNAUTHENTICATED");
+    }
 
     /** BR-808: kiểm từng trường thiếu, null, rỗng và trắng với đúng thông báo lỗi. */
     @ParameterizedTest
@@ -294,6 +323,7 @@ class BranchApiIntegrationTest {
                 .uri(uri(BRANCHES_PATH))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Accept", MediaType.APPLICATION_JSON_VALUE)
+                .header("Authorization", "Bearer " + tokens.adminToken(clock))
                 .header("Content-Type", contentType)
                 .POST(
                         HttpRequest.BodyPublishers.ofString(
@@ -322,6 +352,7 @@ class BranchApiIntegrationTest {
     ) throws IOException, InterruptedException {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(resourceUri)
+                .header("Authorization", "Bearer " + tokens.adminToken(clock))
                 .timeout(REQUEST_TIMEOUT)
                 .header("Accept", MediaType.APPLICATION_JSON_VALUE)
                 .GET()
