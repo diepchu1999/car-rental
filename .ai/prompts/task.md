@@ -5,6 +5,9 @@
 > Vai: **Chief Architect** soạn prompt và review cuối · **codex** (Principal Engineer) viết code,
 > chia nhỏ từng phần và hướng dẫn chạy · **Tech Owner** chạy test, gọi API, báo kết quả.
 >
+> Từ 23/10/2026 Chief Architect **chỉ đọc code khi review**, không chạy build, test hay SQL — số đo lấy
+> từ báo cáo cuối task của codex (`implement.md`, Bước 4, mục "Số đo").
+>
 > Từ Task 5b (02/10/2026). Trước đó Tech Owner tự gõ code `main`.
 >
 > Đừng nhầm với `/task` của Codex: lệnh đó **làm** việc (`.ai/prompts/implement.md`). File này là cách
@@ -97,6 +100,9 @@ Liệt kê **cụ thể** những gì đừng làm, kèm lý do ngắn.
 phình thành ba.
 
 ### §8 Báo cáo cuối task
+- **Số đo — bắt buộc**, theo `implement.md` Bước 4: lệnh đã chạy và ai chạy · số test của **từng dự án bị
+  chạm** so với mốc trước task · thời gian build · kết quả phép thử phá hoại · kết quả phép thử đảo (đỏ rồi
+  xanh) · số đo hiệu năng nếu task có khẳng định hiệu năng. Thiếu mục này thì Chief Architect chưa review.
 - Những lựa chọn kỹ thuật đã chọn và **vì sao**.
 - Chỗ nào thấy tài liệu chưa rõ hoặc mâu thuẫn — **ghi lại, đừng tự quyết**.
 - **File collection Postman** của cả task trong `postman/` — import được, chạy được bằng Collection Runner

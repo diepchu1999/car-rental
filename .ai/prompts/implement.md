@@ -110,8 +110,17 @@ codex chỉ chạy lệnh **đọc**: `git status`, `git diff`, `git log`, tìm 
 
 ## Bước 4 — Kết thúc
 
-1. Hướng dẫn Tech Owner chạy `./mvnw clean verify` ở `car-rental-api/`, báo số test và số giây.
-2. Báo cáo:
+1. Hướng dẫn Tech Owner chạy `./mvnw clean verify` ở **mọi dự án bị chạm** (`car-rental-api/`, và
+   `car-rental-keycloak/` nếu có), báo số test và số giây.
+2. Báo cáo — Chief Architect **chỉ đọc code, không chạy gì**, nên số đo của review lấy từ đây:
+   - **Số đo — bắt buộc, thiếu thì review chưa bắt đầu:**
+     - Lệnh đã chạy, ai chạy (Tech Owner hay codex), lúc nào.
+     - Số test của **từng dự án**: chạy · đạt · trượt · bỏ qua, so với mốc trước task.
+     - Thời gian build của từng dự án.
+     - Kết quả **phép thử phá hoại** (câu SQL, mã lỗi hoặc tên constraint nhận được).
+     - Kết quả **phép thử đảo**: gỡ cơ chế nào, test nào đỏ, khôi phục rồi xanh lại.
+     - Số đo hiệu năng — chỉ khi task có khẳng định về hiệu năng.
+     - Ghi rõ con số nào **lấy từ output thật**, con số nào chưa chạy.
    - Tóm tắt từng test một dòng — trong báo cáo, **không** vào README.
    - Danh sách file đã tạo hoặc sửa.
    - **File collection Postman** (và environment nếu mới tạo): đường dẫn, cách import, thứ tự chạy thư mục.

@@ -7,6 +7,10 @@
 > bất biến có thật sự được ép không.**
 >
 > Review theo **diff từ commit trước task** — Tech Owner commit trước khi giao task cho codex.
+>
+> **Từ 23/10/2026, Chief Architect chỉ đọc code — không chạy build, test, Docker, SQL hay đo hiệu năng.**
+> Được dùng lệnh chỉ đọc: đọc file, `git diff`, `git log`, `git status`, tìm kiếm. Số đo lấy từ **báo cáo
+> cuối task của codex** (`implement.md`, Bước 4, mục "Số đo") và từ kết quả Tech Owner tự chạy.
 
 ---
 
@@ -17,32 +21,34 @@ Không kết luận từ tên file, tên class hay tên method. Mở file ra đ�
 Với một tính năng, trace đủ đường: **điểm vào → use case → domain → port → adapter → SQL → CSDL.**
 Đọc thiếu một tầng thì kết luận về tầng đó là phỏng đoán.
 
-## 2. Đo, đừng đoán
+## 2. Số đo đến từ báo cáo, không đến từ suy luận
 
-```bash
-cd car-rental-api && ./mvnw clean verify
-```
+Trước khi review, **đòi báo cáo cuối task có mục "Số đo"** (`implement.md`, Bước 4). Thiếu mục nào thì
+yêu cầu codex bổ sung, **không** tự điền và không review như thể đã có.
 
-Đếm test từ `target/surefire-reports/`, đo thời gian thật.
+Trong kết quả review, tách rõ hai nguồn:
+- **"Theo báo cáo của codex"** — số test, thời gian build, kết quả phép thử phá hoại và phép thử đảo.
+- **"Tôi đọc code thấy"** — điều suy ra từ code đã đọc.
 
-**Trước khi báo bất kỳ vấn đề hiệu năng nào, phải có số đo.** Bài học Task 4: thấy build dựng 7
-container PostgreSQL và suýt báo động vấn đề hiệu năng — đo ra thì toàn bộ 397 test hết 70 giây,
-hoàn toàn không phải vấn đề.
+Không khẳng định một con số mình không thấy trong báo cáo hay trong code.
 
-Tương tự với mọi khẳng định kỹ thuật: kiểm bằng lệnh thay vì suy luận. Task 1 tôi định báo lỗi vì
+**Trước khi báo bất kỳ vấn đề hiệu năng nào, phải có số đo** — trong báo cáo, hoặc yêu cầu codex đo. Bài
+học Task 4: thấy build dựng 7 container PostgreSQL và suýt báo động vấn đề hiệu năng — đo ra thì toàn
+bộ 397 test hết 70 giây, hoàn toàn không phải vấn đề. Nghi ngờ mà chưa có số đo thì ghi là **câu hỏi
+cần đo**, không phải lỗi.
+
+Tương tự với mọi khẳng định kỹ thuật: kiểm bằng nguồn thay vì suy luận. Task 1 tôi định báo lỗi vì
 image bị ép `linux/amd64` trên máy arm64 — kiểm manifest thì image đó **chỉ có** bản amd64, codex
 làm đúng.
 
-## 3. Kiểm từng tiêu chí nghiệm thu bằng lệnh cụ thể
+## 3. Đối chiếu từng tiêu chí nghiệm thu với bằng chứng
 
-Không hỏi codex xem nó có làm chưa. Tự chạy.
+Không chấp nhận "codex bảo xong". Mỗi tiêu chí nghiệm thu phải có **bằng chứng** trong báo cáo hoặc
+trong code: test nào chứng minh, lệnh nào đã chạy và ra kết quả gì.
 
-Ràng buộc CSDL thì phải **thử vi phạm**:
-```sql
-BEGIN; <câu lệnh cố tình sai>; ROLLBACK;
-```
-Và khẳng định nó thất bại **đúng lý do đó** — kiểm mã lỗi hoặc tên constraint, không chỉ "có ném
-exception".
+Ràng buộc CSDL thì phải có **phép thử vi phạm** (`BEGIN; <câu lệnh cố tình sai>; ROLLBACK;`, chạy bởi
+codex hoặc Tech Owner) và test khẳng định nó thất bại **đúng lý do đó** — mã lỗi hoặc tên constraint,
+không chỉ "có ném exception". Đọc test để kiểm điều này; thiếu thì yêu cầu bổ sung.
 
 ## 4. Với mỗi phát hiện, hỏi ba câu
 
@@ -86,7 +92,8 @@ Từ Task 5b, **codex viết cả code `main` lẫn test, Tech Owner chỉ chạ
 — kể cả `main` — trừ review vòng 2**. Tech Owner thấy hành vi qua kết quả chạy, nhưng không thấy code
 đạt được hành vi đó bằng cách nào.
 
-Thêm một việc: **đối chiếu các bước codex bảo Tech Owner chạy với tiêu chí nghiệm thu.** Bước nào chạy
+Thêm một việc: **đối chiếu các bước codex bảo Tech Owner chạy, và số đo trong báo cáo, với tiêu chí
+nghiệm thu.** Bước nào chạy
 xong xanh mà không chứng minh được tiêu chí nào thì nó chỉ tạo cảm giác an toàn.
 
 Với file test, soi ba thứ:
