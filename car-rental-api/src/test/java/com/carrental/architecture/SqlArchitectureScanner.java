@@ -44,7 +44,7 @@ final class SqlArchitectureScanner {
     );
 
     private static final Set<String> IMMUTABLE_EVIDENCE_MODULES =
-            Set.of("handover", "compliance");
+            Set.of("handover", "compliance", "audit");
 
     private static final Pattern FLYWAY_FILE_NAME = Pattern.compile(
             "(?i)^(?:V[0-9][0-9._]*|U[0-9][0-9._]*|B[0-9][0-9._]*|R)"
@@ -360,6 +360,8 @@ final class SqlArchitectureScanner {
     ) {
         for (int index = 0; index < tokens.size(); index++) {
             SqlToken token = tokens.get(index);
+            // Khai báo sự kiện trigger bảo vệ không phải câu lệnh sửa/xoá dữ liệu.
+            if (isCreateTriggerStatement(tokens, index)) continue;
             String operation = null;
 
             if (token.isKeyword("DELETE")) {
@@ -377,6 +379,11 @@ final class SqlArchitectureScanner {
             } else if (token.isKeyword("DROP")
                     && hasKeyword(tokens, index + 1, "TABLE")) {
                 operation = "DROP TABLE";
+            } else if (token.isKeyword("UPDATE")
+                    && !hasKeyword(tokens, index - 1, "FOR")
+                    && !hasKeyword(tokens, index - 1, "KEY")
+                    && (module.equals("audit") || updateTargetsAudit(tokens, index))) {
+                operation = "UPDATE";
             }
 
             boolean belongsToEvidenceModule =
@@ -394,7 +401,7 @@ final class SqlArchitectureScanner {
                     || targetsEvidenceSchema)) {
                 String targetExplanation = belongsToEvidenceModule
                         ? ""
-                        : " nhằm vào schema handover/compliance";
+                        : " nhằm vào schema handover/compliance/audit";
 
                 violations.add(
                         new ArchitectureViolation(
@@ -437,8 +444,34 @@ final class SqlArchitectureScanner {
                     tokens,
                     operationIndex + 2
             );
+            case "UPDATE" -> updateTargetsAudit(tokens, operationIndex);
             default -> false;
         };
+    }
+
+    /** Nhận diện đúng CREATE [OR REPLACE] [CONSTRAINT] TRIGGER, không bỏ qua DML phía sau dấu ;. */
+    private static boolean isCreateTriggerStatement(List<SqlToken> tokens, int index) {
+        int start = index;
+        while (start > 0 && tokens.get(start - 1).kind() != TokenKind.SEMICOLON) start--;
+        if (!hasKeyword(tokens, start++, "CREATE")) return false;
+        if (hasKeyword(tokens, start, "OR") && hasKeyword(tokens, start + 1, "REPLACE")) start += 2;
+        if (hasKeyword(tokens, start, "CONSTRAINT")) start++;
+        return hasKeyword(tokens, start, "TRIGGER");
+    }
+
+    /** Bắt UPDATE audit kể cả trong CTE, MERGE và ON CONFLICT; không cấm UPDATE ở module khác. */
+    private static boolean updateTargetsAudit(List<SqlToken> tokens, int index) {
+        int target = hasKeyword(tokens, index + 1, "ONLY") ? index + 2 : index + 1;
+        if (hasKind(tokens, target + 1, TokenKind.DOT) && tokens.get(target).isIdentifier("audit")) return true;
+        if (!hasKeyword(tokens, index - 1, "THEN") && !hasKeyword(tokens, index - 1, "DO")) return false;
+        for (int cursor = index - 2; cursor >= 0 && tokens.get(cursor).kind() != TokenKind.SEMICOLON; cursor--) {
+            if ((hasKeyword(tokens, cursor, "MERGE") || hasKeyword(tokens, cursor, "INSERT"))
+                    && hasKeyword(tokens, cursor + 1, "INTO")) {
+                int table = hasKeyword(tokens, cursor + 2, "ONLY") ? cursor + 3 : cursor + 2;
+                return hasKind(tokens, table + 1, TokenKind.DOT) && tokens.get(table).isIdentifier("audit");
+            }
+        }
+        return false;
     }
 
     private static boolean mergeTargetUsesEvidenceSchema(

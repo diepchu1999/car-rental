@@ -15,6 +15,15 @@ package com.carrental.shared.error;
  */
 public enum ErrorCode {
 
+    /** BR-130: ảnh vượt giới hạn byte trong cấu hình. */
+    DOCUMENT_IMAGE_TOO_LARGE("The document image exceeds the size limit."),
+
+    /** BR-130: nội dung không phải ảnh được hỗ trợ hoặc kích thước ảnh không hợp lệ. */
+    DOCUMENT_IMAGE_INVALID("The document image is invalid or unsupported."),
+
+    /** BR-130: chưa tải object lên vùng tạm. */
+    DOCUMENT_UPLOAD_NOT_READY("The document upload is not ready."),
+
     /** ADR-0006: thiếu token hoặc token không vượt qua kiểm chứng của resource server. */
     UNAUTHENTICATED("Authentication is required."),
 

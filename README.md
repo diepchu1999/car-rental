@@ -79,6 +79,13 @@ Mức tăng cuối tuần/lễ dùng dạng thập phân, không âm; hạn báo
 Nguồn tham số hiện là cấu hình ứng dụng, đổi cần khởi động lại; lịch lễ nằm trong YAML,
 không tự suy ngày nghỉ liền kề. Trước khi chạy với khách thật phải có module config (ADR-0013).
 
+**Kho ảnh giấy tờ (BR-130):** thêm đủ tám biến `CAR_RENTAL_STORAGE_*` và `CAR_RENTAL_DOCUMENT_*`
+từ `.env.example` vào `.env`. Riêng `CAR_RENTAL_STORAGE_SECRET_KEY` phải tự sinh bằng
+`openssl rand -hex 32`; không dùng mật khẩu MinIO root, không dán secret vào chat hoặc commit.
+Backend dùng tài khoản riêng `car-rental-documents-app`, bucket riêng tư `car-rental-documents`.
+Giới hạn mặc định: 5.000.000 byte, 40 triệu pixel, URL upload 5 phút, URL xem 60 giây.
+Nạp các biến này vào cả môi trường chạy IntelliJ; backend không tự đọc `.env`.
+
 ### 2. Khởi động hạ tầng
 
 **Build provider trước khi chạy Keycloak** (bytecode Java 21, dùng được JDK 25 ở trên):
@@ -109,6 +116,17 @@ docker compose ps
 
 PostgreSQL, Keycloak và MinIO phải cùng hiện trạng thái `(healthy)`.
 `config --quiet` kiểm cấu hình mà không in giá trị secret; thiếu biến sẽ báo đúng tên biến.
+
+Khởi tạo bucket giấy tờ riêng tư và quyền cho tài khoản ứng dụng (chạy lại được, không xoá dữ liệu):
+
+```bash
+docker compose exec -T minio sh < infra/minio/bootstrap-documents.sh
+```
+
+Kết quả: `Private document bucket and application account are ready.` Nếu vừa thêm/đổi biến storage
+trên máy đã chạy hạ tầng, chạy `docker compose up -d minio` trước lệnh trên để cập nhật môi trường
+container; chỉ restart không cập nhật biến. Không cần `down -v`.
+Xem [hướng dẫn MinIO](infra/minio/README.md) về quyền, endpoint và cách kiểm local.
 
 Compose chỉ mount provider lõi và JAR SMS local, không mount JAR `*-tests.jar`. Nếu chưa build,
 mount phải báo thiếu file, không tự tạo thư mục giả mang tên `.jar`. Không đổi image/platform.

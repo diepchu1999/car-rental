@@ -38,6 +38,17 @@ management:
 
 car-rental:
   time-zone: ${CAR_RENTAL_TIME_ZONE:Asia/Ho_Chi_Minh}
+  storage:
+    endpoint: ${CAR_RENTAL_STORAGE_ENDPOINT}
+    bucket: ${CAR_RENTAL_STORAGE_BUCKET}
+    access-key: ${CAR_RENTAL_STORAGE_ACCESS_KEY}
+    secret-key: ${CAR_RENTAL_STORAGE_SECRET_KEY}
+    documents:
+      # BR-130: byte thập phân, pixel và hạn liên kết đã chốt; đổi cần restart.
+      max-bytes: ${CAR_RENTAL_DOCUMENT_MAX_BYTES:5000000}
+      max-pixels: ${CAR_RENTAL_DOCUMENT_MAX_PIXELS:40000000}
+      upload-lifetime: ${CAR_RENTAL_DOCUMENT_UPLOAD_LIFETIME:PT5M}
+      view-lifetime: ${CAR_RENTAL_DOCUMENT_VIEW_LIFETIME:PT60S}
   identity:
     jwt:
       # Phải khớp mapper backend-audience trong realm Keycloak (ADR-0006).
