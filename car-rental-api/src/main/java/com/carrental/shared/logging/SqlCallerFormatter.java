@@ -1,6 +1,7 @@
 package com.carrental.shared.logging;
 
 import com.p6spy.engine.spy.appender.MessageFormattingStrategy;
+import com.carrental.shared.sql.SensitiveSql;
 
 import java.util.List;
 import java.util.stream.Collectors;
@@ -9,7 +10,7 @@ import java.util.stream.Stream;
 /**
  * Định dạng SQL local theo security-guideline §3; không dùng ở môi trường có dữ liệu thật.
  * Chỉ appender được chọn bởi profile sql-log tạo formatter này; không phải Spring component.
- * Giữ nguyên SQL đã thay tham số và mọi dấu xuống dòng, đặc biệt sau comment --.
+ * SQL thường giữ nguyên xuống dòng; SQL giấy tờ trong SensitiveSql không in nội dung/giá trị.
  */
 public final class SqlCallerFormatter implements MessageFormattingStrategy {
     private static final String APPLICATION_PREFIX = "com.carrental.";
@@ -21,7 +22,7 @@ public final class SqlCallerFormatter implements MessageFormattingStrategy {
     }
 
     /**
-     * P6Spy cung cấp sql đã thay tham số; prepared còn placeholder nên không dùng làm nội dung.
+     * P6Spy cung cấp sql đã thay tham số; SQL nhạy cảm che cả prepared để không lọt literal/comment.
      * Không in URL JDBC, connection ID hoặc dữ liệu HTTP; requestId/api do MDC của logger cung cấp.
      * SQL rỗng không cần đi bộ stack hoặc sinh nội dung caller.
      */
@@ -32,7 +33,8 @@ public final class SqlCallerFormatter implements MessageFormattingStrategy {
             return "";
         }
         String caller = WALKER.walk(frames -> formatCaller(frames.map(StackWalker.StackFrame::toStackTraceElement)));
-        return "SQL (" + elapsed + " ms):\ncaller: " + caller + "\n" + sql;
+        return "SQL (" + elapsed + " ms):\ncaller: " + caller + "\n"
+                + (SensitiveSql.isActive() ? "[REDACTED sensitive SQL]" : sql);
     }
 
     /**
@@ -56,6 +58,7 @@ public final class SqlCallerFormatter implements MessageFormattingStrategy {
         String name = frame.getClassName();
         return name.startsWith(APPLICATION_PREFIX)
                 && !name.startsWith(APPLICATION_PREFIX + "shared.logging.")
+                && !name.equals(APPLICATION_PREFIX + "shared.sql.SensitiveSql")
                 && !name.equals(APPLICATION_PREFIX + "shared.config.SchedulerLoggingConfiguration")
                 && !name.contains("$$") && !name.contains("$Proxy")
                 && !frame.getMethodName().startsWith("CGLIB$");

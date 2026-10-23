@@ -2,6 +2,8 @@ package com.carrental.shared.logging;
 
 import com.p6spy.engine.spy.appender.MessageFormattingStrategy;
 import com.p6spy.engine.spy.appender.Slf4JLogger;
+import com.carrental.shared.sql.SensitiveSql;
+import com.carrental.shared.sql.SensitiveSqlFailure;
 
 /**
  * Cầu nối cấu hình starter P6Spy với formatter caller, chỉ được chọn trong application-sql-log.yml.
@@ -23,5 +25,17 @@ public final class SqlCallerLogger extends Slf4JLogger {
     @Override
     public void setStrategy(MessageFormattingStrategy ignored) {
         super.setStrategy(callerFormatter);
+    }
+
+    /** Đường lỗi riêng của P6Spy cũng không được in exception JDBC thô của giấy tờ. */
+    @Override
+    public void logException(Exception failure) {
+        super.logException(SensitiveSql.isActive() ? SensitiveSqlFailure.from(failure) : failure);
+    }
+
+    /** Che cả thông điệp ngoài logSQL khi đang trong phạm vi nhạy cảm. */
+    @Override
+    public void logText(String text) {
+        super.logText(SensitiveSql.isActive() ? "[REDACTED sensitive SQL]" : text);
     }
 }

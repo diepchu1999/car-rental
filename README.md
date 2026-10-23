@@ -348,6 +348,10 @@ Không có frame ứng dụng thì `caller: -`; loại proxy/CGLIB và tầng lo
 được phân biệt bằng module. SQL giữ xuống dòng sau `--`; không dùng `sqlSingleLine`.
 Đây chỉ là hiển thị: JDBC vẫn bind tham số, không nối SQL nghiệp vụ. Giới hạn `api` không cắt SQL.
 
+SQL giấy tờ chạy trong phạm vi bảo vệ chỉ in `[REDACTED sensitive SQL]` thay nội dung SQL,
+kể cả với `sql-log`; vẫn có thời gian và caller. JDBC DEBUG/TRACE trong phạm vi này bị chặn.
+Lỗi JDBC giấy tờ chỉ giữ loại lỗi, SQLSTATE, tên constraint và vị trí stack, không giữ message/row gốc.
+
 **Đọc lỗi HTTP 500 và lỗi job**
 
 Mỗi lỗi có một sự kiện ERROR: `Failure summary:` đứng trước stack trace nguyên bản. Ví dụ giả lập
