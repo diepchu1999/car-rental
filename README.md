@@ -79,12 +79,21 @@ Mức tăng cuối tuần/lễ dùng dạng thập phân, không âm; hạn báo
 Nguồn tham số hiện là cấu hình ứng dụng, đổi cần khởi động lại; lịch lễ nằm trong YAML,
 không tự suy ngày nghỉ liền kề. Trước khi chạy với khách thật phải có module config (ADR-0013).
 
-**Kho ảnh giấy tờ (BR-130):** thêm đủ tám biến `CAR_RENTAL_STORAGE_*` và `CAR_RENTAL_DOCUMENT_*`
+**Kho ảnh giấy tờ (BR-130):** thêm các biến `CAR_RENTAL_STORAGE_*` và cấu hình giới hạn/hạn URL `CAR_RENTAL_DOCUMENT_*`
 từ `.env.example` vào `.env`. Riêng `CAR_RENTAL_STORAGE_SECRET_KEY` phải tự sinh bằng
 `openssl rand -hex 32`; không dùng mật khẩu MinIO root, không dán secret vào chat hoặc commit.
 Backend dùng tài khoản riêng `car-rental-documents-app`, bucket riêng tư `car-rental-documents`.
 Giới hạn mặc định: 5.000.000 byte, 40 triệu pixel, URL upload 5 phút, URL xem 60 giây.
 Nạp các biến này vào cả môi trường chạy IntelliJ; backend không tự đọc `.env`.
+
+**Khoá số giấy tờ (BR-130):** đặt `CAR_RENTAL_DOCUMENT_KEY_VERSION=1` trong `.env`.
+Chạy `openssl rand -base64 32` **hai lần độc lập**, lưu lần lượt vào
+`CAR_RENTAL_DOCUMENT_ENCRYPTION_KEY` và `CAR_RENTAL_DOCUMENT_HASH_KEY`; không dùng lại khoá OTP hay MinIO.
+Hai khoá bắt buộc khác nhau, mỗi khoá giải mã Base64 được đúng 32 byte. Thiếu hoặc sai thì backend
+không khởi động. Nạp cả ba biến vào run configuration IntelliJ hoặc shell chạy backend.
+Giữ nguyên và sao lưu an toàn cặp khoá cùng phiên bản qua restart: mất/đổi khoá sẽ không đọc được
+bản mã cũ hoặc đối chiếu hash cũ. Chưa hỗ trợ xoay vòng khoá; không tự tăng phiên bản để thử.
+Không gửi khoá vào chat, log hay commit. Test dùng khoá giả riêng, không đọc khoá trong `.env`.
 
 ### 2. Khởi động hạ tầng
 

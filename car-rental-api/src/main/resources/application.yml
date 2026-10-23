@@ -50,6 +50,12 @@ car-rental:
       upload-lifetime: ${CAR_RENTAL_DOCUMENT_UPLOAD_LIFETIME:PT5M}
       view-lifetime: ${CAR_RENTAL_DOCUMENT_VIEW_LIFETIME:PT60S}
   identity:
+    documents:
+      crypto:
+        # BR-130: hai khoá độc lập, không có mặc định; giữ nguyên qua restart.
+        key-version: ${CAR_RENTAL_DOCUMENT_KEY_VERSION}
+        encryption-key: ${CAR_RENTAL_DOCUMENT_ENCRYPTION_KEY}
+        hash-key: ${CAR_RENTAL_DOCUMENT_HASH_KEY}
     jwt:
       # Phải khớp mapper backend-audience trong realm Keycloak (ADR-0006).
       audience: car-rental-api
