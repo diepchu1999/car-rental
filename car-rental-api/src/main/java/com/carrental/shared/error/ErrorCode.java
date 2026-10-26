@@ -24,6 +24,9 @@ public enum ErrorCode {
     /** BR-130: chưa tải object lên vùng tạm. */
     DOCUMENT_UPLOAD_NOT_READY("The document upload is not ready."),
 
+    /** BR-130: một lượt tải không được gắn vào nhiều lần nộp giấy tờ. */
+    DOCUMENT_UPLOAD_ALREADY_USED("The document upload has already been used."),
+
     /** ADR-0006: thiếu token hoặc token không vượt qua kiểm chứng của resource server. */
     UNAUTHENTICATED("Authentication is required."),
 
