@@ -1,15 +1,17 @@
-# API tài khoản — client và admin
+# API tài khoản và giấy tờ — client và admin
 
 ## Phạm vi
 
 Đọc tài khoản của chính người đang đăng nhập và ADMIN gán chi nhánh theo BR-120/803/807/809 và ADR-0006.
 Không có API tìm tài khoản theo số điện thoại hoặc đọc tài khoản khác bằng mã.
+Khách có thể xin URL tải từng mặt ảnh giấy tờ của chính mình theo BR-130.
 
 | Method | Path | Quyền | Thành công |
 |---|---|---|---|
 | GET | `/api/v1/client/accounts/me` | JWT hợp lệ có vai `CUSTOMER` | 200 |
 | GET | `/api/v1/admin/accounts/me` | JWT hợp lệ có vai nhân viên, `azp=admin-web` | 200 |
 | PUT | `/api/v1/admin/accounts/{accountCode}/branch` | JWT nhân viên hợp lệ; use case yêu cầu `ADMIN` | 200 |
+| POST | `/api/v1/client/document-uploads` | JWT khách hợp lệ có vai `CUSTOMER`, đã đồng ý điều khoản | 201 |
 
 Nhân viên chưa được gán chi nhánh vẫn đọc được `/admin/accounts/me` để lấy mã `TK-<6>`
 cung cấp cho ADMIN. Điều này **không** cấp quyền thao tác xe hoặc chi nhánh (BR-803/810).
@@ -141,3 +143,59 @@ Thư mục `Part 3 - Staff branch assignment` lấy lại mã nhân viên qua `/
 token ADMIN rồi gán. Mỗi lần chạy tạo chi nhánh thử mới và thay bản gán của **nhân viên local thử**;
 không dùng với tài khoản/dữ liệu thật. Script truyền mã tự động; không tự sao chép token giữa các vai.
 Các ca thiếu token, STAFF tự gán và ADMIN gửi body sai phải bị từ chối trước khi request gán hợp lệ chạy.
+
+## POST /api/v1/client/document-uploads
+
+BR-120/130: cấp một liên kết PUT có hạn cho **một mặt ảnh** của chính khách đang đăng nhập.
+Header như GET, thêm `Content-Type: application/json`. Body chỉ có hai trường bắt buộc:
+
+```json
+{"documentType":"IDENTITY_CARD","side":"FRONT"}
+```
+
+- `documentType`: `IDENTITY_CARD` hoặc `DRIVER_LICENSE`.
+- `side`: `FRONT` hoặc `BACK`.
+- Enum phân biệt hoa/thường, không tự cắt trắng. Trường lạ bị từ chối; không nhận `accountCode`,
+  `objectKey`, URL hay thời hạn do client đặt. Chủ luôn lấy từ phiên đã xác minh.
+
+Response 201 minh hoạ (URL dưới đây không sử dụng được):
+
+```json
+{
+  "success": true,
+  "data": {
+    "code": "AN-LOCAL1",
+    "documentType": "IDENTITY_CARD",
+    "side": "FRONT",
+    "uploadUrl": "http://localhost:9000/example-bucket/incoming/example?example-signature=not-valid",
+    "expiresAt": "2026-10-24T03:05:00Z"
+  },
+  "error": null
+}
+```
+
+`code` là mã lượt tải `AN-<6>`, không phải mã hồ sơ `GT-<6>`. `uploadUrl` dùng HTTP PUT;
+hạn lấy từ cấu hình storage (5 phút theo BR-130), lưu cố định khi tạo, không gia hạn khi đọc.
+URL chỉ trả sau khi transaction lưu lượt tải đã commit; CSDL giữ object key, **không lưu URL ký**.
+Response có `Cache-Control: no-store` và `X-Request-Id`. Không có `Location` vì chưa có GET theo mã AN.
+Không chia sẻ, log hoặc lưu URL thật vào repo; người có URL có thể PUT trong thời hạn của nó.
+
+Gọi lại cấp lượt tải mới và mã AN mới. Endpoint này **chưa nộp hồ sơ GT**, không tự xác minh giấy tờ,
+không chứng minh nội dung ảnh hợp lệ. Kiểm JPEG/PNG/HEIC, byte/pixel thực hiện khi tiếp nhận và chốt ảnh,
+không dựa vào loại file do khách tự khai trong request xin URL.
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 400 | `INVALID_REQUEST` | Thiếu/null/sai enum, JSON sai hoặc trường ngoài hợp đồng |
+| 401 | `UNAUTHENTICATED` | Thiếu/sai token |
+| 403 | `ACCESS_DENIED` | Không có quyền namespace khách, kể cả token nhân viên ADMIN |
+| 403 | `CONSENT_REQUIRED` | Không có bằng chứng đồng ý điều khoản |
+| 404 | `ACCOUNT_NOT_FOUND` | Tài khoản không còn tồn tại sau bước đồng bộ |
+| 500 | `INTERNAL_ERROR` | Ký URL, ghi/reload/commit thất bại hoặc không cấp được AN sau 5 lần trùng mã |
+
+Lỗi ở biên xác thực giữ nguyên như GET `/accounts/me`. JSON lỗi không chứa URL, object key hay SQL.
+
+Kiểm bằng `postman/task-08b-documents.postman_collection.json`, environment `Car Rental - Local`:
+chuẩn bị token `customer-web` tại Authorization của thư mục `Part 2 - Document upload URLs (BR-130)`,
+rồi chạy cả thư mục. Các request kiểm bốn cặp loại/mặt, body sai và thiếu token; chạy lại tạo lượt tải mới,
+không cần dọn dữ liệu. Bộ này chỉ xin URL, **không upload ảnh hay nộp hồ sơ**. Không bật Share/Sync Token.

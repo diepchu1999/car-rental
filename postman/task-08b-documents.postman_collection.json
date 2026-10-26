@@ -1,0 +1,782 @@
+{
+  "info": {
+    "name": "Car Rental - Task 08b - Documents",
+    "description": "Chỉ dùng dữ liệu local giả. Part 2 hiện kiểm cấp URL tải ảnh, chưa PUT ảnh/nộp hồ sơ GT. Chọn Car Rental - Local, lấy token customer-web bằng Authorization Code + PKCE tại thư mục rồi Use Token và chạy cả thư mục. Không bật Share/Sync Token, không export token hoặc URL ký; collection không lưu URL ký vào biến và không ghi URL ra console. Đồng hồ máy và server cần đồng bộ. Khởi động lại backend với code mới trước khi chạy.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "keycloakBaseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "realm",
+      "value": "car-rental",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Part 2 - Document upload URLs (BR-130)",
+      "description": "Chuẩn bị token CUSTOMER ở Authorization của thư mục; toàn bộ request trừ ca thiếu token dùng cùng token. Chạy theo thứ tự. Mỗi lượt chạy cấp AN mới, không thay/xoá giấy tờ đang dùng.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Documents Customer",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check current customer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-120/130: xác nhận đang dùng token CUSTOMER trước khi xin URL."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Current customer has consent', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data.roles).to.include('CUSTOMER'); pm.expect(typeof b.data.termsVersion === 'string' && b.data.termsVersion.length > 0).to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Create IDENTITY_CARD FRONT upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: cấp URL PUT 5 phút cho IDENTITY_CARD/FRONT; chỉ xin URL, chưa tải ảnh hay nộp hồ sơ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\",\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload contract', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code', 'documentType', 'side', 'uploadUrl', 'expiresAt'); pm.expect(/^AN-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('IDENTITY_CARD'); pm.expect(b.data.side).to.equal('FRONT'); });",
+                  "pm.test('Signed PUT link and finite deadline', () => { const d = pm.response.json().data; const validUrl = typeof d.uploadUrl === 'string' && /^https?:\\/\\//.test(d.uploadUrl) && /[?&]X-Amz-Signature=/i.test(d.uploadUrl) && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl); pm.expect(validUrl, 'Expected a signed five-minute upload URL').to.equal(true); const remaining = Date.parse(d.expiresAt) - Date.now(); pm.expect(Number.isFinite(remaining) && remaining > 0 && remaining <= 305000, 'Expected a future deadline within five minutes plus clock tolerance').to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Create IDENTITY_CARD BACK upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: cấp URL PUT 5 phút cho IDENTITY_CARD/BACK; chỉ xin URL, chưa tải ảnh hay nộp hồ sơ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\",\n  \"side\": \"BACK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload contract', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code', 'documentType', 'side', 'uploadUrl', 'expiresAt'); pm.expect(/^AN-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('IDENTITY_CARD'); pm.expect(b.data.side).to.equal('BACK'); });",
+                  "pm.test('Signed PUT link and finite deadline', () => { const d = pm.response.json().data; const validUrl = typeof d.uploadUrl === 'string' && /^https?:\\/\\//.test(d.uploadUrl) && /[?&]X-Amz-Signature=/i.test(d.uploadUrl) && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl); pm.expect(validUrl, 'Expected a signed five-minute upload URL').to.equal(true); const remaining = Date.parse(d.expiresAt) - Date.now(); pm.expect(Number.isFinite(remaining) && remaining > 0 && remaining <= 305000, 'Expected a future deadline within five minutes plus clock tolerance').to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Create DRIVER_LICENSE FRONT upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: cấp URL PUT 5 phút cho DRIVER_LICENSE/FRONT; chỉ xin URL, chưa tải ảnh hay nộp hồ sơ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload contract', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code', 'documentType', 'side', 'uploadUrl', 'expiresAt'); pm.expect(/^AN-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.side).to.equal('FRONT'); });",
+                  "pm.test('Signed PUT link and finite deadline', () => { const d = pm.response.json().data; const validUrl = typeof d.uploadUrl === 'string' && /^https?:\\/\\//.test(d.uploadUrl) && /[?&]X-Amz-Signature=/i.test(d.uploadUrl) && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl); pm.expect(validUrl, 'Expected a signed five-minute upload URL').to.equal(true); const remaining = Date.parse(d.expiresAt) - Date.now(); pm.expect(Number.isFinite(remaining) && remaining > 0 && remaining <= 305000, 'Expected a future deadline within five minutes plus clock tolerance').to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Create DRIVER_LICENSE BACK upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: cấp URL PUT 5 phút cho DRIVER_LICENSE/BACK; chỉ xin URL, chưa tải ảnh hay nộp hồ sơ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"side\": \"BACK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload contract', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code', 'documentType', 'side', 'uploadUrl', 'expiresAt'); pm.expect(/^AN-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.side).to.equal('BACK'); });",
+                  "pm.test('Signed PUT link and finite deadline', () => { const d = pm.response.json().data; const validUrl = typeof d.uploadUrl === 'string' && /^https?:\\/\\//.test(d.uploadUrl) && /[?&]X-Amz-Signature=/i.test(d.uploadUrl) && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl); pm.expect(validUrl, 'Expected a signed five-minute upload URL').to.equal(true); const remaining = Date.parse(d.expiresAt) - Date.now(); pm.expect(Number.isFinite(remaining) && remaining > 0 && remaining <= 305000, 'Expected a future deadline within five minutes plus clock tolerance').to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Reject missing type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: body sai hoặc trường ngoài hợp đồng bị từ chối; không cấp lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Reject missing side",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: body sai hoặc trường ngoài hợp đồng bị từ chối; không cấp lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Reject unknown type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: body sai hoặc trường ngoài hợp đồng bị từ chối; không cấp lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"PASSPORT\",\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Reject null type",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: body sai hoặc trường ngoài hợp đồng bị từ chối; không cấp lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": null,\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - Reject null side",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: body sai hoặc trường ngoài hợp đồng bị từ chối; không cấp lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\",\n  \"side\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - Reject client selected owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: body sai hoặc trường ngoài hợp đồng bị từ chối; không cấp lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\",\n  \"side\": \"FRONT\",\n  \"accountCode\": \"TK-OTHER1\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 - Reject client selected key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: body sai hoặc trường ngoài hợp đồng bị từ chối; không cấp lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\",\n  \"side\": \"FRONT\",\n  \"objectKey\": \"incoming/foreign\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 - Reject client selected expiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: body sai hoặc trường ngoài hợp đồng bị từ chối; không cấp lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\",\n  \"side\": \"FRONT\",\n  \"expiresAt\": \"2099-01-01T00:00:00Z\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 - Reject missing token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-120/130: không có token thì không cấp lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\",\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('UNAUTHENTICATED'); });",
+                  "pm.test('Bearer authentication required', () => pm.expect(/^Bearer\\b/i.test(pm.response.headers.get('WWW-Authenticate') || '')).to.equal(true));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
