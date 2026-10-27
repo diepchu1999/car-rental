@@ -15,6 +15,9 @@ package com.carrental.shared.error;
  */
 public enum ErrorCode {
 
+    /** BR-130: GT không tồn tại hoặc không thuộc caller đều trả 404, không tiết lộ chủ hồ sơ. */
+    DOCUMENT_NOT_FOUND("Document not found."),
+
     /** BR-130: ảnh vượt giới hạn byte trong cấu hình. */
     DOCUMENT_IMAGE_TOO_LARGE("The document image exceeds the size limit."),
 

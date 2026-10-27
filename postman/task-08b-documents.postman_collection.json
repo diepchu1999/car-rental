@@ -2256,6 +2256,807 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Part 2 - Read document status (BR-130)",
+      "description": "Dùng cùng CUSTOMER đã chạy Submit documents; chạy cả 8 request theo thứ tự. Có thể chạy lại, không sửa dữ liệu. Hai loại có tối đa một head mỗi loại; active VERIFIED không khẳng định đủ điều kiện thuê.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Status Owner",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check document owner",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "['documentStatusOwnerCode','documentStatusCardCode','documentStatusLicenseCode'].forEach(k=>pm.collectionVariables.unset(k));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Customer identity', () => { const b=pm.response.json(); pm.expect(b.data.roles).to.include('CUSTOMER'); pm.expect(b.data.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('documentStatusOwnerCode', b.data.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - List own document heads",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-130: chạy Submit documents trước bằng cùng khách nếu chưa có đủ CCCD/GPLX; chỉ lưu mã GT, không lưu ghi chú/URL."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Two submitted document types are present', () => { const rows=pm.response.json().data; pm.expect(rows).to.be.an('array').with.lengthOf(2); pm.expect(rows.map(x=>x.documentType)).to.eql(['DRIVER_LICENSE','IDENTITY_CARD']); });",
+                  "pm.test('Separate latest and selected verified version', () => { for(const h of pm.response.json().data) { pm.expect(h).to.have.all.keys('documentType','latestSubmission','activeVerifiedSubmission'); const v=h.latestSubmission; pm.expect(v).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(v.documentType).to.equal(h.documentType); pm.expect(v.code).to.match(/^GT-[A-Z0-9]{6}$/); if(h.activeVerifiedSubmission!==null) { pm.expect(h.activeVerifiedSubmission).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(h.activeVerifiedSubmission.status).to.equal('VERIFIED'); pm.expect(h.activeVerifiedSubmission.documentType).to.equal(h.documentType); } } });",
+                  "if(pm.response.code===200 && Array.isArray(pm.response.json().data)) { for(const h of pm.response.json().data) { if(h.documentType==='IDENTITY_CARD') pm.collectionVariables.set('documentStatusCardCode',h.latestSubmission.code); if(h.documentType==='DRIVER_LICENSE') pm.collectionVariables.set('documentStatusLicenseCode',h.latestSubmission.code); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Read own identity_card status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{documentStatusCardCode}}",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('documentStatusCardCode')||'')) throw new Error('Run the preceding owner and head checks after submitting both document types.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact private status response', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('documentStatusCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); if(['PENDING','SUPERSEDED'].includes(d.status)) pm.expect(d.reviewedAt).to.equal(null); if(d.status==='REJECTED') pm.expect(['ILLEGIBLE','MISSING_SIDE','DATA_MISMATCH','EXPIRED','HOLDER_MISMATCH','SUSPECTED_FORGERY']).to.include(d.rejectionCode); else { pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); } });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Read own driver_license status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{documentStatusLicenseCode}}",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('documentStatusLicenseCode')||'')) throw new Error('Run the preceding owner and head checks after submitting both document types.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact private status response', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('documentStatusLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); if(['PENDING','SUPERSEDED'].includes(d.status)) pm.expect(d.reviewedAt).to.equal(null); if(d.status==='REJECTED') pm.expect(['ILLEGIBLE','MISSING_SIDE','DATA_MISMATCH','EXPIRED','HOLDER_MISMATCH','SUSPECTED_FORGERY']).to.include(d.rejectionCode); else { pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); } });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Reject list without token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('UNAUTHENTICATED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Reject detail without token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{documentStatusCardCode}}",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('UNAUTHENTICATED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Reject numeric document identifier",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/123",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Reject upload code as document code",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/AN-LOCAL1",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 2 - Reject cross-account document reads (BR-130)",
+      "description": "Sau Read document status, lấy token CUSTOMER KHÁC ở Authorization của folder này (Clear cookies khi đổi người). Chạy cả 3 request, không nhập hoặc chia sẻ token. Cùng khách cũ thì bước 01 thất bại.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Status Other Customer",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check a different customer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('documentStatusOtherChecked'); if(!pm.collectionVariables.get('documentStatusOwnerCode')) throw new Error('Run Read document status first with the owner.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Different customer from document owner', () => { const d=pm.response.json().data; pm.expect(d.roles).to.include('CUSTOMER'); pm.expect(d.code).not.to.equal(pm.collectionVariables.get('documentStatusOwnerCode')); pm.variables.set('documentStatusOtherChecked',d.code!==pm.collectionVariables.get('documentStatusOwnerCode')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Reject reading another customers document",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{documentStatusCardCode}}?accountCode={{documentStatusOwnerCode}}",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(pm.variables.get('documentStatusOtherChecked')!==true) throw new Error('Use a different CUSTOMER and run the preceding identity check.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('DOCUMENT_NOT_FOUND'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Ignore supplied owner when listing",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents?accountCode={{documentStatusOwnerCode}}",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(pm.variables.get('documentStatusOtherChecked')!==true) throw new Error('Use a different CUSTOMER and run the preceding identity check.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Other owners documents are absent', () => { const rows=pm.response.json().data; pm.expect(rows).to.be.an('array'); for(const h of rows) for(const v of [h.latestSubmission,h.activeVerifiedSubmission]) if(v!==null) pm.expect([pm.collectionVariables.get('documentStatusCardCode'),pm.collectionVariables.get('documentStatusLicenseCode')]).not.to.include(v.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 2 - Reject staff document status access (BR-130)",
+      "description": "Token ADMIN qua admin-web, không kiêm CUSTOMER trong token. Chạy 3 request; quyền xem giấy tờ admin được triển khai riêng ở Phần 3.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Document Status Staff",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check staff audience",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Staff token has no CUSTOMER role', () => { const d=pm.response.json().data; pm.expect(d.roles).not.to.include('CUSTOMER'); pm.expect(d.roles).to.include('ADMIN'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Reject staff reading client heads",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Reject staff reading client detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/GT-LOCAL1",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

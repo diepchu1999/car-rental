@@ -4,7 +4,7 @@
 
 Đọc tài khoản của chính người đang đăng nhập và ADMIN gán chi nhánh theo BR-120/803/807/809 và ADR-0006.
 Không có API tìm tài khoản theo số điện thoại hoặc đọc tài khoản khác bằng mã.
-Khách có thể xin URL tải từng mặt ảnh và nộp hồ sơ giấy tờ của chính mình theo BR-130.
+Khách có thể xin URL tải từng mặt ảnh, nộp hồ sơ và đọc trạng thái giấy tờ của chính mình theo BR-130.
 
 | Method | Path | Quyền | Thành công |
 |---|---|---|---|
@@ -13,6 +13,8 @@ Khách có thể xin URL tải từng mặt ảnh và nộp hồ sơ giấy tờ
 | PUT | `/api/v1/admin/accounts/{accountCode}/branch` | JWT nhân viên hợp lệ; use case yêu cầu `ADMIN` | 200 |
 | POST | `/api/v1/client/document-uploads` | JWT khách hợp lệ có vai `CUSTOMER`, đã đồng ý điều khoản | 201 |
 | POST | `/api/v1/client/documents` | JWT khách hợp lệ có vai `CUSTOMER`, đã đồng ý điều khoản | 201 |
+| GET | `/api/v1/client/documents` | JWT khách hợp lệ có vai `CUSTOMER`, đã đồng ý điều khoản | 200 |
+| GET | `/api/v1/client/documents/{documentCode}` | Như trên, chỉ hồ sơ của chính người gọi | 200 |
 
 Nhân viên chưa được gán chi nhánh vẫn đọc được `/admin/accounts/me` để lấy mã `TK-<6>`
 cung cấp cho ADMIN. Điều này **không** cấp quyền thao tác xe hoặc chi nhánh (BR-803/810).
@@ -269,7 +271,7 @@ Response 201 sau commit:
 ```
 
 Response có `Cache-Control: no-store` và `X-Request-Id`; không có ID số, số giấy tờ, họ tên/ngày sinh,
-bản mã/hash, key hay URL ảnh. Không đặt `Location` vì GET theo GT chưa được cung cấp.
+bản mã/hash, key hay URL ảnh. Dùng `data.code` để đọc trạng thái qua GET theo GT.
 `PENDING` không có nghĩa đủ điều kiện thuê. Xác minh và xét hiệu lực/hạng GPLX là thao tác riêng.
 
 | HTTP | Mã | Khi nào |
@@ -299,3 +301,94 @@ Các HTTP 400/401/409/422 là kết quả mong đợi; xem `pm.test`, không ch�
 URL ký chỉ nằm trong `pm.variables` của lượt Runner; không lưu URL vào collection/environment.
 Không chạy rời request PUT/nộp; cần chạy lại thì chạy từ request 01 để cấp URL còn hạn và AN mới.
 Chỉ hai mã GT kết quả được lưu vào collection variables `submittedIdentityCardCode`, `submittedDriverLicenseCode`.
+
+## GET /api/v1/client/documents — trạng thái theo loại giấy tờ
+
+BR-120/130, security-guideline §2/§3: CUSTOMER chỉ đọc của chính mình. Header như `/accounts/me`.
+Không có body hoặc tham số lựa chọn chủ. `accountCode`/`role` do client thêm vào query/header không
+thay đổi danh tính. Quyền được kiểm lại ở application service; transaction chỉ đọc.
+
+Response 200 gồm danh sách tối đa hai mục, một mục cho mỗi loại đã nộp, sắp theo tên loại tăng dần
+(`DRIVER_LICENSE`, `IDENTITY_CARD`). Chưa nộp trả `data: []`, không phải lỗi 404.
+
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "documentType": "IDENTITY_CARD",
+      "latestSubmission": {
+        "code": "GT-LOCAL1",
+        "documentType": "IDENTITY_CARD",
+        "status": "PENDING",
+        "expiresOn": "2035-01-01",
+        "submittedAt": "2026-10-27T03:00:00Z",
+        "reviewedAt": null,
+        "rejectionCode": null,
+        "rejectionNote": null
+      },
+      "activeVerifiedSubmission": null
+    }
+  ],
+  "error": null
+}
+```
+
+- `latestSubmission`: bản nộp mới nhất để theo dõi tiến trình.
+- `activeVerifiedSubmission`: cùng cấu trúc metadata, nhưng là bản VERIFIED được chọn tại head;
+  null nếu chưa có. Latest PENDING/REJECTED không thay thế active đã được xác minh.
+- Active hết hạn vẫn xuất hiện với `expiresOn` thật; đây **không phải** kết luận đủ điều kiện thuê.
+  Không tự quay về một VERIFIED lịch sử khác. Cổng điều kiện thuê kiểm hạn/hạng riêng theo BR-130.
+- Hai con trỏ được đọc trong cùng một câu SQL, cùng snapshot. Không đọc lại ảnh hoặc ký URL.
+
+## GET /api/v1/client/documents/{documentCode} — trạng thái một phiên bản
+
+`documentCode` phải đúng `GT-` cộng sáu chữ hoa ASCII/chữ số, không tự cắt trắng hoặc đổi chữ hoa.
+Chỉ đọc đúng chủ, kể cả bản lịch sử SUPERSEDED. Không có tham số accountCode.
+Response 200 dùng envelope chuẩn; `data` có đúng tám trường như `latestSubmission` ở trên.
+
+| Trường | Ý nghĩa |
+|---|---|
+| `code`, `documentType` | Mã phiên bản và loại IDENTITY_CARD/DRIVER_LICENSE |
+| `status` | PENDING, VERIFIED, REJECTED hoặc SUPERSEDED |
+| `expiresOn`, `submittedAt` | Ngày hết hạn đã khai và thời điểm nộp đã lưu |
+| `reviewedAt` | Mốc duyệt/từ chối; null với PENDING/SUPERSEDED |
+| `rejectionCode` | Một trong sáu mã BR-130 khi REJECTED; ngoài ra null |
+| `rejectionNote` | Ghi chú từ chối nếu có; ngoài ra null |
+
+Sáu mã lý do: `ILLEGIBLE`, `MISSING_SIDE`, `DATA_MISMATCH`, `EXPIRED`, `HOLDER_MISMATCH`,
+`SUSPECTED_FORGERY`. Ghi chú là văn bản thuần, frontend phải hiển thị như text, không render thành HTML.
+
+Cả hai GET trả `Cache-Control: no-store` và `X-Request-Id`. Không trả ID số, số giấy tờ, tên/ngày sinh,
+reviewer, bản mã/hash, key ảnh hoặc URL. Đây là khách đọc metadata của chính mình, không tạo audit
+mở giấy tờ của người khác. API admin xem ảnh kèm audit là thao tác riêng.
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 400 | `INVALID_REQUEST` | Mã trên path không đúng định dạng GT |
+| 401 | `UNAUTHENTICATED` | Thiếu/sai/hết hạn token |
+| 403 | `ACCESS_DENIED` | Không có quyền CUSTOMER, gồm token ADMIN qua admin-web |
+| 403 | `CONSENT_REQUIRED` | Không có bằng chứng điều khoản hợp lệ |
+| 404 | `ACCOUNT_NOT_FOUND` | Account không còn sau bước xác thực |
+| 404 | `DOCUMENT_NOT_FOUND` | GT không tồn tại hoặc thuộc người khác; cùng mã và thông điệp |
+| 500 | `INTERNAL_ERROR` | Lỗi lưu trữ hoặc kết quả tra cứu không nhất quán; không trả chi tiết nội bộ |
+
+Lỗi danh tính khác giữ như `/accounts/me`. `DOCUMENT_NOT_FOUND` chỉ dùng cho GET một phiên bản;
+GET danh sách chưa có hồ sơ vẫn 200 với mảng rỗng.
+
+### Postman: đọc trạng thái và chống đọc chéo
+
+Import lại cùng collection Task 8b, giữ environment `Car Rental - Local`, restart backend.
+Mỗi folder có OAuth PKCE riêng; chọn đúng token và Use Token ở **Authorization của folder**:
+
+1. **Part 2 - Read document status (BR-130)** — 8 request, dùng CUSTOMER đã nộp cả CCCD/GPLX.
+   Nếu chưa có đủ hai loại, chạy folder Submit documents trước với cùng khách. Chạy cả folder bằng
+   Runner 1 iteration. Mã chủ/GT được lưu tự động; không giữ ghi chú hoặc URL trong biến.
+2. **Part 2 - Reject cross-account document reads (BR-130)** — 3 request, đăng nhập một CUSTOMER
+   **khác** bằng PKCE (Clear cookies nếu Keycloak tự dùng lại phiên). Request 01 kiểm đúng khác chủ;
+   đọc GT của chủ trước trả 404; thêm accountCode vào query không đổi danh sách của người gọi.
+3. **Part 2 - Reject staff document status access (BR-130)** — 3 request, token ADMIN qua admin-web.
+   `/admin/accounts/me` thành công nhưng cả hai GET client đều 403.
+
+Chạy theo thứ tự ba folder, tất cả `pm.test` phải xanh, kể cả HTTP 400/401/403/404 có chủ đích.
+Các folder đọc không sửa dữ liệu, chạy lại được nhiều lần. Không export token hoặc response giấy tờ.

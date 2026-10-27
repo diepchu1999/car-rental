@@ -142,6 +142,10 @@ Khách xin URL tại `POST /api/v1/client/document-uploads`, PUT ảnh vào URL 
 thư mục **Part 2 - Submit documents (BR-130)** với token CUSTOMER và Collection Runner.
 Ảnh giả và cách đặt working directory Postman ở [hướng dẫn fixture](postman/fixtures/documents/README.md).
 Chỉ dùng dữ liệu thử; chi tiết body và mã lỗi ở [API tài khoản và giấy tờ](car-rental-docs/vi/api/identity.md).
+Khách xem trạng thái tại `GET /api/v1/client/documents` và `GET /api/v1/client/documents/{documentCode}`.
+Danh sách tách bản nộp mới nhất với bản VERIFIED được chọn; không trả số giấy tờ hoặc ảnh.
+Trong cùng collection, chạy các folder **Read document status**, **Reject cross-account document reads**
+và **Reject staff document status access** bằng token chủ hồ sơ, khách khác, rồi ADMIN tương ứng.
 
 Compose chỉ mount provider lõi và JAR SMS local, không mount JAR `*-tests.jar`. Nếu chưa build,
 mount phải báo thiếu file, không tự tạo thư mục giả mang tên `.jar`. Không đổi image/platform.

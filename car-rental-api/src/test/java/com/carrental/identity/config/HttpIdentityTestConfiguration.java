@@ -21,6 +21,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * ADR-0006, BR-120/803/809/810: danh tính chỉ dành cho HTTP integration test có PostgreSQL thật.
@@ -47,6 +48,7 @@ public class HttpIdentityTestConfiguration {
 
     /** Khóa riêng chỉ ở bộ nhớ; JWKS chỉ công bố khóa công khai, không ghi token vào log. */
     public static final class TestJwtIssuer implements AutoCloseable {
+        private static final AtomicLong FRESH_CUSTOMERS = new AtomicLong();
         private final RSAKey key;
         private final HttpServer server;
         private final String adminSubject = UUID.randomUUID().toString();
@@ -92,6 +94,12 @@ public class HttpIdentityTestConfiguration {
         /** Khách thứ hai có danh tính độc lập để kiểm chống truy cập chéo bằng JWT thật. */
         public String anotherCustomerToken(Clock clock) {
             return token(clock, anotherCustomerSubject, "+84910000003", "CUSTOMER", "customer-web");
+        }
+
+        /** Khách thử mới mỗi lần để kiểm danh sách rỗng và sở hữu, không cần xoá hồ sơ giữa các test. */
+        public String newCustomerToken(Clock clock) {
+            return token(clock, UUID.randomUUID().toString(), "+8492%07d".formatted(FRESH_CUSTOMERS.incrementAndGet()),
+                    "CUSTOMER", "customer-web");
         }
 
         /** Ký RS256 theo Clock của ứng dụng test, kể cả test dùng mốc cố định khác đồng hồ máy. */
