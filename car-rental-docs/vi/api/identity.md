@@ -19,6 +19,11 @@ Khách có thể xin URL tải từng mặt ảnh, nộp hồ sơ và đọc tr�
 Nhân viên chưa được gán chi nhánh vẫn đọc được `/admin/accounts/me` để lấy mã `TK-<6>`
 cung cấp cho ADMIN. Điều này **không** cấp quyền thao tác xe hoặc chi nhánh (BR-803/810).
 
+`DOCUMENT_VERIFIER` là vai nhân viên cấp công ty (BR-130/803), đăng nhập `admin-web` bằng
+mật khẩu + OTP. `/admin/accounts/me` trả vai này với `branchCode: null`; không cần gán chi nhánh.
+Vai này không có quyền tạo/đọc chi nhánh, tạo/đọc/duyệt xe, đổi giá hoặc gán nhân viên vào chi nhánh.
+Token từ client khách chỉ có `CUSTOMER`, không mang quyền xác minh kể cả cùng một tài khoản.
+
 ## GET /accounts/me — request
 
 Không có body hoặc tham số lựa chọn tài khoản. Danh tính chỉ lấy từ JWT đã xác minh;

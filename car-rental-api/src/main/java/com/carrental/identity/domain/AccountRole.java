@@ -24,6 +24,8 @@ public enum AccountRole {
     OPERATIONS_MANAGER,
     /** Quản trị toàn quyền, không gắn với một chi nhánh. */
     ADMIN,
+    /** BR-130/803: nhân viên xác minh giấy tờ cấp công ty, không có quyền vận hành chi nhánh. */
+    DOCUMENT_VERIFIER,
     /** Đối tác cá nhân, dành cho giai đoạn 2. */
     HOST,
     /** Đối tác doanh nghiệp, dành cho giai đoạn 3. */
@@ -33,11 +35,11 @@ public enum AccountRole {
     /** Tài xế tự do, không phải tài xế nhân viên công ty. */
     FREELANCE_DRIVER;
 
-    /** Xác định bảy vai nhân viên công ty theo BR-801 và BR-809. */
+    /** Xác định tám vai nhân viên công ty theo BR-801 và BR-809. */
     public boolean isEmployee() {
         return switch (this) {
             case BRANCH_STAFF, BRANCH_MANAGER, DELIVERY_STAFF, DRIVER,
-                    ACCOUNTANT, OPERATIONS_MANAGER, ADMIN -> true;
+                    ACCOUNTANT, OPERATIONS_MANAGER, ADMIN, DOCUMENT_VERIFIER -> true;
             default -> false;
         };
     }

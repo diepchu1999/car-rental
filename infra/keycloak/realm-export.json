@@ -32,7 +32,7 @@
     "realm": [
       {"name": "CUSTOMER"}, {"name": "BRANCH_STAFF"}, {"name": "BRANCH_MANAGER"},
       {"name": "DELIVERY_STAFF"}, {"name": "DRIVER"}, {"name": "ACCOUNTANT"},
-      {"name": "OPERATIONS_MANAGER"}, {"name": "ADMIN"}, {"name": "HOST"},
+      {"name": "OPERATIONS_MANAGER"}, {"name": "ADMIN"}, {"name": "DOCUMENT_VERIFIER"}, {"name": "HOST"},
       {"name": "BUSINESS_PARTNER"}, {"name": "BUSINESS_PARTNER_STAFF"}, {"name": "FREELANCE_DRIVER"}
     ]
   },
@@ -130,7 +130,7 @@
   "scopeMappings": [
     {"client": "customer-web", "roles": ["CUSTOMER"]},
     {"client": "mobile", "roles": ["CUSTOMER"]},
-    {"client": "admin-web", "roles": ["BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN"]}
+    {"client": "admin-web", "roles": ["BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN", "DOCUMENT_VERIFIER"]}
   ],
   "clientScopeMappings": {
     "realm-management": [

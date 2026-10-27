@@ -3057,6 +3057,822 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Part 3 - Verifier access fixtures (ADMIN)",
+      "description": "Dữ liệu local giả. Dùng token ADMIN qua admin-web, giữ nguyên token và chạy cả 3 request theo thứ tự. Mỗi lượt tạo chi nhánh/xe DRAFT riêng, mã tự lưu cho thư mục verifier; không dùng dữ liệu thật.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Document Verifier Fixtures ADMIN",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check ADMIN identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-810: xác nhận ADMIN trước khi tạo tài nguyên thử."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "['verifierAdminChecked','verifierBranchCode','verifierVehicleCode'].forEach(k => pm.collectionVariables.unset(k));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('ADMIN identity', () => { const d=pm.response.json().data; pm.expect(d.roles).to.include('ADMIN'); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('verifierAdminChecked', true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Create fixture branch",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-810: ADMIN tạo chi nhánh riêng cho phép thử quyền.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"T08b-Verifier-{{$guid}}\",\n  \"latitude\": 10.76,\n  \"longitude\": 106.66,\n  \"address\": \"Local test address\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('verifierAdminChecked')) !== 'true') throw new Error('Run ADMIN identity check first; keep the same token for this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Fixture branch code', () => { const d=pm.response.json().data; pm.expect(d.code).to.match(/^CN-[A-Z0-9]{6}$/); pm.collectionVariables.set('verifierBranchCode',d.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Create fixture draft vehicle",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-001/810: ADMIN tạo xe DRAFT ở chi nhánh thử, dùng kiểm giới hạn vai.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"T08B-V-{{$guid}}\",\n  \"branchCode\": \"{{verifierBranchCode}}\",\n  \"fuelType\": \"PETROL\",\n  \"seats\": 4,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Local\",\n  \"model\": \"Verifier\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('verifierAdminChecked')) !== 'true') throw new Error('Run ADMIN identity check first; keep the same token for this folder.');",
+                  "if (!/^CN-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierBranchCode') || '')) throw new Error('Create fixture branch first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Fixture vehicle is DRAFT in expected branch', () => { const d=pm.response.json().data; pm.expect(d.code).to.match(/^XE-[A-Z0-9]{6}$/); pm.expect(d.branchCode).to.equal(pm.collectionVariables.get('verifierBranchCode')); pm.expect(d.status).to.equal('DRAFT'); pm.collectionVariables.set('verifierVehicleCode',d.code); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Verifier role boundaries (BR-130)",
+      "description": "Lấy token DOCUMENT_VERIFIER mới bằng admin-web (mật khẩu + OTP). Giữ nguyên token trong cả 10 request; chạy sau thư mục ADMIN fixtures. Request 01 phải 200, đúng một vai DOCUMENT_VERIFIER và branchCode null; 02–10 phải 403 ACCESS_DENIED. Chưa có API duyệt giấy tờ ở bước này.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Document Verifier",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check DOCUMENT_VERIFIER identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130/803: vai xác minh cấp công ty, không cần chi nhánh."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('documentVerifierChecked'); pm.collectionVariables.unset('documentVerifierAccountCode');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Company-scoped verifier identity', () => { const d=pm.response.json().data; pm.expect(d.roles).to.have.members(['DOCUMENT_VERIFIER']); pm.expect(d.branchCode).to.equal(null); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('documentVerifierChecked', true); pm.collectionVariables.set('documentVerifierAccountCode', d.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Reject branch creation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches",
+            "description": "BR-130/803/810: vai xác minh không có quyền vận hành xe hoặc chi nhánh.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"T08b-Verifier-{{$guid}}\",\n  \"latitude\": 10.76,\n  \"longitude\": 106.66,\n  \"address\": \"Local test address\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('documentVerifierChecked')) !== 'true') throw new Error('Run verifier identity check first; keep the same token for this folder.');",
+                  "if (!/^CN-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierBranchCode') || '') || !/^XE-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierVehicleCode') || '')) throw new Error('Run ADMIN fixture folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Access denied envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Reject branch reading",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/branches/{{verifierBranchCode}}",
+            "description": "BR-130/803/810: vai xác minh không có quyền vận hành xe hoặc chi nhánh."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('documentVerifierChecked')) !== 'true') throw new Error('Run verifier identity check first; keep the same token for this folder.');",
+                  "if (!/^CN-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierBranchCode') || '') || !/^XE-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierVehicleCode') || '')) throw new Error('Run ADMIN fixture folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Access denied envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Reject vehicle creation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles",
+            "description": "BR-130/803/810: vai xác minh không có quyền vận hành xe hoặc chi nhánh.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plateNumber\": \"T08B-V-{{$guid}}\",\n  \"branchCode\": \"{{verifierBranchCode}}\",\n  \"fuelType\": \"PETROL\",\n  \"seats\": 4,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Local\",\n  \"model\": \"Verifier\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('documentVerifierChecked')) !== 'true') throw new Error('Run verifier identity check first; keep the same token for this folder.');",
+                  "if (!/^CN-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierBranchCode') || '') || !/^XE-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierVehicleCode') || '')) throw new Error('Run ADMIN fixture folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Access denied envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Reject vehicle reading",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{verifierVehicleCode}}",
+            "description": "BR-130/803/810: vai xác minh không có quyền vận hành xe hoặc chi nhánh."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('documentVerifierChecked')) !== 'true') throw new Error('Run verifier identity check first; keep the same token for this folder.');",
+                  "if (!/^CN-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierBranchCode') || '') || !/^XE-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierVehicleCode') || '')) throw new Error('Run ADMIN fixture folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Access denied envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Reject price change",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{verifierVehicleCode}}/daily-rate",
+            "description": "BR-130/803/810: vai xác minh không có quyền vận hành xe hoặc chi nhánh.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dailyRate\": 600000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('documentVerifierChecked')) !== 'true') throw new Error('Run verifier identity check first; keep the same token for this folder.');",
+                  "if (!/^CN-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierBranchCode') || '') || !/^XE-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierVehicleCode') || '')) throw new Error('Run ADMIN fixture folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Access denied envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Reject vehicle submission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{verifierVehicleCode}}/submit-for-approval",
+            "description": "BR-130/803/810: vai xác minh không có quyền vận hành xe hoặc chi nhánh."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('documentVerifierChecked')) !== 'true') throw new Error('Run verifier identity check first; keep the same token for this folder.');",
+                  "if (!/^CN-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierBranchCode') || '') || !/^XE-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierVehicleCode') || '')) throw new Error('Run ADMIN fixture folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Access denied envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Reject vehicle approval",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/vehicles/{{verifierVehicleCode}}/approve",
+            "description": "BR-130/803/810: vai xác minh không có quyền vận hành xe hoặc chi nhánh."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('documentVerifierChecked')) !== 'true') throw new Error('Run verifier identity check first; keep the same token for this folder.');",
+                  "if (!/^CN-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierBranchCode') || '') || !/^XE-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierVehicleCode') || '')) throw new Error('Run ADMIN fixture folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Access denied envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Reject branch assignment",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/{{documentVerifierAccountCode}}/branch",
+            "description": "BR-130/803/810: vai xác minh không có quyền vận hành xe hoặc chi nhánh.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"branchCode\": \"{{verifierBranchCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('documentVerifierChecked')) !== 'true') throw new Error('Run verifier identity check first; keep the same token for this folder.');",
+                  "if (!/^CN-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierBranchCode') || '') || !/^XE-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierVehicleCode') || '')) throw new Error('Run ADMIN fixture folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Access denied envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - Reject client document access",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-130/803/810: vai xác minh không có quyền vận hành xe hoặc chi nhánh."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (String(pm.collectionVariables.get('documentVerifierChecked')) !== 'true') throw new Error('Run verifier identity check first; keep the same token for this folder.');",
+                  "if (!/^CN-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierBranchCode') || '') || !/^XE-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('verifierVehicleCode') || '')) throw new Error('Run ADMIN fixture folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Access denied envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
