@@ -4,7 +4,7 @@
 
 Đọc tài khoản của chính người đang đăng nhập và ADMIN gán chi nhánh theo BR-120/803/807/809 và ADR-0006.
 Không có API tìm tài khoản theo số điện thoại hoặc đọc tài khoản khác bằng mã.
-Khách có thể xin URL tải từng mặt ảnh giấy tờ của chính mình theo BR-130.
+Khách có thể xin URL tải từng mặt ảnh và nộp hồ sơ giấy tờ của chính mình theo BR-130.
 
 | Method | Path | Quyền | Thành công |
 |---|---|---|---|
@@ -12,6 +12,7 @@ Khách có thể xin URL tải từng mặt ảnh giấy tờ của chính mình
 | GET | `/api/v1/admin/accounts/me` | JWT hợp lệ có vai nhân viên, `azp=admin-web` | 200 |
 | PUT | `/api/v1/admin/accounts/{accountCode}/branch` | JWT nhân viên hợp lệ; use case yêu cầu `ADMIN` | 200 |
 | POST | `/api/v1/client/document-uploads` | JWT khách hợp lệ có vai `CUSTOMER`, đã đồng ý điều khoản | 201 |
+| POST | `/api/v1/client/documents` | JWT khách hợp lệ có vai `CUSTOMER`, đã đồng ý điều khoản | 201 |
 
 Nhân viên chưa được gán chi nhánh vẫn đọc được `/admin/accounts/me` để lấy mã `TK-<6>`
 cung cấp cho ADMIN. Điều này **không** cấp quyền thao tác xe hoặc chi nhánh (BR-803/810).
@@ -199,3 +200,102 @@ Kiểm bằng `postman/task-08b-documents.postman_collection.json`, environment 
 chuẩn bị token `customer-web` tại Authorization của thư mục `Part 2 - Document upload URLs (BR-130)`,
 rồi chạy cả thư mục. Các request kiểm bốn cặp loại/mặt, body sai và thiếu token; chạy lại tạo lượt tải mới,
 không cần dọn dữ liệu. Bộ này chỉ xin URL, **không upload ảnh hay nộp hồ sơ**. Không bật Share/Sync Token.
+
+## POST /api/v1/client/documents
+
+BR-120/130: nộp một phiên bản CCCD hoặc GPLX của chính người gọi. Đầu tiên cấp hai lượt tải bằng
+`POST /document-uploads` với đúng loại và hai mặt FRONT/BACK, rồi PUT bytes ảnh vào từng URL ký.
+Request PUT đi trực tiếp tới MinIO, dùng **No Auth**, không gửi bearer token của backend.
+Sau khi PUT thành công, gửi hai mã AN trong body JSON, không gửi URL hoặc object key.
+
+Ví dụ CCCD với dữ liệu hoàn toàn giả:
+
+```json
+{
+  "documentType": "IDENTITY_CARD",
+  "number": "LOCAL-TEST-IDENTITY-CARD",
+  "fullName": "LOCAL FAKE DOCUMENT",
+  "birthDate": "1990-01-01",
+  "expiresOn": "2035-01-01",
+  "frontUploadCode": "AN-FRONT1",
+  "backUploadCode": "AN-BACK01"
+}
+```
+
+Ví dụ GPLX:
+
+```json
+{
+  "documentType": "DRIVER_LICENSE",
+  "number": "LOCAL-TEST-DRIVER-LICENSE",
+  "licenseClass": "B",
+  "automaticOnly": false,
+  "expiresOn": "2035-01-01",
+  "frontUploadCode": "AN-FRONT2",
+  "backUploadCode": "AN-BACK02"
+}
+```
+
+- Các trường trong mỗi ví dụ đều bắt buộc; ngày dùng ISO `YYYY-MM-DD`. Hai AN phải khác nhau.
+- CCCD không nhận `licenseClass`/`automaticOnly`; GPLX không nhận `fullName`/`birthDate`.
+  Trường không áp dụng phải vắng hoặc null. `automaticOnly=false` khác thiếu/null.
+- Trường ngoài hợp đồng bị từ chối, gồm chủ, ID số, trạng thái, người duyệt, key và URL.
+  Danh tính luôn từ JWT; cả hai AN phải đúng chủ, loại và mặt trước khi đọc/chốt bất kỳ ảnh nào.
+- Số được bỏ khoảng trắng hai đầu rồi băm/mã hoá; server không OCR hoặc xác nhận giấy tờ thật lúc nộp.
+  Ảnh được kiểm nội dung thật JPEG/PNG/HEIC, giới hạn byte/pixel theo cấu hình BR-130.
+- URL PUT hết hạn không phải hạn nộp hồ sơ. Ảnh đã tải hợp lệ vẫn nộp được sau khi URL hết hạn.
+- Ảnh đã kiểm được lưu dưới key sealed mới. PUT lại URL cũ không sửa ảnh gắn với hồ sơ đã nộp.
+- Bản mới ở PENDING và thay bản PENDING trước bằng SUPERSEDED; không xoá lịch sử hoặc ảnh.
+  Bản VERIFIED đang dùng giữ nguyên cho tới khi bản mới được duyệt hoặc bản đó hết hạn (BR-130).
+- Dùng lại AN đã gắn vào một hồ sơ trả 409. Muốn nộp lại phải cấp AN và tải ảnh mới.
+  Trùng mã GT nội bộ được thử lại tối đa 5 lần, không chốt ảnh lại; lỗi khác không tự retry.
+- Ghi hồ sơ/hai ảnh/head và reload cùng một transaction PostgreSQL. Storage không có transaction
+  chung với PostgreSQL: lỗi nộp có thể để object sealed chưa được tham chiếu; việc dọn chưa cung cấp.
+
+Response 201 sau commit:
+
+```json
+{
+  "success": true,
+  "data": {
+    "code": "GT-LOCAL1",
+    "documentType": "IDENTITY_CARD",
+    "status": "PENDING",
+    "expiresOn": "2035-01-01",
+    "submittedAt": "2026-10-27T03:00:00Z"
+  },
+  "error": null
+}
+```
+
+Response có `Cache-Control: no-store` và `X-Request-Id`; không có ID số, số giấy tờ, họ tên/ngày sinh,
+bản mã/hash, key hay URL ảnh. Không đặt `Location` vì GET theo GT chưa được cung cấp.
+`PENDING` không có nghĩa đủ điều kiện thuê. Xác minh và xét hiệu lực/hạng GPLX là thao tác riêng.
+
+| HTTP | Mã | Khi nào |
+|---|---|---|
+| 400 | `INVALID_REQUEST` | Thiếu/null/sai trường, JSON sai, hai mặt cùng AN, AN sai loại/mặt, hoặc trường ngoài hợp đồng |
+| 401 | `UNAUTHENTICATED` | Thiếu/sai token |
+| 403 | `ACCESS_DENIED` | Không có quyền namespace khách, kể cả token ADMIN của admin-web |
+| 403 | `CONSENT_REQUIRED` | Chưa có bằng chứng đồng ý điều khoản |
+| 404 | `ACCOUNT_NOT_FOUND` | Tài khoản không còn sau bước đồng bộ |
+| 404 | `DOCUMENT_UPLOAD_NOT_FOUND` | Một trong hai AN không tồn tại hoặc không thuộc người gọi |
+| 409 | `DOCUMENT_UPLOAD_ALREADY_USED` | AN đã gắn vào một lần nộp, kể cả tranh chấp đồng thời |
+| 422 | `DOCUMENT_UPLOAD_NOT_READY` | Chưa có object của lượt tải trong kho |
+| 422 | `DOCUMENT_IMAGE_TOO_LARGE` | Ảnh vượt giới hạn byte; local mặc định 5.000.000 byte |
+| 422 | `DOCUMENT_IMAGE_INVALID` | Nội dung sai/hỏng hoặc vượt giới hạn pixel; local mặc định 40 triệu pixel |
+| 500 | `INTERNAL_ERROR` | Storage/mật mã/SQL/reload lỗi hoặc không cấp được GT sau 5 lần trùng |
+
+Lỗi xác thực khác giữ như `/accounts/me`; không trả dữ liệu giấy tờ hoặc chi tiết nội bộ trong lỗi.
+
+### Postman: tải ảnh và nộp
+
+Import lại `postman/task-08b-documents.postman_collection.json`, dùng environment `Car Rental - Local`.
+Chọn thư mục **Part 2 - Submit documents (BR-130)**, lấy token customer-web rồi Use Token.
+Đặt Postman Working directory là thư mục gốc repo theo [hướng dẫn fixture](../../../postman/fixtures/documents/README.md).
+Chạy **cả thư mục bằng Collection Runner, 1 iteration**: 27 request tự truyền AN và URL ký,
+nộp CCCD/GPLX, rồi thử dùng lại AN, ảnh thiếu/sai/6 MB và đầu vào sai.
+Các HTTP 400/401/409/422 là kết quả mong đợi; xem `pm.test`, không chỉ nhìn HTTP màu đỏ.
+URL ký chỉ nằm trong `pm.variables` của lượt Runner; không lưu URL vào collection/environment.
+Không chạy rời request PUT/nộp; cần chạy lại thì chạy từ request 01 để cấp URL còn hạn và AN mới.
+Chỉ hai mã GT kết quả được lưu vào collection variables `submittedIdentityCardCode`, `submittedDriverLicenseCode`.

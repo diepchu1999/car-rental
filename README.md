@@ -137,6 +137,12 @@ trên máy đã chạy hạ tầng, chạy `docker compose up -d minio` trước
 container; chỉ restart không cập nhật biến. Không cần `down -v`.
 Xem [hướng dẫn MinIO](infra/minio/README.md) về quyền, endpoint và cách kiểm local.
 
+Khách xin URL tại `POST /api/v1/client/document-uploads`, PUT ảnh vào URL ký rồi nộp hai mã AN tại
+`POST /api/v1/client/documents`. Dùng collection `postman/task-08b-documents.postman_collection.json`,
+thư mục **Part 2 - Submit documents (BR-130)** với token CUSTOMER và Collection Runner.
+Ảnh giả và cách đặt working directory Postman ở [hướng dẫn fixture](postman/fixtures/documents/README.md).
+Chỉ dùng dữ liệu thử; chi tiết body và mã lỗi ở [API tài khoản và giấy tờ](car-rental-docs/vi/api/identity.md).
+
 Compose chỉ mount provider lõi và JAR SMS local, không mount JAR `*-tests.jar`. Nếu chưa build,
 mount phải báo thiếu file, không tự tạo thư mục giả mang tên `.jar`. Không đổi image/platform.
 

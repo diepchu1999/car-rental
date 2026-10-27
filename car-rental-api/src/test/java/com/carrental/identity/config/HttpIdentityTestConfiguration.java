@@ -51,6 +51,7 @@ public class HttpIdentityTestConfiguration {
         private final HttpServer server;
         private final String adminSubject = UUID.randomUUID().toString();
         private final String customerSubject = UUID.randomUUID().toString();
+        private final String anotherCustomerSubject = UUID.randomUUID().toString();
 
         /** Lắng nghe đúng loopback và cổng ngẫu nhiên; không mở server fixture ra mạng LAN. */
         private TestJwtIssuer() throws Exception {
@@ -86,6 +87,11 @@ public class HttpIdentityTestConfiguration {
         /** BR-120: CUSTOMER có bằng chứng điều khoản thử, không mang vai nhân viên hay quyền admin. */
         public String customerToken(Clock clock) {
             return token(clock, customerSubject, "+84910000002", "CUSTOMER", "customer-web");
+        }
+
+        /** Khách thứ hai có danh tính độc lập để kiểm chống truy cập chéo bằng JWT thật. */
+        public String anotherCustomerToken(Clock clock) {
+            return token(clock, anotherCustomerSubject, "+84910000003", "CUSTOMER", "customer-web");
         }
 
         /** Ký RS256 theo Clock của ứng dụng test, kể cả test dùng mốc cố định khác đồng hồ máy. */
