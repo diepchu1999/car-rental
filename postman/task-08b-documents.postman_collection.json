@@ -3873,6 +3873,1114 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Part 3 - View session owner setup (CUSTOMER)",
+      "description": "Chỉ dữ liệu local giả. Token customer-web của khách đã nộp CCCD và GPLX; nếu thiếu, chạy Part 2 - Submit documents trước. Chạy cả 3 request theo thứ tự. Chỉ lưu mã TK/GT, không lưu số/ảnh/URL.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental View Owner",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check CUSTOMER identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-130: xác nhận đúng vai trước các request trong folder; giữ nguyên token."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('viewOwnerCode');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected role only', () => { const d=pm.response.json().data; pm.expect(d.roles).to.have.members(['CUSTOMER']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('viewOwnerCode',d.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Select submitted document versions",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-130: lấy hai GT của chủ để các folder nhân viên sử dụng, không copy tay."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewOwnerCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "['viewCardCode','viewLicenseCode'].forEach(k=>pm.collectionVariables.unset(k));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Both document types exist', () => { const rows=pm.response.json().data; pm.expect(rows).to.be.an('array').with.lengthOf(2); for(const [type,key] of [['IDENTITY_CARD','viewCardCode'],['DRIVER_LICENSE','viewLicenseCode']]) { const h=rows.find(x=>x.documentType===type); pm.expect(Boolean(h && /^GT-[A-Z0-9]{6}$/.test(h.latestSubmission.code))).to.equal(true); pm.collectionVariables.set(key,h.latestSubmission.code); } });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Owner cannot open admin view",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{viewCardCode}}/view-sessions",
+            "description": "BR-130: chủ hồ sơ vẫn không có quyền mở ảnh bằng endpoint nhân viên."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewOwnerCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Open view sessions (DOCUMENT_VERIFIER)",
+      "description": "Token admin-web chỉ vai DOCUMENT_VERIFIER; chạy sau View session owner setup. Chạy cả folder, không đổi token giữa chừng. Mở CCCD hai lần dùng cùng X-Request-Id: phải tạo hai audit. Mỗi thành công script tự GET hai ảnh bằng URL ký, không gửi bearer; không lưu URL vào biến. Không chia sẻ response/history chứa thông tin giấy tờ.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental View Verifier",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check DOCUMENT_VERIFIER identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130: xác nhận đúng vai trước các request trong folder; giữ nguyên token."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('viewVerifierCode');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected role only', () => { const d=pm.response.json().data; pm.expect(d.roles).to.have.members(['DOCUMENT_VERIFIER']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('viewVerifierCode',d.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Open identity card and fetch images",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{viewRepeatedRequestId}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{viewCardCode}}/view-sessions",
+            "description": "BR-130: mở CCCD với audit trước URL; tự tải hai ảnh từ MinIO bằng chữ ký.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewVerifierCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');",
+                  "pm.collectionVariables.set('viewRepeatedRequestId','view-'+pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('viewCardCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('viewOwnerCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
+                  "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
+                  "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
+                  "if (pm.response.code===201) { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d && d[side]; if(image && /^https?:\\/\\//.test(image.url)) pm.sendRequest({url:image.url,method:'GET',auth:{type:'noauth'}}, (err,res) => { pm.test(side+' signed GET succeeds without bearer', () => { pm.expect(Boolean(err)).to.equal(false); pm.expect(res.code).to.equal(200); pm.expect(/^(image\\/jpeg|image\\/png|image\\/heic)(;|$)/i.test(res.headers.get('Content-Type') || '')).to.equal(true); pm.expect((res.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true); }); }); } }",
+                  "pm.test('Request ID is reused', () => pm.expect(pm.response.headers.get('X-Request-Id')).to.equal(pm.collectionVariables.get('viewRepeatedRequestId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Reopen same card with same request ID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "{{viewRepeatedRequestId}}"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{viewCardCode}}/view-sessions",
+            "description": "BR-130: mở lại phải tạo audit thứ hai dù requestId không đổi; kiểm số dòng audit bằng CSDL sau folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewVerifierCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');",
+                  "if (!/^view-[A-Za-z0-9-]+$/.test(pm.collectionVariables.get('viewRepeatedRequestId') || '')) throw new Error('Run request 02 first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('viewCardCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('viewOwnerCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
+                  "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
+                  "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
+                  "if (pm.response.code===201) { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d && d[side]; if(image && /^https?:\\/\\//.test(image.url)) pm.sendRequest({url:image.url,method:'GET',auth:{type:'noauth'}}, (err,res) => { pm.test(side+' signed GET succeeds without bearer', () => { pm.expect(Boolean(err)).to.equal(false); pm.expect(res.code).to.equal(200); pm.expect(/^(image\\/jpeg|image\\/png|image\\/heic)(;|$)/i.test(res.headers.get('Content-Type') || '')).to.equal(true); pm.expect((res.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true); }); }); } }",
+                  "pm.test('Same request ID is reused', () => pm.expect(pm.response.headers.get('X-Request-Id')).to.equal(pm.collectionVariables.get('viewRepeatedRequestId')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Open driver license and fetch images",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{viewLicenseCode}}/view-sessions",
+            "description": "BR-130: mở GPLX và tự tải hai mặt, dùng cùng quyền công ty không cần chi nhánh."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewVerifierCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('viewLicenseCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('viewOwnerCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
+                  "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
+                  "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
+                  "if (pm.response.code===201) { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d && d[side]; if(image && /^https?:\\/\\//.test(image.url)) pm.sendRequest({url:image.url,method:'GET',auth:{type:'noauth'}}, (err,res) => { pm.test(side+' signed GET succeeds without bearer', () => { pm.expect(Boolean(err)).to.equal(false); pm.expect(res.code).to.equal(200); pm.expect(/^(image\\/jpeg|image\\/png|image\\/heic)(;|$)/i.test(res.headers.get('Content-Type') || '')).to.equal(true); pm.expect((res.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true); }); }); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Reject malformed document code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/123/view-sessions",
+            "description": "BR-130: mã số nội bộ không phải GT hợp lệ."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewVerifierCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Missing document is not found",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/GT-ZZZZZZ/view-sessions",
+            "description": "BR-130: mã GT đúng định dạng chưa tồn tại trả đúng DOCUMENT_NOT_FOUND."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewVerifierCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('DOCUMENT_NOT_FOUND'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Reject client supplied owner",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{viewCardCode}}/view-sessions",
+            "description": "BR-130: body không được tự khai chủ hồ sơ/người mở.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"accountCode\": \"{{viewOwnerCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewVerifierCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Missing token is rejected",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{viewCardCode}}/view-sessions",
+            "description": "BR-130: không JWT thì không mở được giấy tờ hoặc ảnh.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewVerifierCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('UNAUTHENTICATED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Unsafe request ID is replaced",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "X-Request-Id",
+                "value": "unsafe value"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{viewCardCode}}/view-sessions",
+            "description": "BR-130: ID có khoảng trắng được thay bằng ID an toàn và audit dùng ID mới."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewVerifierCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('viewCardCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('viewOwnerCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
+                  "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
+                  "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
+                  "if (pm.response.code===201) { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d && d[side]; if(image && /^https?:\\/\\//.test(image.url)) pm.sendRequest({url:image.url,method:'GET',auth:{type:'noauth'}}, (err,res) => { pm.test(side+' signed GET succeeds without bearer', () => { pm.expect(Boolean(err)).to.equal(false); pm.expect(res.code).to.equal(200); pm.expect(/^(image\\/jpeg|image\\/png|image\\/heic)(;|$)/i.test(res.headers.get('Content-Type') || '')).to.equal(true); pm.expect((res.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true); }); }); } }",
+                  "pm.test('Unsafe request ID replaced', () => pm.expect(pm.response.headers.get('X-Request-Id')).not.to.equal('unsafe value'));",
+                  "if(pm.response.code===201) pm.collectionVariables.set('viewNormalizedRequestId',pm.response.headers.get('X-Request-Id'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Open view sessions (ADMIN)",
+      "description": "Chạy sau View session owner setup; token admin-web ADMIN, giữ nguyên trong folder. Script tự GET hai ảnh bằng URL ký.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental View ADMIN",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check ADMIN identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130: xác nhận đúng vai trước các request trong folder; giữ nguyên token."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('viewAdminCode');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected role only', () => { const d=pm.response.json().data; pm.expect(d.roles).to.have.members(['ADMIN']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('viewAdminCode',d.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - ADMIN opens driver license",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{viewLicenseCode}}/view-sessions",
+            "description": "BR-130: ADMIN có quyền mở GPLX, cùng bảo đảm audit và thời hạn URL."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewAdminCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('viewLicenseCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('viewOwnerCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
+                  "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
+                  "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
+                  "if (pm.response.code===201) { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d && d[side]; if(image && /^https?:\\/\\//.test(image.url)) pm.sendRequest({url:image.url,method:'GET',auth:{type:'noauth'}}, (err,res) => { pm.test(side+' signed GET succeeds without bearer', () => { pm.expect(Boolean(err)).to.equal(false); pm.expect(res.code).to.equal(200); pm.expect(/^(image\\/jpeg|image\\/png|image\\/heic)(;|$)/i.test(res.headers.get('Content-Type') || '')).to.equal(true); pm.expect((res.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true); }); }); } }"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Reject view sessions (BRANCH_STAFF)",
+      "description": "Token admin-web chỉ vai BRANCH_STAFF. Chạy sau View session owner setup; toàn bộ 2 request. Không gán thêm ADMIN hoặc DOCUMENT_VERIFIER.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental View Staff",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check BRANCH_STAFF identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130: xác nhận đúng vai trước các request trong folder; giữ nguyên token."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('viewStaffCode');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected role only', () => { const d=pm.response.json().data; pm.expect(d.roles).to.have.members(['BRANCH_STAFF']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('viewStaffCode',d.code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Branch staff cannot open customer documents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{viewCardCode}}/view-sessions",
+            "description": "BR-130: nhân viên chi nhánh không có quyền xem giấy tờ khách."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!/^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('viewStaffCode') || '')) throw new Error('Run the identity check first and keep the same token for this folder.');",
+                  "for (const k of ['viewCardCode','viewLicenseCode']) if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get(k) || '')) throw new Error('Run View session owner setup first using a customer who submitted both documents.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

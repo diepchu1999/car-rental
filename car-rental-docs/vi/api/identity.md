@@ -15,6 +15,7 @@ Khách có thể xin URL tải từng mặt ảnh, nộp hồ sơ và đọc tr�
 | POST | `/api/v1/client/documents` | JWT khách hợp lệ có vai `CUSTOMER`, đã đồng ý điều khoản | 201 |
 | GET | `/api/v1/client/documents` | JWT khách hợp lệ có vai `CUSTOMER`, đã đồng ý điều khoản | 200 |
 | GET | `/api/v1/client/documents/{documentCode}` | Như trên, chỉ hồ sơ của chính người gọi | 200 |
+| POST | `/api/v1/admin/documents/{documentCode}/view-sessions` | JWT `admin-web`, vai `DOCUMENT_VERIFIER` hoặc `ADMIN` | 201 |
 
 Nhân viên chưa được gán chi nhánh vẫn đọc được `/admin/accounts/me` để lấy mã `TK-<6>`
 cung cấp cho ADMIN. Điều này **không** cấp quyền thao tác xe hoặc chi nhánh (BR-803/810).
@@ -397,3 +398,96 @@ Mỗi folder có OAuth PKCE riêng; chọn đúng token và Use Token ở **Auth
 
 Chạy theo thứ tự ba folder, tất cả `pm.test` phải xanh, kể cả HTTP 400/401/403/404 có chủ đích.
 Các folder đọc không sửa dữ liệu, chạy lại được nhiều lần. Không export token hoặc response giấy tờ.
+
+## POST /admin/documents/{documentCode}/view-sessions — mở giấy tờ kèm ảnh
+
+Đường đầy đủ: `/api/v1/admin/documents/{documentCode}/view-sessions` (BR-130/803).
+Chỉ `DOCUMENT_VERIFIER` và `ADMIN` được gọi bằng JWT nhân viên `admin-web`.
+Không yêu cầu chi nhánh; `BRANCH_STAFF`, các vai vận hành khác và `CUSTOMER` (kể cả chủ hồ sơ)
+không có quyền này. Đây là POST có tác dụng ghi audit, không có GET tương đương.
+
+Request không body hoặc JSON `{}`. Không nhận trường khác: người mở lấy từ JWT, chủ hồ sơ
+lấy từ bản nộp đã lưu, `requestId` lấy từ filter đã chuẩn hoá `X-Request-Id`.
+`documentCode` phải dạng `GT-<6 ký tự A–Z/0–9>`, không phải ID số.
+Header dùng chung như `/accounts/me`; không truyền token qua query.
+
+Mỗi POST hợp lệ mở đúng phiên bản GT, kể cả VERIFIED/REJECTED/SUPERSEDED, và tạo đúng một event
+`DOCUMENT_VIEW_OPENED` gồm actor TK, chủ TK, GT, thời điểm và requestId.
+**Audit commit xong mới giải mã số và ký URL.** Gọi hai lần cùng GT/requestId vẫn là hai lượt mở,
+không gộp theo idempotency key. Audit không chứa số giấy tờ, thông tin nhân thân, key ảnh hoặc URL.
+Nếu commit audit lỗi, không trả số/URL. Nếu giải mã/ký lỗi sau commit, event vẫn được giữ và response
+là lỗi chung; không trả dữ liệu dở dang. Thiếu quyền hoặc không tìm thấy GT không tạo event mở.
+
+Response `201 Created`, `Cache-Control: no-store`, `X-Request-Id` an toàn. Không có `Location`
+vì lượt mở không tạo resource có endpoint đọc riêng. Ví dụ dưới đây chỉ là dữ liệu giả và URL minh hoạ:
+
+```json
+{
+  "success": true,
+  "data": {
+    "code": "GT-LOCAL1",
+    "accountCode": "TK-LOCAL1",
+    "documentType": "IDENTITY_CARD",
+    "status": "PENDING",
+    "number": "000000000000",
+    "fullName": "LOCAL TEST ONLY",
+    "birthDate": "1990-01-01",
+    "expiresOn": "2030-01-01",
+    "licenseClass": null,
+    "automaticOnly": null,
+    "submittedAt": "2026-10-28T03:00:00Z",
+    "reviewedAt": null,
+    "rejectionCode": null,
+    "rejectionNote": null,
+    "frontImage": {
+      "url": "https://storage.invalid/front?signature=example",
+      "expiresAt": "2026-10-28T03:01:00Z"
+    },
+    "backImage": {
+      "url": "https://storage.invalid/back?signature=example",
+      "expiresAt": "2026-10-28T03:01:00Z"
+    }
+  },
+  "error": null
+}
+```
+
+CCCD có `fullName`/`birthDate`; GPLX có `licenseClass`/`automaticOnly`, hai trường của CCCD là null.
+Các trường trạng thái, thời điểm duyệt và lý do từ chối giữ ý nghĩa như endpoint đọc trạng thái.
+Không trả ID số, phong bì mã hoá, HMAC, mã AN hoặc object key riêng thành trường response.
+URL ký có thể chứa đường dẫn object ngẫu nhiên, là bí mật ngắn hạn: không ghi log hoặc chia sẻ.
+Client GET URL trực tiếp, **không** kèm bearer; MinIO trả ảnh với `Cache-Control: no-store`.
+Hạn URL đọc từ cấu hình storage, mặc định 60 giây (BR-130); dùng `expiresAt` để biết lúc hết hạn.
+Dùng lại URL còn hạn không tạo audit mới; audit đếm lượt POST mở, không đếm lượt tải ảnh.
+
+| Trường hợp | HTTP | Mã lỗi |
+|---|---|---|
+| Thiếu/sai token | 401 | `UNAUTHENTICATED` |
+| Sai vai hoặc client | 403 | `ACCESS_DENIED` |
+| Sai định dạng GT, body có trường ngoài hợp đồng | 400 | `INVALID_REQUEST` |
+| GT hợp lệ không tồn tại | 404 | `DOCUMENT_NOT_FOUND` |
+| Commit audit, giải mã hoặc storage lỗi | 500 | `INTERNAL_ERROR` |
+
+### Kiểm bằng Postman
+
+Import lại `postman/task-08b-documents.postman_collection.json`, chọn environment local và chạy
+bốn folder dưới đây bằng Collection Runner. Giữ nguyên token trong từng folder; dùng Get new access
+token/Use Token ở Authorization của folder để chọn đúng tài khoản, không chỉ đổi tên token.
+
+| Thứ tự | Folder (tiền tố `Part 3 -`) | Token | Request |
+|---|---|---|---:|
+| 1 | `View session owner setup (CUSTOMER)` | CUSTOMER đã nộp CCCD/GPLX | 3 |
+| 2 | `Open view sessions (DOCUMENT_VERIFIER)` | Chỉ DOCUMENT_VERIFIER | 9 |
+| 3 | `Open view sessions (ADMIN)` | Chỉ ADMIN | 2 |
+| 4 | `Reject view sessions (BRANCH_STAFF)` | Chỉ BRANCH_STAFF | 2 |
+
+Nếu khách chưa có hai giấy tờ, chạy folder `Part 2 - Submit documents (BR-130)` trước.
+Mã TK/GT được truyền tự động. Mỗi response mở thành công được script kiểm hình dạng, đúng chủ/GT,
+hạn URL; script tự GET cả hai ảnh ngay, kiểm 200/MIME/no-store và không lưu URL vào collection/environment.
+Request phá hoại kiểm 400/401/403/404 đúng mã. Số lượt tải ảnh không phải số lượt audit.
+
+Hai request 02–03 của verifier dùng cùng biến `viewRepeatedRequestId`; sau đúng một lượt chạy folder,
+CSDL phải có **hai** event tương ứng, cùng actor `viewVerifierCode`, chủ `viewOwnerCode`, GT `viewCardCode`.
+Nếu gửi lại riêng request 03 thì có thêm một event — đó là hành vi đúng. Biến `viewNormalizedRequestId`
+của request 09 dùng kiểm một audit với ID đã thay thế. Việc đối chiếu audit thực hiện trực tiếp CSDL,
+không thêm API đọc audit chỉ để test. Không export token, response hoặc URL ký khi chia sẻ collection.

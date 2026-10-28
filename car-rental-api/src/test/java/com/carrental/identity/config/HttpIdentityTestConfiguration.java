@@ -55,6 +55,7 @@ public class HttpIdentityTestConfiguration {
         private final String customerSubject = UUID.randomUUID().toString();
         private final String anotherCustomerSubject = UUID.randomUUID().toString();
         private final String verifierSubject = UUID.randomUUID().toString();
+        private final String staffSubject = UUID.randomUUID().toString();
 
         /** Lắng nghe đúng loopback và cổng ngẫu nhiên; không mở server fixture ra mạng LAN. */
         private TestJwtIssuer() throws Exception {
@@ -106,6 +107,11 @@ public class HttpIdentityTestConfiguration {
         /** BR-130/809: verifier chỉ mang vai xác minh trên token admin-web, không kiêm ADMIN/CUSTOMER. */
         public String documentVerifierToken(Clock clock) {
             return token(clock, verifierSubject, "+84910000008", "DOCUMENT_VERIFIER", "admin-web");
+        }
+
+        /** BR-130: nhân viên chi nhánh qua được namespace admin nhưng không được xem giấy tờ khách. */
+        public String branchStaffToken(Clock clock) {
+            return token(clock, staffSubject, "+84910000009", "BRANCH_STAFF", "admin-web");
         }
 
         /** Ký RS256 theo Clock của ứng dụng test, kể cả test dùng mốc cố định khác đồng hồ máy. */

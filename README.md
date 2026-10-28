@@ -147,6 +147,15 @@ Danh sách tách bản nộp mới nhất với bản VERIFIED được chọn; 
 Trong cùng collection, chạy các folder **Read document status**, **Reject cross-account document reads**
 và **Reject staff document status access** bằng token chủ hồ sơ, khách khác, rồi ADMIN tương ứng.
 
+Nhân viên có vai `DOCUMENT_VERIFIER` hoặc `ADMIN` mở hồ sơ kèm ảnh bằng
+`POST /api/v1/admin/documents/{documentCode}/view-sessions` (không body hoặc `{}`).
+Mỗi lượt mở ghi một audit đã commit trước khi cấp URL xem ảnh; URL có hạn 60 giây theo cấu hình,
+response không cache. Trong collection giấy tờ, chạy lần lượt các folder **View session owner setup
+(CUSTOMER)**, **Open view sessions (DOCUMENT_VERIFIER)**, **Open view sessions (ADMIN)** và
+**Reject view sessions (BRANCH_STAFF)**. Mỗi folder dùng token đúng vai; script tự tải hai ảnh ngay
+bằng URL ký, không gửi bearer tới MinIO và không lưu URL vào biến. Không chia sẻ response/history
+chứa giấy tờ; chỉ dùng ảnh và thông tin thử ở local.
+
 Compose chỉ mount provider lõi và JAR SMS local, không mount JAR `*-tests.jar`. Nếu chưa build,
 mount phải báo thiếu file, không tự tạo thư mục giả mang tên `.jar`. Không đổi image/platform.
 
