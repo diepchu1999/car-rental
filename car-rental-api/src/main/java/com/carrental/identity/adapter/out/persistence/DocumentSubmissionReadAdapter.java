@@ -4,6 +4,10 @@ import com.carrental.identity.application.port.out.ReadDocumentSubmissionPort;
 import com.carrental.identity.application.view.DocumentSubmissionDetail;
 import com.carrental.identity.application.view.DocumentStatusDetail;
 import com.carrental.identity.application.view.DocumentHeadSummary;
+import com.carrental.identity.application.view.DocumentReviewDetail;
+import com.carrental.identity.domain.DocumentImage;
+import com.carrental.identity.domain.DocumentSide;
+import com.carrental.identity.domain.ProtectedDocumentNumber;
 import com.carrental.identity.domain.DocumentSubmissionStatus;
 import com.carrental.identity.domain.DocumentType;
 import com.carrental.shared.sql.SensitiveSql;
@@ -20,13 +24,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-/** Đọc lại bản nộp đúng chủ; che cả truy vấn và lỗi đọc row theo security-guideline §3. */
+/** Đọc bản nộp theo từng mục đích; che cả truy vấn và lỗi đọc row theo security-guideline §3. */
 @Repository
 class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
     private final NamedParameterJdbcTemplate jdbc;
     private final String findSql;
     private final String statusSql;
     private final String headsSql;
+    private final String reviewSql;
 
     /** Nạp SQL cố định, không nối input thành câu truy vấn. */
     DocumentSubmissionReadAdapter(NamedParameterJdbcTemplate jdbc, SqlLoader loader) {
@@ -34,6 +39,7 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
         findSql = loader.load("sql/identity/find_document_submission_by_code_and_owner.sql");
         statusSql = loader.load("sql/identity/find_document_status_by_code_and_owner.sql");
         headsSql = loader.load("sql/identity/list_document_heads_by_owner.sql");
+        reviewSql = loader.load("sql/identity/find_document_submission_for_review.sql");
     }
 
     /** Không SELECT số đã mã hoá hoặc key ảnh khi chỉ cần trạng thái của bản nộp. */
@@ -57,6 +63,29 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
         return SensitiveSql.execute(() -> List.copyOf(jdbc.query(headsSql, Map.of("accountCode", accountCode),
                 (row, ignored) -> new DocumentHeadSummary(DocumentType.valueOf(row.getString("document_type")),
                         status(row, "latest_"), status(row, "active_")))));
+    }
+
+    /** Một câu SQL giữ bản nộp và hai ảnh trong cùng snapshot; chỉ đọc phong bì, không giải mã số. */
+    @Override public Optional<DocumentReviewDetail> findForReviewByCode(String code) {
+        return SensitiveSql.execute(() -> DataAccessUtils.optionalResult(jdbc.query(reviewSql,
+                Map.of("code", code), (row, ignored) -> new DocumentReviewDetail(
+                        row.getString("account_code"), status(row, ""),
+                        new ProtectedDocumentNumber(row.getInt("number_key_version"),
+                                row.getString("number_nonce"), row.getString("number_ciphertext"),
+                                row.getString("number_hash")),
+                        row.getString("full_name"), row.getObject("birth_date", LocalDate.class),
+                        row.getString("license_class"), row.getObject("automatic_only", Boolean.class),
+                        image(row, "front_", DocumentSide.FRONT), image(row, "back_", DocumentSide.BACK)))));
+    }
+
+    /** Prefix do adapter chọn; LEFT JOIN giữ hàng lỗi để thiếu ảnh không bị hiểu nhầm thành không tồn tại. */
+    private static DocumentImage image(ResultSet row, String prefix, DocumentSide side) throws SQLException {
+        if (row.getString(prefix + "upload_code") == null) {
+            throw new IllegalStateException("Document submission is missing a sealed image.");
+        }
+        return new DocumentImage(row.getString(prefix + "upload_code"), side,
+                row.getString(prefix + "object_key"), row.getString(prefix + "content_type"),
+                row.getLong(prefix + "size_bytes"), row.getInt(prefix + "width"), row.getInt(prefix + "height"));
     }
 
     /** Prefix cố định trong adapter; mã null chỉ biểu diễn bên active chưa được chọn của LEFT JOIN. */
