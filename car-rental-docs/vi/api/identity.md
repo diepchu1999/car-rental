@@ -491,3 +491,77 @@ CSDL phải có **hai** event tương ứng, cùng actor `viewVerifierCode`, ch�
 Nếu gửi lại riêng request 03 thì có thêm một event — đó là hành vi đúng. Biến `viewNormalizedRequestId`
 của request 09 dùng kiểm một audit với ID đã thay thế. Việc đối chiếu audit thực hiện trực tiếp CSDL,
 không thêm API đọc audit chỉ để test. Không export token, response hoặc URL ký khi chia sẻ collection.
+
+## GET /admin/documents — hàng chờ xác minh
+
+Đường đầy đủ: `GET /api/v1/admin/documents` (BR-130/803). Token nhân viên `admin-web`
+với vai `DOCUMENT_VERIFIER` hoặc `ADMIN`; không yêu cầu chi nhánh. Khách và các vai nhân viên
+khác không có quyền đọc hàng chờ, kể cả khách là chủ một hồ sơ trong đó.
+
+| Query | Kiểu | Mặc định | Giới hạn |
+|---|---|---|---|
+| `limit` | Số nguyên | 20 | 1–100, vượt giới hạn trả 400, không tự cắt |
+| `offset` | Số nguyên 64 bit | 0 | 0–9223372036854775807 |
+
+Thiếu hoặc để rỗng tham số dùng mặc định. Sai kiểu, âm hoặc tràn kiểu trả 400 `INVALID_REQUEST`.
+Chỉ hai query trên có tác dụng; thêm `accountCode`, `branchCode`, `status` hoặc `role` không thay
+phạm vi và không cấp quyền. Không có bộ lọc hồ sơ lịch sử ở endpoint này.
+
+Chỉ trả các bản `PENDING` của cả CCCD/GPLX trên toàn công ty, sắp thời điểm nộp tăng dần rồi mã GT
+(theo thứ tự byte ASCII) khi cùng thời điểm. Đây là thứ tự hiển thị, không phải bắt buộc duyệt FIFO.
+Response `200 OK`, `Cache-Control: no-store`, `X-Request-Id`:
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "code": "GT-LOCAL1",
+        "accountCode": "TK-LOCAL1",
+        "documentType": "IDENTITY_CARD",
+        "submittedAt": "2026-10-28T03:00:00Z"
+      }
+    ],
+    "hasMore": false
+  },
+  "error": null
+}
+```
+
+Mỗi item chỉ có bốn trường như trên; không trả ID số, số giấy tờ, tên/ngày sinh, hash/bản mã,
+ảnh hoặc URL ký. Đọc hàng chờ không giải mã, ký ảnh hoặc ghi audit mở giấy tờ; mở chi tiết kèm ảnh
+phải gọi `POST /admin/documents/{documentCode}/view-sessions` để ghi audit trước khi cấp URL.
+
+Trang rỗng vẫn 200 với `items: []`, `hasMore: false`. Đọc trang tiếp bằng
+`offset hiện tại + số item vừa nhận`. `hasMore` tính từ một hàng thăm dò trong cùng SELECT;
+không có tổng số hoặc cursor. Hàng chờ có thể thay đổi giữa hai request, nên phân trang offset có thể
+bị xê dịch; đọc trang không giữ chỗ hoặc nhận quyền xác minh hồ sơ.
+
+| Trường hợp | HTTP | Mã lỗi |
+|---|---|---|
+| Thiếu/sai/hết hạn token | 401 | `UNAUTHENTICATED` |
+| Sai vai hoặc client | 403 | `ACCESS_DENIED` |
+| Sai kiểu/giới hạn phân trang | 400 | `INVALID_REQUEST` |
+| Lỗi đọc nội bộ | 500 | `INTERNAL_ERROR` |
+
+Lỗi đồng bộ danh tính giữ như `/accounts/me`. Lỗi nội bộ không trả SQL, tên lớp hay nội dung giấy tờ.
+
+### Postman: hàng chờ
+
+Import lại cùng `postman/task-08b-documents.postman_collection.json`; environment `Car Rental - Local`.
+Restart backend để nạp endpoint. Chạy lần lượt bốn folder bằng Runner (1 iteration), mỗi folder dùng
+Get new access token và Use Token tại Authorization để chọn **đúng tài khoản và giữ cùng token**:
+
+| Folder (tiền tố `Part 3 -`) | Token chỉ mang vai | Số request |
+|---|---|---:|
+| `Pending queue (DOCUMENT_VERIFIER)` | DOCUMENT_VERIFIER, admin-web | 12 |
+| `Pending queue (ADMIN)` | ADMIN, admin-web | 2 |
+| `Pending queue (BRANCH_STAFF)` | BRANCH_STAFF, admin-web | 2 |
+| `Pending queue (CUSTOMER)` | CUSTOMER, customer-web | 2 |
+
+Cần ít nhất hai hồ sơ PENDING để kiểm hai trang: nếu chưa có, dùng folder
+`Part 2 - Submit documents (BR-130)` với CUSTOMER để nộp CCCD/GPLX. Không cần chạy folder mở ảnh.
+Trong lúc kiểm phân trang, không nộp/duyệt hồ sơ khác làm đổi thứ tự hàng chờ.
+Collection tự truyền mã GT giữa các request, không cần copy. Tất cả `pm.test` phải xanh, kể cả
+các HTTP 400/401/403 có chủ đích. Các folder chỉ đọc, chạy lại được nhiều lần và không lấy ảnh.

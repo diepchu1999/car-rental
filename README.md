@@ -147,6 +147,12 @@ Danh sách tách bản nộp mới nhất với bản VERIFIED được chọn; 
 Trong cùng collection, chạy các folder **Read document status**, **Reject cross-account document reads**
 và **Reject staff document status access** bằng token chủ hồ sơ, khách khác, rồi ADMIN tương ứng.
 
+Nhân viên `DOCUMENT_VERIFIER` hoặc `ADMIN` đọc hàng chờ tại
+`GET /api/v1/admin/documents?limit=20&offset=0`: chỉ metadata của hồ sơ PENDING, không có số/ảnh.
+Trang tối đa 100, vượt giới hạn trả 400; dùng `hasMore` để biết còn trang sau. Trong collection giấy tờ,
+chạy các folder **Pending queue** theo thứ tự DOCUMENT_VERIFIER, ADMIN, BRANCH_STAFF, CUSTOMER;
+chi tiết token và dữ liệu thử ở [danh mục API](car-rental-docs/vi/api/identity.md).
+
 Nhân viên có vai `DOCUMENT_VERIFIER` hoặc `ADMIN` mở hồ sơ kèm ảnh bằng
 `POST /api/v1/admin/documents/{documentCode}/view-sessions` (không body hoặc `{}`).
 Mỗi lượt mở ghi một audit đã commit trước khi cấp URL xem ảnh; URL có hạn 60 giây theo cấu hình,

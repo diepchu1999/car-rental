@@ -4981,6 +4981,1145 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Part 3 - Pending queue (DOCUMENT_VERIFIER)",
+      "description": "BR-130: chạy cả 12 request bằng token admin-web chỉ vai DOCUMENT_VERIFIER. Cần ít nhất hai hồ sơ PENDING: nếu chưa có, chạy Part 2 - Submit documents với CUSTOMER. Không cần chạy các folder mở ảnh. Không thay đổi hàng chờ hoặc token trong lúc Runner đang kiểm hai trang. Chỉ đọc metadata, không lấy URL ảnh hoặc ghi audit mở hồ sơ. Chạy lại được nhiều lần.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Queue DOCUMENT_VERIFIER",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check DOCUMENT_VERIFIER identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130/803, api-guideline §8: 01 - Check DOCUMENT_VERIFIER identity. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('queueCheckedRole');",
+                  "pm.collectionVariables.unset('queueFirstCode');",
+                  "pm.collectionVariables.unset('queueSecondCode');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected role only', () => { const d=pm.response.json().data; pm.expect(d.roles).to.have.members(['DOCUMENT_VERIFIER']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('queueCheckedRole','DOCUMENT_VERIFIER'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Read default queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents",
+            "description": "BR-130/803, api-guideline §8: 02 - Read default queue. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact queue envelope and fields', () => { const b=pm.response.json(); pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); const d=b.data; pm.expect(d).to.have.all.keys('items','hasMore'); pm.expect(d.items).to.be.an('array'); pm.expect(d.hasMore).to.be.a('boolean'); for(const i of d.items) { pm.expect(i).to.have.all.keys('code','accountCode','documentType','submittedAt'); pm.expect(i.code).to.match(/^GT-[A-Z0-9]{6}$/); pm.expect(i.accountCode).to.match(/^TK-[A-Z0-9]{6}$/); pm.expect(['IDENTITY_CARD','DRIVER_LICENSE']).to.include(i.documentType); pm.expect(Number.isFinite(Date.parse(i.submittedAt))).to.equal(true); } });",
+                  "pm.test('Queue is ordered by submission time then code', () => { const a=pm.response.json().data.items; for(let i=1;i<a.length;i++) { const x=Date.parse(a[i-1].submittedAt),y=Date.parse(a[i].submittedAt); pm.expect(x<y || (x===y && a[i-1].code<a[i].code)).to.equal(true); } });",
+                  "pm.test('Default page limit and usable fixtures', () => { const a=pm.response.json().data.items; pm.expect(a.length).to.be.at.most(20); pm.expect(a.length, 'Submit both documents with the Part 2 customer folder first; need at least two pending submissions.').to.be.at.least(2); pm.collectionVariables.set('queueFirstCode',a[0].code); pm.collectionVariables.set('queueSecondCode',a[1].code); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Read first one-item page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents?limit=1&offset=0",
+            "description": "BR-130/803, api-guideline §8: 03 - Read first one-item page. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');",
+                  "if(!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('queueFirstCode') || '') || !/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('queueSecondCode') || '')) throw new Error('Run request 02 first with at least two pending submissions.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact queue envelope and fields', () => { const b=pm.response.json(); pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); const d=b.data; pm.expect(d).to.have.all.keys('items','hasMore'); pm.expect(d.items).to.be.an('array'); pm.expect(d.hasMore).to.be.a('boolean'); for(const i of d.items) { pm.expect(i).to.have.all.keys('code','accountCode','documentType','submittedAt'); pm.expect(i.code).to.match(/^GT-[A-Z0-9]{6}$/); pm.expect(i.accountCode).to.match(/^TK-[A-Z0-9]{6}$/); pm.expect(['IDENTITY_CARD','DRIVER_LICENSE']).to.include(i.documentType); pm.expect(Number.isFinite(Date.parse(i.submittedAt))).to.equal(true); } });",
+                  "pm.test('Queue is ordered by submission time then code', () => { const a=pm.response.json().data.items; for(let i=1;i<a.length;i++) { const x=Date.parse(a[i-1].submittedAt),y=Date.parse(a[i].submittedAt); pm.expect(x<y || (x===y && a[i-1].code<a[i].code)).to.equal(true); } });",
+                  "pm.test('First item and next page', () => { const d=pm.response.json().data; pm.expect(d.items.length).to.equal(1); pm.expect(d.items[0].code).to.equal(pm.collectionVariables.get('queueFirstCode')); pm.expect(d.hasMore).to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Read second one-item page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents?limit=1&offset=1",
+            "description": "BR-130/803, api-guideline §8: 04 - Read second one-item page. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');",
+                  "if(!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('queueFirstCode') || '') || !/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('queueSecondCode') || '')) throw new Error('Run request 02 first with at least two pending submissions.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact queue envelope and fields', () => { const b=pm.response.json(); pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); const d=b.data; pm.expect(d).to.have.all.keys('items','hasMore'); pm.expect(d.items).to.be.an('array'); pm.expect(d.hasMore).to.be.a('boolean'); for(const i of d.items) { pm.expect(i).to.have.all.keys('code','accountCode','documentType','submittedAt'); pm.expect(i.code).to.match(/^GT-[A-Z0-9]{6}$/); pm.expect(i.accountCode).to.match(/^TK-[A-Z0-9]{6}$/); pm.expect(['IDENTITY_CARD','DRIVER_LICENSE']).to.include(i.documentType); pm.expect(Number.isFinite(Date.parse(i.submittedAt))).to.equal(true); } });",
+                  "pm.test('Queue is ordered by submission time then code', () => { const a=pm.response.json().data.items; for(let i=1;i<a.length;i++) { const x=Date.parse(a[i-1].submittedAt),y=Date.parse(a[i].submittedAt); pm.expect(x<y || (x===y && a[i-1].code<a[i].code)).to.equal(true); } });",
+                  "pm.test('Offset selects the second item', () => { const a=pm.response.json().data.items; pm.expect(a.length).to.equal(1); pm.expect(a[0].code).to.equal(pm.collectionVariables.get('queueSecondCode')); pm.expect(a[0].code).not.to.equal(pm.collectionVariables.get('queueFirstCode')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Read maximum page",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents?limit=100",
+            "description": "BR-130/803, api-guideline §8: 05 - Read maximum page. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact queue envelope and fields', () => { const b=pm.response.json(); pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); const d=b.data; pm.expect(d).to.have.all.keys('items','hasMore'); pm.expect(d.items).to.be.an('array'); pm.expect(d.hasMore).to.be.a('boolean'); for(const i of d.items) { pm.expect(i).to.have.all.keys('code','accountCode','documentType','submittedAt'); pm.expect(i.code).to.match(/^GT-[A-Z0-9]{6}$/); pm.expect(i.accountCode).to.match(/^TK-[A-Z0-9]{6}$/); pm.expect(['IDENTITY_CARD','DRIVER_LICENSE']).to.include(i.documentType); pm.expect(Number.isFinite(Date.parse(i.submittedAt))).to.equal(true); } });",
+                  "pm.test('Queue is ordered by submission time then code', () => { const a=pm.response.json().data.items; for(let i=1;i<a.length;i++) { const x=Date.parse(a[i-1].submittedAt),y=Date.parse(a[i].submittedAt); pm.expect(x<y || (x===y && a[i-1].code<a[i].code)).to.equal(true); } });",
+                  "pm.test('At most 100 items', () => pm.expect(pm.response.json().data.items.length).to.be.at.most(100));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Read empty page beyond queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents?limit=1&offset=9223372036854775807",
+            "description": "BR-130/803, api-guideline §8: 06 - Read empty page beyond queue. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact queue envelope and fields', () => { const b=pm.response.json(); pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); const d=b.data; pm.expect(d).to.have.all.keys('items','hasMore'); pm.expect(d.items).to.be.an('array'); pm.expect(d.hasMore).to.be.a('boolean'); for(const i of d.items) { pm.expect(i).to.have.all.keys('code','accountCode','documentType','submittedAt'); pm.expect(i.code).to.match(/^GT-[A-Z0-9]{6}$/); pm.expect(i.accountCode).to.match(/^TK-[A-Z0-9]{6}$/); pm.expect(['IDENTITY_CARD','DRIVER_LICENSE']).to.include(i.documentType); pm.expect(Number.isFinite(Date.parse(i.submittedAt))).to.equal(true); } });",
+                  "pm.test('Queue is ordered by submission time then code', () => { const a=pm.response.json().data.items; for(let i=1;i<a.length;i++) { const x=Date.parse(a[i-1].submittedAt),y=Date.parse(a[i].submittedAt); pm.expect(x<y || (x===y && a[i-1].code<a[i].code)).to.equal(true); } });",
+                  "pm.test('Empty page has no next page', () => { const d=pm.response.json().data; pm.expect(d.items).to.have.length(0); pm.expect(d.hasMore).to.equal(false); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Reject zero limit",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents?limit=0",
+            "description": "BR-130/803, api-guideline §8: 07 - Reject zero limit. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error code', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Reject oversized limit",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents?limit=101",
+            "description": "BR-130/803, api-guideline §8: 08 - Reject oversized limit. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error code', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Reject negative offset",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents?offset=-1",
+            "description": "BR-130/803, api-guideline §8: 09 - Reject negative offset. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error code', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - Reject nonnumeric limit",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents?limit=abc",
+            "description": "BR-130/803, api-guideline §8: 10 - Reject nonnumeric limit. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error code', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - Reject overflowing offset",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents?offset=9223372036854775808",
+            "description": "BR-130/803, api-guideline §8: 11 - Reject overflowing offset. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error code', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 - Reject missing bearer",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents",
+            "description": "BR-130/803, api-guideline §8: 12 - Reject missing bearer. Chỉ dữ liệu local giả; giữ cùng token trong folder.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='DOCUMENT_VERIFIER') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error code', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('UNAUTHENTICATED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Pending queue (ADMIN)",
+      "description": "BR-130/803: chạy cả 2 request, dùng token chỉ vai ADMIN. Chọn Get new access token rồi Use Token tại Authorization của folder; giữ nguyên token. Không ghi dữ liệu hoặc mở ảnh.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Queue ADMIN",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check ADMIN identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130/803, api-guideline §8: 01 - Check ADMIN identity. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('queueCheckedRole');",
+                  "pm.collectionVariables.unset('queueFirstCode');",
+                  "pm.collectionVariables.unset('queueSecondCode');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected role only', () => { const d=pm.response.json().data; pm.expect(d.roles).to.have.members(['ADMIN']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('queueCheckedRole','ADMIN'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - ADMIN reads pending queue",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents",
+            "description": "BR-130/803, api-guideline §8: 02 - ADMIN reads pending queue. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='ADMIN') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact queue envelope and fields', () => { const b=pm.response.json(); pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); const d=b.data; pm.expect(d).to.have.all.keys('items','hasMore'); pm.expect(d.items).to.be.an('array'); pm.expect(d.hasMore).to.be.a('boolean'); for(const i of d.items) { pm.expect(i).to.have.all.keys('code','accountCode','documentType','submittedAt'); pm.expect(i.code).to.match(/^GT-[A-Z0-9]{6}$/); pm.expect(i.accountCode).to.match(/^TK-[A-Z0-9]{6}$/); pm.expect(['IDENTITY_CARD','DRIVER_LICENSE']).to.include(i.documentType); pm.expect(Number.isFinite(Date.parse(i.submittedAt))).to.equal(true); } });",
+                  "pm.test('Queue is ordered by submission time then code', () => { const a=pm.response.json().data.items; for(let i=1;i<a.length;i++) { const x=Date.parse(a[i-1].submittedAt),y=Date.parse(a[i].submittedAt); pm.expect(x<y || (x===y && a[i-1].code<a[i].code)).to.equal(true); } });",
+                  "pm.test('Default limit', () => pm.expect(pm.response.json().data.items.length).to.be.at.most(20));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Pending queue (BRANCH_STAFF)",
+      "description": "BR-130/803: chạy cả 2 request, dùng token chỉ vai BRANCH_STAFF. Chọn Get new access token rồi Use Token tại Authorization của folder; giữ nguyên token. Không ghi dữ liệu hoặc mở ảnh.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Queue BRANCH_STAFF",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check BRANCH_STAFF identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130/803, api-guideline §8: 01 - Check BRANCH_STAFF identity. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('queueCheckedRole');",
+                  "pm.collectionVariables.unset('queueFirstCode');",
+                  "pm.collectionVariables.unset('queueSecondCode');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected role only', () => { const d=pm.response.json().data; pm.expect(d.roles).to.have.members(['BRANCH_STAFF']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('queueCheckedRole','BRANCH_STAFF'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Reject queue access by BRANCH_STAFF",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents",
+            "description": "BR-130/803, api-guideline §8: 02 - Reject queue access by BRANCH_STAFF. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='BRANCH_STAFF') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error code', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Pending queue (CUSTOMER)",
+      "description": "BR-130/803: chạy cả 2 request, dùng token chỉ vai CUSTOMER. Chọn Get new access token rồi Use Token tại Authorization của folder; giữ nguyên token. Không ghi dữ liệu hoặc mở ảnh.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Queue CUSTOMER",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check CUSTOMER identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-130/803, api-guideline §8: 01 - Check CUSTOMER identity. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.unset('queueCheckedRole');",
+                  "pm.collectionVariables.unset('queueFirstCode');",
+                  "pm.collectionVariables.unset('queueSecondCode');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected role only', () => { const d=pm.response.json().data; pm.expect(d.roles).to.have.members(['CUSTOMER']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.collectionVariables.set('queueCheckedRole','CUSTOMER'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Reject queue access by CUSTOMER",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents",
+            "description": "BR-130/803, api-guideline §8: 02 - Reject queue access by CUSTOMER. Chỉ dữ liệu local giả; giữ cùng token trong folder."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.collectionVariables.get('queueCheckedRole')!=='CUSTOMER') throw new Error('Run request 01 first and keep the same token throughout this folder.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Exact error code', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
