@@ -171,6 +171,43 @@ của Keycloak tạo trong **database `keycloak`**, không thuộc Flyway/backen
 restart không xoá user, không đặt lại mật khẩu và không áp lại nội dung JSON lên realm cũ.
 Nếu local đã có realm `car-rental` từ cấu hình khác, dừng để đối chiếu trước; **không xoá realm hoặc volume**.
 
+**Phiên đăng nhập local và Postman.** Realm local dùng phiên tối đa **30 ngày** và thời gian
+không hoạt động tối đa **30 ngày**. Access token chỉ **5 phút**; Postman dùng refresh token để lấy
+access token mới, không phải token vô thời hạn. Phiên client kế thừa realm (`clientSessionIdleTimeout=0`,
+`clientSessionMaxLifespan=0`); giữ xoay refresh token (`revokeRefreshToken=true`, `refreshTokenMaxReuse=0`).
+Refresh không vượt hạn 30 ngày tính từ lúc bắt đầu phiên; logout/thu hồi phiên cũng có thể làm token mất hiệu lực.
+Đây là cấu hình tiện kiểm thử với dữ liệu giả, **không mang sang môi trường thật**.
+
+Realm đã tồn tại cần áp một lần bằng quản trị hạ tầng ở
+`http://localhost:8080/admin/master/console/` → chọn **car-rental**:
+
+1. **Realm settings → Sessions:** SSO Session Idle và SSO Session Max đều **30 Days**.
+   Client Session Idle và Client Session Max để **0** (kế thừa realm). Save rồi tải lại để kiểm.
+2. **Realm settings → Tokens:** Access Token Lifespan **5 Minutes**. Giữ Revoke Refresh Token **On**,
+   Refresh Token Max Reuse **0**. Không đổi Implicit Flow, offline session hoặc phiên Remember Me.
+3. **Clients → admin-web/customer-web → Advanced:** không đặt timeout riêng ngắn hơn realm.
+   Export được commit không đặt override cho hai client này. Nếu local có override thì đối chiếu trước.
+4. Không cần restart hay xoá volume. Token đã hết hạn không sống lại: đăng nhập mới **một lần cho mỗi
+   tài khoản thử** sau khi áp cấu hình. Không xuất hoặc chia sẻ token.
+
+Trong Postman desktop, tại Authorization của folder, dùng OAuth 2.0 / Authorization Code with PKCE:
+
+- Đặt Token Name dễ nhận ra, ví dụ `LOCAL-CUSTOMER-A`, `LOCAL-ADMIN`, `LOCAL-VERIFIER`, `LOCAL-STAFF`;
+  nếu có hai CUSTOMER thì mỗi người một tên. Đăng nhập đúng người rồi **Use Token**.
+- Bật **Auto-refresh Token** (hoặc Auto-refresh access token). Trong Manage Tokens phải có refresh token;
+  nếu không có, lấy lại bằng luồng PKCE. Giữ token trong kho token của Postman, không copy sang Bearer
+  tĩnh, environment, collection hoặc file JSON. Tắt Share Token cho token thử cá nhân.
+- Khi chuyển folder, chọn token đã lưu đúng người và đúng client trong Current Token/Available Tokens;
+  không cần Get new access token mỗi lần. Token `customer-web` không dùng thay cho `admin-web` và ngược lại.
+- Khi gửi tay, Postman tự refresh trước request. Trước khi chạy Runner, có thể bấm **Refresh** để lấy
+  token mới mà không nhập lại mật khẩu/OTP; không giả định mọi chế độ Runner/CLI đều tự refresh.
+  Scheduled runs, monitors, Postman CLI và Newman không hỗ trợ auto-refresh như gửi tay.
+- Refresh token chỉ dùng một lần: không sao chép cùng refresh token sang nhiều công cụ chạy song song.
+  Nếu phiên hết hạn/đã bị thu hồi hoặc báo `invalid_grant`, lấy token mới bằng đăng nhập đầy đủ.
+
+Nguồn: [Postman OAuth refresh](https://learning.postman.com/docs/use/send-requests/authorization/oauth-20/#refreshing-an-oauth-20-token),
+[Keycloak session timeouts](https://www.keycloak.org/docs/latest/server_admin/index.html#_timeouts).
+
 **Chống đoán mật khẩu nhân viên (BR-809).** Realm mới import bật khoá tạm: 5 lần sai → 15 phút,
 mỗi nhóm 5 lần sai tăng thêm 15 phút, trần 1 giờ; không khoá vĩnh viễn. OTP vẫn dùng giới hạn riêng
 BR-129. Đăng nhập nhân viên thành công **đầy đủ mật khẩu + SMS** xoá bộ đếm; chỉ hết thời gian khoá
