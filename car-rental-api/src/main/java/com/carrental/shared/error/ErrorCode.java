@@ -18,6 +18,9 @@ public enum ErrorCode {
     /** BR-130: GT không tồn tại hoặc không thuộc caller đều trả 404, không tiết lộ chủ hồ sơ. */
     DOCUMENT_NOT_FOUND("Document not found."),
 
+    /** BR-130: bản nộp đã được xử lý hoặc bị thay; đọc lại thay vì tự thử lại quyết định. */
+    DOCUMENT_REVIEW_CONFLICT("The document has already been reviewed or superseded."),
+
     /** BR-130: ảnh vượt giới hạn byte trong cấu hình. */
     DOCUMENT_IMAGE_TOO_LARGE("The document image exceeds the size limit."),
 

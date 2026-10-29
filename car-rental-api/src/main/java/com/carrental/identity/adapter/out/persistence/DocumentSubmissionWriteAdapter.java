@@ -1,5 +1,6 @@
 package com.carrental.identity.adapter.out.persistence;
 
+import com.carrental.identity.application.command.RejectDocumentCommand;
 import com.carrental.identity.application.port.out.WriteDocumentSubmissionPort;
 import com.carrental.identity.domain.DocumentImage;
 import com.carrental.identity.domain.DocumentSubmission;
@@ -17,6 +18,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.sql.Types;
+import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.Objects;
 
@@ -31,6 +33,8 @@ class DocumentSubmissionWriteAdapter implements WriteDocumentSubmissionPort {
     private final String insertSql;
     private final String imageSql;
     private final String latestSql;
+    private final String lockReviewSql;
+    private final String rejectSql;
 
     /** Savepoint không tự mở giao dịch nghiệp vụ; service vẫn sở hữu commit/rollback cuối cùng. */
     DocumentSubmissionWriteAdapter(NamedParameterJdbcTemplate jdbc, SqlLoader loader,
@@ -44,6 +48,35 @@ class DocumentSubmissionWriteAdapter implements WriteDocumentSubmissionPort {
         insertSql = loader.load("sql/identity/insert_document_submission.sql");
         imageSql = loader.load("sql/identity/insert_document_image.sql");
         latestSql = loader.load("sql/identity/update_document_head_latest.sql");
+        lockReviewSql = loader.load("sql/identity/lock_document_head_for_review.sql");
+        rejectSql = loader.load("sql/identity/reject_pending_document.sql");
+    }
+
+    /** Cùng thứ tự head rồi submission với insert; không đụng ảnh, lịch sử hay active VERIFIED. */
+    @Override public void reject(RejectDocumentCommand command, String reviewerAccountCode, Instant reviewedAt) {
+        Objects.requireNonNull(command, "command must not be null.");
+        Objects.requireNonNull(reviewedAt, "reviewedAt must not be null.");
+        if (reviewerAccountCode == null || !reviewerAccountCode.matches("TK-[A-Z0-9]{6}")) {
+            throw new IllegalArgumentException("A valid reviewer account code is required.");
+        }
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Document review requires a caller transaction.");
+        }
+        nested.executeWithoutResult(status -> {
+            var values = new MapSqlParameterSource()
+                    .addValue("code", command.code(), Types.VARCHAR)
+                    .addValue("reviewerAccountCode", reviewerAccountCode, Types.VARCHAR)
+                    .addValue("reviewedAt", reviewedAt.atOffset(ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE)
+                    .addValue("rejectionCode", command.rejectionCode().name(), Types.VARCHAR)
+                    .addValue("rejectionNote", command.rejectionNote(), Types.VARCHAR);
+            var heads = SensitiveSql.execute(() -> jdbc.queryForList(lockReviewSql, values, Long.class));
+            if (heads.isEmpty()) throw DomainException.notFound(ErrorCode.DOCUMENT_NOT_FOUND);
+            if (heads.size() != 1) throw new IllegalStateException("Expected one document head.");
+            // Câu lệnh mới sau khi lấy khoá đọc trạng thái đã commit của bên thắng ở READ COMMITTED.
+            int changed = SensitiveSql.execute(() -> jdbc.update(rejectSql, values));
+            if (changed == 0) throw DomainException.conflict(ErrorCode.DOCUMENT_REVIEW_CONFLICT);
+            requireOne(changed);
+        });
     }
 
     /** Trùng GT hoàn tác cả bước thay PENDING; lỗi ảnh/SQL cũng không để lại bản nộp dở dang. */

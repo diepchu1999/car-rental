@@ -1,8 +1,11 @@
 package com.carrental.identity.application.port.out;
 
 import com.carrental.identity.domain.DocumentSubmission;
+import com.carrental.identity.application.command.RejectDocumentCommand;
 
-/** BR-130: ghi một phiên bản giấy tờ cùng hai ảnh, không thay phiên bản VERIFIED đang dùng. */
+import java.time.Instant;
+
+/** BR-130: ghi bản nộp và quyết định từ chối; cả hai thao tác giữ phiên bản VERIFIED đang dùng. */
 public interface WriteDocumentSubmissionPort {
     /**
      * Bắt buộc nằm trong transaction của use case. Khoá head theo chủ/loại, thay PENDING cũ thành
@@ -11,4 +14,12 @@ public interface WriteDocumentSubmissionPort {
      * Một AN đã dùng trả DOCUMENT_UPLOAD_ALREADY_USED, không coi là trùng GT để thử mã khác.
      */
     boolean insert(DocumentSubmission submission);
+
+    /**
+     * BR-130: từ chối latest còn PENDING trong transaction của use case; khoá cùng head với nộp lại.
+     * Giữ nguyên active VERIFIED. Không có hồ sơ trả DOCUMENT_NOT_FOUND; đã xử lý/bị thay trả
+     * DOCUMENT_REVIEW_CONFLICT, không thử lại. Người duyệt và thời điểm phải do use case cung cấp.
+     * Adapter hoàn tác savepoint khi lỗi; use case chịu trách nhiệm kiểm vai trước khi gọi port.
+     */
+    void reject(RejectDocumentCommand command, String reviewerAccountCode, Instant reviewedAt);
 }
