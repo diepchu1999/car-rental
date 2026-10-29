@@ -4,6 +4,7 @@ import com.carrental.identity.application.view.DocumentSubmissionDetail;
 import com.carrental.identity.application.view.DocumentStatusDetail;
 import com.carrental.identity.application.view.DocumentHeadSummary;
 import com.carrental.identity.application.view.DocumentReviewDetail;
+import com.carrental.identity.application.view.PendingDocumentListItem;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,4 +29,11 @@ public interface ReadDocumentSubmissionPort {
      * Không giải mã, không ký URL; mã không tồn tại trả rỗng, dữ liệu hỏng phải ném lỗi nội bộ.
      */
     Optional<DocumentReviewDetail> findForReviewByCode(String code);
+
+    /**
+     * Chỉ PENDING, thứ tự submittedAt tăng dần rồi mã GT theo ASCII; không lọc theo chủ hoặc chi nhánh.
+     * Use case kiểm quyền trước; fetchLimit gồm tối đa một hàng thăm dò để tính hasMore (1..101), offset >= 0.
+     * Chỉ đọc metadata, không lấy số/nhân thân/key ảnh hoặc ghi audit mở hồ sơ.
+     */
+    List<PendingDocumentListItem> searchPending(int fetchLimit, long offset);
 }

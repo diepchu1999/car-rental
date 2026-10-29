@@ -5,6 +5,7 @@ import com.carrental.identity.application.view.DocumentSubmissionDetail;
 import com.carrental.identity.application.view.DocumentStatusDetail;
 import com.carrental.identity.application.view.DocumentHeadSummary;
 import com.carrental.identity.application.view.DocumentReviewDetail;
+import com.carrental.identity.application.view.PendingDocumentListItem;
 import com.carrental.identity.domain.DocumentImage;
 import com.carrental.identity.domain.DocumentSide;
 import com.carrental.identity.domain.ProtectedDocumentNumber;
@@ -32,6 +33,7 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
     private final String statusSql;
     private final String headsSql;
     private final String reviewSql;
+    private final String pendingSql;
 
     /** Nạp SQL cố định, không nối input thành câu truy vấn. */
     DocumentSubmissionReadAdapter(NamedParameterJdbcTemplate jdbc, SqlLoader loader) {
@@ -40,6 +42,7 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
         statusSql = loader.load("sql/identity/find_document_status_by_code_and_owner.sql");
         headsSql = loader.load("sql/identity/list_document_heads_by_owner.sql");
         reviewSql = loader.load("sql/identity/find_document_submission_for_review.sql");
+        pendingSql = loader.load("sql/identity/search_pending_documents.sql");
     }
 
     /** Không SELECT số đã mã hoá hoặc key ảnh khi chỉ cần trạng thái của bản nộp. */
@@ -76,6 +79,18 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
                         row.getString("full_name"), row.getObject("birth_date", LocalDate.class),
                         row.getString("license_class"), row.getObject("automatic_only", Boolean.class),
                         image(row, "front_", DocumentSide.FRONT), image(row, "back_", DocumentSide.BACK)))));
+    }
+
+    /** Giới hạn ngay tại PostgreSQL; SELECT chỉ bốn trường metadata, SensitiveSql che cả tham số và lỗi JDBC. */
+    @Override public List<PendingDocumentListItem> searchPending(int fetchLimit, long offset) {
+        if (fetchLimit < 1 || fetchLimit > 101 || offset < 0) {
+            throw new IllegalArgumentException("Invalid pending document page bounds.");
+        }
+        return SensitiveSql.execute(() -> List.copyOf(jdbc.query(pendingSql,
+                Map.of("fetchLimit", fetchLimit, "offset", offset),
+                (row, ignored) -> new PendingDocumentListItem(row.getString("code"), row.getString("account_code"),
+                        DocumentType.valueOf(row.getString("document_type")),
+                        row.getObject("submitted_at", OffsetDateTime.class).toInstant()))));
     }
 
     /** Prefix do adapter chọn; LEFT JOIN giữ hàng lỗi để thiếu ảnh không bị hiểu nhầm thành không tồn tại. */
