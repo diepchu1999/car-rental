@@ -50,6 +50,27 @@ car-rental:
       upload-lifetime: ${CAR_RENTAL_DOCUMENT_UPLOAD_LIFETIME:PT5M}
       view-lifetime: ${CAR_RENTAL_DOCUMENT_VIEW_LIFETIME:PT60S}
   identity:
+    # BR-128: bảng khởi điểm local, hợp nhất các hạng cũ/mới có cùng mã và cùng phạm vi số chỗ.
+    # Chưa phải dữ liệu được xác nhận để chạy khách thật; đổi YAML cần build/restart (ADR-0013).
+    license-classes:
+      - code: B
+        seats: [4, 5, 7]
+      - code: B1
+        seats: [4, 5, 7]
+      - code: B2
+        seats: [4, 5, 7]
+      - code: C1
+        seats: [4, 5, 7]
+      - code: C
+        seats: [4, 5, 7]
+      - code: D1
+        seats: [4, 5, 7, 16]
+      - code: D2
+        seats: [4, 5, 7, 16]
+      - code: D
+        seats: [4, 5, 7, 16]
+      - code: E
+        seats: [4, 5, 7, 16]
     documents:
       crypto:
         # BR-130: hai khoá độc lập, không có mặc định; giữ nguyên qua restart.

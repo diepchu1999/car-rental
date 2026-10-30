@@ -95,6 +95,13 @@ Giữ nguyên và sao lưu an toàn cặp khoá cùng phiên bản qua restart: 
 bản mã cũ hoặc đối chiếu hash cũ. Chưa hỗ trợ xoay vòng khoá; không tự tăng phiên bản để thử.
 Không gửi khoá vào chat, log hay commit. Test dùng khoá giả riêng, không đọc khoá trong `.env`.
 
+**Bảng hạng GPLX (BR-128):** khai báo tại `car-rental.identity.license-classes` trong
+`car-rental-api/src/main/resources/application.yml`. Mỗi hàng gồm `code` và danh sách `seats`;
+bảng thiếu, hàng trùng, số chỗ không dương hoặc dữ liệu sai làm backend không khởi động.
+Bảng hiện là nguồn local theo ADR-0013, chưa có lịch sử hiệu lực; đổi YAML trong JAR cần build và
+khởi động lại. Trước khi dùng với khách thật phải xác nhận bảng với người hiểu luật và chuyển nguồn
+sang module config. Cờ `automatic_only` thuộc từng GPLX, không suy ra chỉ từ tên hạng.
+
 ### 2. Khởi động hạ tầng
 
 **Build provider trước khi chạy Keycloak** (bytecode Java 21, dùng được JDK 25 ở trên):
