@@ -11,6 +11,12 @@ import java.util.Optional;
 
 /** Cổng đọc bản nộp BR-130; tách rõ đường đúng chủ và đường phục vụ use case xác minh có kiểm quyền. */
 public interface ReadDocumentSubmissionPort {
+    /**
+     * Đọc lại kết quả sau quyết định của use case đã kiểm quyền ADMIN/DOCUMENT_VERIFIER.
+     * Chỉ metadata trạng thái, không đọc số/nhân thân/ảnh; không phải thao tác mở view-session.
+     */
+    Optional<DocumentStatusDetail> findStatusForReviewByCode(String code);
+
     /** Chủ lấy từ caller; mã không tồn tại hoặc khác chủ đều trả rỗng, không giải mã số hay ký URL. */
     Optional<DocumentSubmissionDetail> findByCodeAndOwner(String code, String accountCode);
 

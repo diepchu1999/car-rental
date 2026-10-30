@@ -34,6 +34,7 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
     private final String headsSql;
     private final String reviewSql;
     private final String pendingSql;
+    private final String reviewStatusSql;
 
     /** Nạp SQL cố định, không nối input thành câu truy vấn. */
     DocumentSubmissionReadAdapter(NamedParameterJdbcTemplate jdbc, SqlLoader loader) {
@@ -43,6 +44,13 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
         headsSql = loader.load("sql/identity/list_document_heads_by_owner.sql");
         reviewSql = loader.load("sql/identity/find_document_submission_for_review.sql");
         pendingSql = loader.load("sql/identity/search_pending_documents.sql");
+        reviewStatusSql = loader.load("sql/identity/find_document_status_for_review.sql");
+    }
+
+    /** Reload quyết định đúng GT; SensitiveSql che cả ghi chú tự do khi JDBC ghi log hoặc ném lỗi. */
+    @Override public Optional<DocumentStatusDetail> findStatusForReviewByCode(String code) {
+        return SensitiveSql.execute(() -> DataAccessUtils.optionalResult(jdbc.query(reviewStatusSql,
+                Map.of("code", code), (row, ignored) -> status(row, ""))));
     }
 
     /** Không SELECT số đã mã hoá hoặc key ảnh khi chỉ cần trạng thái của bản nộp. */
