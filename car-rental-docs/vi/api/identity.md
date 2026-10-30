@@ -16,6 +16,9 @@ Khách có thể xin URL tải từng mặt ảnh, nộp hồ sơ và đọc tr�
 | GET | `/api/v1/client/documents` | JWT khách hợp lệ có vai `CUSTOMER`, đã đồng ý điều khoản | 200 |
 | GET | `/api/v1/client/documents/{documentCode}` | Như trên, chỉ hồ sơ của chính người gọi | 200 |
 | POST | `/api/v1/admin/documents/{documentCode}/view-sessions` | JWT `admin-web`, vai `DOCUMENT_VERIFIER` hoặc `ADMIN` | 201 |
+| GET | `/api/v1/admin/documents` | JWT `admin-web`, vai `DOCUMENT_VERIFIER` hoặc `ADMIN` | 200 |
+| POST | `/api/v1/admin/documents/{documentCode}/verify` | Như trên | 200 |
+| POST | `/api/v1/admin/documents/{documentCode}/reject` | Như trên | 200 |
 
 Nhân viên chưa được gán chi nhánh vẫn đọc được `/admin/accounts/me` để lấy mã `TK-<6>`
 cung cấp cho ADMIN. Điều này **không** cấp quyền thao tác xe hoặc chi nhánh (BR-803/810).
@@ -565,3 +568,94 @@ Cần ít nhất hai hồ sơ PENDING để kiểm hai trang: nếu chưa có, d
 Trong lúc kiểm phân trang, không nộp/duyệt hồ sơ khác làm đổi thứ tự hàng chờ.
 Collection tự truyền mã GT giữa các request, không cần copy. Tất cả `pm.test` phải xanh, kể cả
 các HTTP 400/401/403 có chủ đích. Các folder chỉ đọc, chạy lại được nhiều lần và không lấy ảnh.
+
+## Xác minh hoặc từ chối giấy tờ — BR-130
+
+- `POST /api/v1/admin/documents/{documentCode}/verify`
+- `POST /api/v1/admin/documents/{documentCode}/reject`
+
+Cần JWT `admin-web` của `DOCUMENT_VERIFIER` hoặc `ADMIN`, không cần chi nhánh. Khách và nhân viên
+chi nhánh không có quyền. `documentCode` phải là `GT-<6>`. Người duyệt lấy từ tài khoản hiện tại,
+thời điểm lấy từ đồng hồ server; client không được tự khai hai giá trị này hoặc chủ/trạng thái hồ sơ.
+
+Trước khi ra quyết định, nhân viên dùng API `view-sessions` để đối chiếu thông tin và ảnh; mỗi lần mở
+được audit theo hợp đồng ở trên. Hai API quyết định chỉ ghi quyết định và đọc lại metadata, không mở
+ảnh, không giải mã số và không tạo thêm audit lượt xem. Việc đã mở không phải điều kiện kỹ thuật để
+POST quyết định — BR-130 không quy định phải có một view-session trước đó.
+
+`verify` không có body hoặc gửi `{}`. `reject` cần `Content-Type: application/json` và body:
+
+```json
+{
+  "rejectionCode": "ILLEGIBLE",
+  "rejectionNote": "Local fake review note"
+}
+```
+
+`rejectionCode` bắt buộc, phân biệt hoa thường, chỉ nhận `ILLEGIBLE`, `MISSING_SIDE`, `DATA_MISMATCH`,
+`EXPIRED`, `HOLDER_MISMATCH`, `SUSPECTED_FORGERY`. `rejectionNote` có thể bỏ qua hoặc null; nếu có thì
+không được chỉ gồm khoảng trắng, chứa NUL hoặc Unicode hỏng. Ghi chú giữ nguyên nội dung, kể cả xuống
+dòng. Trường JSON ngoài hợp đồng ở cả hai API bị từ chối `400 INVALID_REQUEST`, không âm thầm bỏ qua.
+
+Cả hai trả **200**, `Cache-Control: no-store`, `X-Request-Id`, envelope không đổi. Ví dụ xác minh:
+
+```json
+{
+  "success": true,
+  "data": {
+    "code": "GT-SAMPLE",
+    "documentType": "IDENTITY_CARD",
+    "status": "VERIFIED",
+    "expiresOn": "2035-01-01",
+    "submittedAt": "2026-10-30T03:00:00Z",
+    "reviewedAt": "2026-10-30T03:05:00Z",
+    "rejectionCode": null,
+    "rejectionNote": null
+  },
+  "error": null
+}
+```
+
+Từ chối có cùng tám trường, `status: REJECTED`, lý do/ghi chú đúng nội dung đã lưu. Response không
+chứa ID số, số giấy tờ, họ tên, ngày sinh, hash/phong bì mã hoá, reviewer nội bộ hay liên kết ảnh.
+Chỉ trả kết quả sau khi transaction quyết định đã commit; lỗi đọc lại sẽ rollback toàn bộ quyết định.
+
+Chỉ bản `PENDING` mới nhất được xử lý. Xác minh đổi con trỏ active sang bản mới; từ chối giữ nguyên
+bản VERIFIED cũ. Lịch sử bản cũ không bị sửa thành quyết định mới. Bản đang chờ không thay thế bản
+đang dùng. CCCD chỉ đăng ký chủ ở bước xác minh, GPLX không chịu ràng buộc một chủ của CCCD.
+
+| HTTP | Mã lỗi | Khi nào |
+|---|---|---|
+| 400 | `INVALID_REQUEST` | Mã GT/body/lý do/ghi chú sai, có trường ngoài hợp đồng |
+| 401 | `UNAUTHENTICATED` | Thiếu hoặc sai JWT |
+| 403 | `ACCESS_DENIED` | Sai audience hoặc không có quyền xác minh |
+| 404 | `DOCUMENT_NOT_FOUND` | Không tồn tại mã GT hợp lệ |
+| 409 | `DOCUMENT_REVIEW_CONFLICT` | Bản không còn là PENDING mới nhất; quyết định lặp hoặc thua cuộc đua |
+| 409 | `IDENTITY_CARD_ALREADY_REGISTERED` | Số CCCD đã xác minh cho tài khoản khác |
+| 500 | `INTERNAL_ERROR` | Lỗi nội bộ; response không lộ SQL, tên lớp hoặc stack trace |
+
+### Chạy luồng quyết định bằng Postman
+
+Import lại `postman/task-08b-documents.postman_collection.json`, chọn environment local, khởi động
+backend và MinIO. Working directory của Postman là thư mục gốc repo để đọc ảnh fixture giả. Mỗi thư
+mục chạy cả lượt bằng Runner, **1 iteration**, cùng token từ request kiểm danh tính tới cuối lượt:
+
+| Thứ tự | Thư mục | Số request | Kết quả chính |
+|---|---|---|---|
+| 1 | `Part 3 - Review setup (CUSTOMER)` | 11 | Tải ảnh giả và nộp CCCD/GPLX PENDING mới |
+| 2 | `Part 3 - Reject review access (BRANCH_STAFF)` | 3 | Cả xác minh và từ chối đều 403 |
+| 3 | `Part 3 - Review decisions (DOCUMENT_VERIFIER)` | 11 | Input sai 400/404; CCCD VERIFIED, GPLX REJECTED; lặp 409 |
+| 4 | `Part 3 - Read review results (CUSTOMER)` | 3 | Chủ đọc đúng hai kết quả |
+| 5 | `Part 3 - Resubmit rejected license (CUSTOMER)` | 6 | Tải ảnh mới và nộp GPLX mới PENDING |
+| 6 | `Part 3 - Review resubmission (ADMIN)` | 3 | Xác minh GPLX mới; không được ghi đè quyết định |
+| 7 | `Part 3 - Read final review (CUSTOMER)` | 4 | GPLX cũ vẫn REJECTED, GPLX mới và CCCD VERIFIED |
+
+Các thư mục CUSTOMER dùng **cùng tài khoản** ở bước 1; mỗi vai nhân viên dùng tài khoản chỉ có đúng
+vai ghi trong tên thư mục. Request đầu kiểm vai/chủ trước khi các request còn lại chạy. Các mã GT
+được truyền tự động bằng biến collection; số giấy tờ giả và URL upload chỉ tồn tại trong lượt Runner.
+Không lưu token/URL ký vào environment hay export. Chỉ dùng dữ liệu local giả.
+
+Muốn chạy lại: bắt đầu từ thư mục 1, rồi chạy đủ thứ tự 1–7. Lượt mới tự tạo số giả, AN và GT mới;
+không cần xoá dữ liệu. Chạy riêng lại quyết định đã thành công sẽ trả 409 đúng hợp đồng, không phải
+một lượt kiểm lại đường thành công. Các test PostgreSQL/HTTP riêng kiểm thêm tranh quyết định, CCCD
+trùng chủ và rollback lỗi nội bộ; collection không sửa CSDL để giả lập các lỗi này.

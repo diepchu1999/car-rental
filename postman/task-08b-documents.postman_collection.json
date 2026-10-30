@@ -6120,6 +6120,2874 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Part 3 - Review setup (CUSTOMER)",
+      "description": "BR-130. Chạy cả thư mục bằng Runner, 1 iteration, đúng thứ tự; giữ cùng token trong suốt lượt chạy. Dùng cùng CUSTOMER của Review setup. Muốn lặp toàn bộ kịch bản, bắt đầu lại Review setup để tạo GT/AN/số giả mới. Không lưu bearer hoặc URL ký vào collection/environment.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Review CUSTOMER",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check CUSTOMER identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-130: Check CUSTOMER identity. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('reviewRoleChecked');",
+                  "['reviewOwnerCode','reviewCardCode','reviewLicenseCode','reviewReplacementCode'].forEach(k => pm.collectionVariables.unset(k));",
+                  "['reviewNumber','reviewCardFrontCode','reviewCardBackCode','reviewDriverFrontCode','reviewDriverBackCode','reviewCardFrontUrl','reviewCardBackUrl','reviewDriverFrontUrl','reviewDriverBackUrl'].forEach(k => pm.variables.unset(k));",
+                  "pm.variables.set('reviewNumber', 'LOCAL-TEST-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact role and account', () => { const d = pm.response.json().data; pm.expect(d.roles).to.have.members(['CUSTOMER']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.expect(Boolean(d.termsVersion)).to.equal(true); });",
+                  "const d = pm.response.code === 200 ? pm.response.json().data : null; const correct = d && Array.isArray(d.roles) && d.roles.length === 1 && d.roles[0] === 'CUSTOMER' && Boolean(d.termsVersion);",
+                  "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong identity. Select the expected token and run this folder again.'); }",
+                  "pm.variables.set('reviewRoleChecked', true);",
+                  "pm.collectionVariables.set('reviewOwnerCode', d.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Create reviewCardFront upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: AN mới cho đúng loại/mặt; URL chỉ ở biến local của Runner, không lưu vào environment/collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\",\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload metadata', () => { const d = pm.response.json().data; pm.expect(/^AN-[A-Z0-9]{6}$/.test(d.code)).to.equal(true); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.side).to.equal('FRONT'); pm.expect(typeof d.uploadUrl === 'string' && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl)).to.equal(true); });",
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.variables.set('reviewCardFrontCode', d.code); pm.variables.set('reviewCardFrontUrl', d.uploadUrl); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - PUT reviewCardFront fixture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/octet-stream"
+              }
+            ],
+            "url": "{{reviewCardFrontUrl}}",
+            "description": "BR-130: PUT binary bằng URL ký, không gửi bearer token. Body file lấy tương đối từ working directory repo; MIME khai không quyết định nội dung hợp lệ.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "postman/fixtures/documents/local-front.png"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewCardFrontUrl')) throw new Error('Run this entire folder from request 01. The upload URL is run-local.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MinIO accepts fixture bytes', () => pm.response.to.have.status(200));",
+                  "pm.variables.unset('reviewCardFrontUrl');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Create reviewCardBack upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: AN mới cho đúng loại/mặt; URL chỉ ở biến local của Runner, không lưu vào environment/collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\",\n  \"side\": \"BACK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload metadata', () => { const d = pm.response.json().data; pm.expect(/^AN-[A-Z0-9]{6}$/.test(d.code)).to.equal(true); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.side).to.equal('BACK'); pm.expect(typeof d.uploadUrl === 'string' && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl)).to.equal(true); });",
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.variables.set('reviewCardBackCode', d.code); pm.variables.set('reviewCardBackUrl', d.uploadUrl); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - PUT reviewCardBack fixture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/octet-stream"
+              }
+            ],
+            "url": "{{reviewCardBackUrl}}",
+            "description": "BR-130: PUT binary bằng URL ký, không gửi bearer token. Body file lấy tương đối từ working directory repo; MIME khai không quyết định nội dung hợp lệ.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "postman/fixtures/documents/local-back.png"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewCardBackUrl')) throw new Error('Run this entire folder from request 01. The upload URL is run-local.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MinIO accepts fixture bytes', () => pm.response.to.have.status(200));",
+                  "pm.variables.unset('reviewCardBackUrl');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Submit IDENTITY_CARD",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-120/130: nộp của chính CUSTOMER; kiểm đúng HTTP/mã lỗi. AN được truyền tự động từ request tạo lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"IDENTITY_CARD\",\n  \"number\": \"{{reviewNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{reviewCardFrontCode}}\",\n  \"backUploadCode\": \"{{reviewCardBackCode}}\",\n  \"fullName\": \"LOCAL FAKE DOCUMENT\",\n  \"birthDate\": \"1990-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewNumber')) throw new Error('Run this entire folder from request 01.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('IDENTITY_CARD'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('reviewCardCode', pm.response.json().data.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Create reviewDriverFront upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: AN mới cho đúng loại/mặt; URL chỉ ở biến local của Runner, không lưu vào environment/collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload metadata', () => { const d = pm.response.json().data; pm.expect(/^AN-[A-Z0-9]{6}$/.test(d.code)).to.equal(true); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.side).to.equal('FRONT'); pm.expect(typeof d.uploadUrl === 'string' && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl)).to.equal(true); });",
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.variables.set('reviewDriverFrontCode', d.code); pm.variables.set('reviewDriverFrontUrl', d.uploadUrl); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - PUT reviewDriverFront fixture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/octet-stream"
+              }
+            ],
+            "url": "{{reviewDriverFrontUrl}}",
+            "description": "BR-130: PUT binary bằng URL ký, không gửi bearer token. Body file lấy tương đối từ working directory repo; MIME khai không quyết định nội dung hợp lệ.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "postman/fixtures/documents/local-front.png"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewDriverFrontUrl')) throw new Error('Run this entire folder from request 01. The upload URL is run-local.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MinIO accepts fixture bytes', () => pm.response.to.have.status(200));",
+                  "pm.variables.unset('reviewDriverFrontUrl');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Create reviewDriverBack upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: AN mới cho đúng loại/mặt; URL chỉ ở biến local của Runner, không lưu vào environment/collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"side\": \"BACK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload metadata', () => { const d = pm.response.json().data; pm.expect(/^AN-[A-Z0-9]{6}$/.test(d.code)).to.equal(true); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.side).to.equal('BACK'); pm.expect(typeof d.uploadUrl === 'string' && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl)).to.equal(true); });",
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.variables.set('reviewDriverBackCode', d.code); pm.variables.set('reviewDriverBackUrl', d.uploadUrl); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - PUT reviewDriverBack fixture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/octet-stream"
+              }
+            ],
+            "url": "{{reviewDriverBackUrl}}",
+            "description": "BR-130: PUT binary bằng URL ký, không gửi bearer token. Body file lấy tương đối từ working directory repo; MIME khai không quyết định nội dung hợp lệ.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "postman/fixtures/documents/local-back.png"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewDriverBackUrl')) throw new Error('Run this entire folder from request 01. The upload URL is run-local.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MinIO accepts fixture bytes', () => pm.response.to.have.status(200));",
+                  "pm.variables.unset('reviewDriverBackUrl');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - Submit DRIVER_LICENSE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-120/130: nộp của chính CUSTOMER; kiểm đúng HTTP/mã lỗi. AN được truyền tự động từ request tạo lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{reviewNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{reviewDriverFrontCode}}\",\n  \"backUploadCode\": \"{{reviewDriverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewNumber')) throw new Error('Run this entire folder from request 01.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('reviewLicenseCode', pm.response.json().data.code);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Reject review access (BRANCH_STAFF)",
+      "description": "BR-130. Chạy cả thư mục bằng Runner, 1 iteration, đúng thứ tự; giữ cùng token trong suốt lượt chạy. Muốn lặp toàn bộ kịch bản, bắt đầu lại Review setup để tạo GT/AN/số giả mới. Không lưu bearer hoặc URL ký vào collection/environment.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Review BRANCH_STAFF",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check BRANCH_STAFF identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130: Check BRANCH_STAFF identity. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('reviewRoleChecked');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact role and account', () => { const d = pm.response.json().data; pm.expect(d.roles).to.have.members(['BRANCH_STAFF']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); });",
+                  "const d = pm.response.code === 200 ? pm.response.json().data : null; const correct = d && Array.isArray(d.roles) && d.roles.length === 1 && d.roles[0] === 'BRANCH_STAFF';",
+                  "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong identity. Select the expected token and run this folder again.'); }",
+                  "pm.variables.set('reviewRoleChecked', true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Reject staff verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewCardCode}}/verify",
+            "description": "BR-130: Reject staff verification. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewCardCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Reject staff rejection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewLicenseCode}}/reject",
+            "description": "BR-130: Reject staff rejection. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionCode\": \"ILLEGIBLE\",\n  \"rejectionNote\": \"Local fake review note\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewLicenseCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Review decisions (DOCUMENT_VERIFIER)",
+      "description": "BR-130. Chạy cả thư mục bằng Runner, 1 iteration, đúng thứ tự; giữ cùng token trong suốt lượt chạy. Muốn lặp toàn bộ kịch bản, bắt đầu lại Review setup để tạo GT/AN/số giả mới. Không lưu bearer hoặc URL ký vào collection/environment.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Review DOCUMENT_VERIFIER",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check DOCUMENT_VERIFIER identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130: Check DOCUMENT_VERIFIER identity. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('reviewRoleChecked');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact role and account', () => { const d = pm.response.json().data; pm.expect(d.roles).to.have.members(['DOCUMENT_VERIFIER']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); });",
+                  "const d = pm.response.code === 200 ? pm.response.json().data : null; const correct = d && Array.isArray(d.roles) && d.roles.length === 1 && d.roles[0] === 'DOCUMENT_VERIFIER';",
+                  "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong identity. Select the expected token and run this folder again.'); }",
+                  "pm.variables.set('reviewRoleChecked', true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Reject invalid document code",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/invalid/verify",
+            "description": "BR-130: Reject invalid document code. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Reject unknown document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/GT-NONE00/verify",
+            "description": "BR-130: Reject unknown document. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('DOCUMENT_NOT_FOUND'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Reject forged reviewer",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewCardCode}}/verify",
+            "description": "BR-130: Reject forged reviewer. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reviewerAccountCode\": \"TK-FAKE01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewCardCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - Reject missing rejection reason",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewLicenseCode}}/reject",
+            "description": "BR-130: Reject missing rejection reason. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewLicenseCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Reject unsupported rejection reason",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewLicenseCode}}/reject",
+            "description": "BR-130: Reject unsupported rejection reason. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionCode\": \"UNKNOWN\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewLicenseCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Verify identity card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewCardCode}}/verify",
+            "description": "BR-130: Verify identity card. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewCardCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Reject repeated verification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewCardCode}}/verify",
+            "description": "BR-130: Reject repeated verification. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewCardCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('DOCUMENT_REVIEW_CONFLICT'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Reject overwriting verified card",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewCardCode}}/reject",
+            "description": "BR-130: Reject overwriting verified card. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionCode\": \"ILLEGIBLE\",\n  \"rejectionNote\": \"Local fake review note\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewCardCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('DOCUMENT_REVIEW_CONFLICT'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - Reject driver license",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewLicenseCode}}/reject",
+            "description": "BR-130: Reject driver license. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionCode\": \"ILLEGIBLE\",\n  \"rejectionNote\": \"Local fake review note\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewLicenseCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('REJECTED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(\"ILLEGIBLE\"); pm.expect(d.rejectionNote).to.equal(\"Local fake review note\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - Reject repeated rejection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewLicenseCode}}/reject",
+            "description": "BR-130: Reject repeated rejection. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionCode\": \"ILLEGIBLE\",\n  \"rejectionNote\": \"Local fake review note\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewLicenseCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('DOCUMENT_REVIEW_CONFLICT'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Read review results (CUSTOMER)",
+      "description": "BR-130. Chạy cả thư mục bằng Runner, 1 iteration, đúng thứ tự; giữ cùng token trong suốt lượt chạy. Dùng cùng CUSTOMER của Review setup. Muốn lặp toàn bộ kịch bản, bắt đầu lại Review setup để tạo GT/AN/số giả mới. Không lưu bearer hoặc URL ký vào collection/environment.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Review CUSTOMER",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check CUSTOMER identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-130: Check CUSTOMER identity. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('reviewRoleChecked');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact role and account', () => { const d = pm.response.json().data; pm.expect(d.roles).to.have.members(['CUSTOMER']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.expect(Boolean(d.termsVersion)).to.equal(true); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewOwnerCode')); });",
+                  "const d = pm.response.code === 200 ? pm.response.json().data : null; const correct = d && Array.isArray(d.roles) && d.roles.length === 1 && d.roles[0] === 'CUSTOMER' && Boolean(d.termsVersion) && d.code === pm.collectionVariables.get('reviewOwnerCode');",
+                  "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong identity. Select the expected token and run this folder again.'); }",
+                  "pm.variables.set('reviewRoleChecked', true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Read verified card",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{reviewCardCode}}",
+            "description": "BR-130: Read verified card. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewCardCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Read rejected license",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{reviewLicenseCode}}",
+            "description": "BR-130: Read rejected license. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewLicenseCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('REJECTED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(\"ILLEGIBLE\"); pm.expect(d.rejectionNote).to.equal(\"Local fake review note\"); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Resubmit rejected license (CUSTOMER)",
+      "description": "BR-130. Chạy cả thư mục bằng Runner, 1 iteration, đúng thứ tự; giữ cùng token trong suốt lượt chạy. Dùng cùng CUSTOMER của Review setup. Muốn lặp toàn bộ kịch bản, bắt đầu lại Review setup để tạo GT/AN/số giả mới. Không lưu bearer hoặc URL ký vào collection/environment.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Review CUSTOMER",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check CUSTOMER identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-130: Check CUSTOMER identity. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('reviewRoleChecked');",
+                  "pm.collectionVariables.unset('reviewReplacementCode');",
+                  "['reviewDriverFrontCode','reviewDriverBackCode','reviewDriverFrontUrl','reviewDriverBackUrl'].forEach(k => pm.variables.unset(k));",
+                  "pm.variables.set('reviewNumber', 'LOCAL-TEST-' + pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact role and account', () => { const d = pm.response.json().data; pm.expect(d.roles).to.have.members(['CUSTOMER']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.expect(Boolean(d.termsVersion)).to.equal(true); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewOwnerCode')); });",
+                  "const d = pm.response.code === 200 ? pm.response.json().data : null; const correct = d && Array.isArray(d.roles) && d.roles.length === 1 && d.roles[0] === 'CUSTOMER' && Boolean(d.termsVersion) && d.code === pm.collectionVariables.get('reviewOwnerCode');",
+                  "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong identity. Select the expected token and run this folder again.'); }",
+                  "pm.variables.set('reviewRoleChecked', true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Create reviewDriverFront upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: AN mới cho đúng loại/mặt; URL chỉ ở biến local của Runner, không lưu vào environment/collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload metadata', () => { const d = pm.response.json().data; pm.expect(/^AN-[A-Z0-9]{6}$/.test(d.code)).to.equal(true); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.side).to.equal('FRONT'); pm.expect(typeof d.uploadUrl === 'string' && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl)).to.equal(true); });",
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.variables.set('reviewDriverFrontCode', d.code); pm.variables.set('reviewDriverFrontUrl', d.uploadUrl); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - PUT reviewDriverFront fixture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/octet-stream"
+              }
+            ],
+            "url": "{{reviewDriverFrontUrl}}",
+            "description": "BR-130: PUT binary bằng URL ký, không gửi bearer token. Body file lấy tương đối từ working directory repo; MIME khai không quyết định nội dung hợp lệ.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "postman/fixtures/documents/local-front.png"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewDriverFrontUrl')) throw new Error('Run this entire folder from request 01. The upload URL is run-local.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MinIO accepts fixture bytes', () => pm.response.to.have.status(200));",
+                  "pm.variables.unset('reviewDriverFrontUrl');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Create reviewDriverBack upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: AN mới cho đúng loại/mặt; URL chỉ ở biến local của Runner, không lưu vào environment/collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"side\": \"BACK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload metadata', () => { const d = pm.response.json().data; pm.expect(/^AN-[A-Z0-9]{6}$/.test(d.code)).to.equal(true); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.side).to.equal('BACK'); pm.expect(typeof d.uploadUrl === 'string' && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl)).to.equal(true); });",
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.variables.set('reviewDriverBackCode', d.code); pm.variables.set('reviewDriverBackUrl', d.uploadUrl); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - PUT reviewDriverBack fixture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/octet-stream"
+              }
+            ],
+            "url": "{{reviewDriverBackUrl}}",
+            "description": "BR-130: PUT binary bằng URL ký, không gửi bearer token. Body file lấy tương đối từ working directory repo; MIME khai không quyết định nội dung hợp lệ.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "postman/fixtures/documents/local-back.png"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewDriverBackUrl')) throw new Error('Run this entire folder from request 01. The upload URL is run-local.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MinIO accepts fixture bytes', () => pm.response.to.have.status(200));",
+                  "pm.variables.unset('reviewDriverBackUrl');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Submit DRIVER_LICENSE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-120/130: nộp của chính CUSTOMER; kiểm đúng HTTP/mã lỗi. AN được truyền tự động từ request tạo lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{reviewNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{reviewDriverFrontCode}}\",\n  \"backUploadCode\": \"{{reviewDriverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewNumber')) throw new Error('Run this entire folder from request 01.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('reviewReplacementCode', pm.response.json().data.code);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Review resubmission (ADMIN)",
+      "description": "BR-130. Chạy cả thư mục bằng Runner, 1 iteration, đúng thứ tự; giữ cùng token trong suốt lượt chạy. Muốn lặp toàn bộ kịch bản, bắt đầu lại Review setup để tạo GT/AN/số giả mới. Không lưu bearer hoặc URL ký vào collection/environment.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Review ADMIN",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check ADMIN identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130: Check ADMIN identity. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('reviewRoleChecked');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact role and account', () => { const d = pm.response.json().data; pm.expect(d.roles).to.have.members(['ADMIN']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); });",
+                  "const d = pm.response.code === 200 ? pm.response.json().data : null; const correct = d && Array.isArray(d.roles) && d.roles.length === 1 && d.roles[0] === 'ADMIN';",
+                  "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong identity. Select the expected token and run this folder again.'); }",
+                  "pm.variables.set('reviewRoleChecked', true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Verify replacement license",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewReplacementCode}}/verify",
+            "description": "BR-130: Verify replacement license. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewReplacementCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewReplacementCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Reject overwriting replacement",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{reviewReplacementCode}}/reject",
+            "description": "BR-130: Reject overwriting replacement. Chỉ dùng dữ liệu local giả.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionCode\": \"ILLEGIBLE\",\n  \"rejectionNote\": \"Local fake review note\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewReplacementCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Exact error code', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('DOCUMENT_REVIEW_CONFLICT'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 3 - Read final review (CUSTOMER)",
+      "description": "BR-130. Chạy cả thư mục bằng Runner, 1 iteration, đúng thứ tự; giữ cùng token trong suốt lượt chạy. Dùng cùng CUSTOMER của Review setup. Muốn lặp toàn bộ kịch bản, bắt đầu lại Review setup để tạo GT/AN/số giả mới. Không lưu bearer hoặc URL ký vào collection/environment.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Review CUSTOMER",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check CUSTOMER identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-130: Check CUSTOMER identity. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('reviewRoleChecked');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact role and account', () => { const d = pm.response.json().data; pm.expect(d.roles).to.have.members(['CUSTOMER']); pm.expect(d.code).to.match(/^TK-[A-Z0-9]{6}$/); pm.expect(Boolean(d.termsVersion)).to.equal(true); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewOwnerCode')); });",
+                  "const d = pm.response.code === 200 ? pm.response.json().data : null; const correct = d && Array.isArray(d.roles) && d.roles.length === 1 && d.roles[0] === 'CUSTOMER' && Boolean(d.termsVersion) && d.code === pm.collectionVariables.get('reviewOwnerCode');",
+                  "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong identity. Select the expected token and run this folder again.'); }",
+                  "pm.variables.set('reviewRoleChecked', true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Old license remains rejected",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{reviewLicenseCode}}",
+            "description": "BR-130: Old license remains rejected. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewLicenseCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('REJECTED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(\"ILLEGIBLE\"); pm.expect(d.rejectionNote).to.equal(\"Local fake review note\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Replacement is verified",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{reviewReplacementCode}}",
+            "description": "BR-130: Replacement is verified. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewReplacementCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewReplacementCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Identity card remains verified",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{reviewCardCode}}",
+            "description": "BR-130: Identity card remains verified. Chỉ dùng dữ liệu local giả."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('reviewRoleChecked')) throw new Error('Run the entire folder from its identity check with the same token.');",
+                  "if (!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('reviewCardCode') || '')) throw new Error('Run the preceding review setup/submission folder first.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }
