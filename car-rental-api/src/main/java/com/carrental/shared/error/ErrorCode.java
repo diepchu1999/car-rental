@@ -21,6 +21,9 @@ public enum ErrorCode {
     /** BR-130: bản nộp đã được xử lý hoặc bị thay; đọc lại thay vì tự thử lại quyết định. */
     DOCUMENT_REVIEW_CONFLICT("The document has already been reviewed or superseded."),
 
+    /** BR-130: số CCCD đã được xác minh cho tài khoản khác, không tiết lộ tài khoản đó. */
+    IDENTITY_CARD_ALREADY_REGISTERED("The identity card is already registered to another account."),
+
     /** BR-130: ảnh vượt giới hạn byte trong cấu hình. */
     DOCUMENT_IMAGE_TOO_LARGE("The document image exceeds the size limit."),
 

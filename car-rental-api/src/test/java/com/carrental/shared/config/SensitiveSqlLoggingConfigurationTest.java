@@ -16,33 +16,95 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Kiểm wiring thật của filter và đường log riêng P6Spy, không chỉ gọi trực tiếp decide. */
 class SensitiveSqlLoggingConfigurationTest {
-    /** TRACE bind bị chặn khi nhạy cảm; ngoài phạm vi vẫn giữ mức log và context đóng gỡ filter. */
+    /** Reset lặp lại vẫn che TRACE, chỉ một filter và log thường giữ nguyên. */
     @Test
-    void suppressesJdbcTraceOnlyInsideSensitiveScopeAndRemovesFilterOnClose() {
-        var context = (LoggerContext) LoggerFactory.getILoggerFactory();
-        int before = context.getTurboFilterList().size();
-        Logger logger = context.getLogger("org.springframework.jdbc.core.StatementCreatorUtils");
-        Level previous = logger.getLevel();
-        var logs = new ListAppender<ILoggingEvent>();
-        logs.setContext(context);
-        logs.start();
-        logger.addAppender(logs);
+    void preservesProtectionAcrossRepeatedLoggingResets() {
+        var context = new LoggerContext();
+        context.start();
         try {
-            logger.setLevel(Level.TRACE);
-            new ApplicationContextRunner().withUserConfiguration(SensitiveSqlLoggingConfiguration.class).run(app -> {
+            var filter = SensitiveSqlLoggingConfiguration.register(context);
+            for (int attempt = 0; attempt < 2; attempt++) {
+                context.reset();
+                assertEquals(1, context.getTurboFilterList().size());
+                assertSame(filter, SensitiveSqlLoggingConfiguration.register(context));
+                assertTrue(filter.isStarted());
+                assertJdbcProtection(context);
+            }
+        } finally { context.stop(); }
+    }
+
+    /** Boot stop/reset xoá listener; context mới đăng ký lại rồi đóng vẫn bảo vệ context cache. */
+    @Test
+    void closingAnotherContextAfterBootStopAndResetPreservesProtection() {
+        var context = new LoggerContext();
+        context.start();
+        try {
+            var original = SensitiveSqlLoggingConfiguration.register(context);
+            context.stop();
+            assertFalse(original.isStarted());
+            assertTrue(context.getTurboFilterList().isEmpty());
+            context.reset();
+            context.start();
+            new ApplicationContextRunner().withBean("sensitiveFilter",
+                    com.carrental.shared.logging.SensitiveSqlLogFilter.class,
+                    () -> SensitiveSqlLoggingConfiguration.register(context)).run(app -> {
                 assertNull(app.getStartupFailure());
-                assertEquals(before + 1, context.getTurboFilterList().size());
-                SensitiveSql.execute(() -> { logger.trace("bind {}", "secret-key"); return null; });
-                assertTrue(logs.list.isEmpty());
-                logger.trace("ordinary-query");
-                assertEquals(1, logs.list.size());
-                assertEquals("ordinary-query", logs.list.getFirst().getFormattedMessage());
+                assertNotSame(original, app.getBean("sensitiveFilter"));
+                assertJdbcProtection(context);
             });
-            assertEquals(before, context.getTurboFilterList().size());
+            // Spring context vừa đóng; Logback dùng chung vẫn sống cho context được cache.
+            assertEquals(1, context.getTurboFilterList().size());
+            assertJdbcProtection(context);
+            context.reset();
+            assertJdbcProtection(context);
+        } finally { context.stop(); }
+    }
+
+    /** Đăng ký hai lần không nhân đôi; Logback stop giải phóng cả filter lẫn listener của nó. */
+    @Test
+    void registrationIsSharedAndReleasedWhenLoggingStops() {
+        var context = new LoggerContext();
+        context.start();
+        try {
+            var first = SensitiveSqlLoggingConfiguration.register(context);
+            assertSame(first, SensitiveSqlLoggingConfiguration.register(context));
+            assertEquals(1, context.getTurboFilterList().size());
+            context.stop();
+            assertFalse(first.isStarted());
+            assertTrue(context.getTurboFilterList().isEmpty());
+            assertTrue(context.getCopyOfListenerList().isEmpty());
+            context.reset();
+            assertTrue(context.getTurboFilterList().isEmpty());
+        } finally { context.stop(); }
+    }
+
+    /** Bean thật không gỡ filter khi Spring context đóng; chỉ Logback quản lý vòng đời bảo vệ. */
+    @Test
+    void springBeanKeepsProtectionAfterContextClose() {
+        var context = (LoggerContext) LoggerFactory.getILoggerFactory();
+        new ApplicationContextRunner().withUserConfiguration(SensitiveSqlLoggingConfiguration.class).run(app -> {
+            assertNull(app.getStartupFailure());
+            assertSame(SensitiveSqlLoggingConfiguration.register(context),
+                    app.getBean("sensitiveSqlLogFilterRegistration"));
+            assertJdbcProtection(context);
+        });
+        assertJdbcProtection(context);
+    }
+
+    /** Ghi qua logger thật, xác nhận bind nhạy cảm bị chặn còn sự kiện thường vẫn được ghi. */
+    private static void assertJdbcProtection(LoggerContext context) {
+        var logger = context.getLogger("org.springframework.jdbc.core.StatementCreatorUtils");
+        Level previous = logger.getLevel();
+        logger.setLevel(Level.TRACE);
+        var logs = new ListAppender<ILoggingEvent>();
+        logs.setContext(context); logs.start(); logger.addAppender(logs);
+        try {
+            SensitiveSql.execute(() -> { logger.trace("bind {}", "local-fake-secret"); return null; });
+            logger.trace("ordinary-query");
+            assertEquals(1, logs.list.size());
+            assertEquals("ordinary-query", logs.list.getFirst().getFormattedMessage());
         } finally {
-            logger.setLevel(previous);
-            logger.detachAppender(logs);
-            logs.stop();
+            logger.setLevel(previous); logger.detachAppender(logs); logs.stop();
         }
     }
 

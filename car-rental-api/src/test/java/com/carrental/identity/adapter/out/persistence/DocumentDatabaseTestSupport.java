@@ -4,6 +4,7 @@ import com.carrental.identity.application.port.out.DocumentNumberCryptoPort;
 import com.carrental.identity.domain.DocumentNumber;
 import com.carrental.identity.domain.DocumentProtectionContext;
 import com.carrental.identity.domain.DocumentType;
+import com.carrental.shared.sql.SensitiveSql;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 
@@ -30,9 +31,14 @@ abstract class DocumentDatabaseTestSupport extends IdentityDatabaseTestSupport {
 
     /** Tạo bản nộp với AAD đúng chủ và mã GT; không giữ số rõ trong tham số SQL. */
     MapSqlParameterSource submission(long owner, String type, String status) {
+        return submission(owner, type, status, fakeNumber(accountCode(owner)));
+    }
+
+    /** Chỉ các test tranh số truyền cùng số tường minh; mặc định mỗi tài khoản dùng số giả riêng. */
+    MapSqlParameterSource submission(long owner, String type, String status, String plaintext) {
         String code = nextCode("GT");
         var context = new DocumentProtectionContext(accountCode(owner), DocumentType.valueOf(type), code);
-        var number = crypto.protect(new DocumentNumber(FAKE_NUMBER), context);
+        var number = crypto.protect(new DocumentNumber(plaintext), context);
         boolean card = type.equals("IDENTITY_CARD");
         boolean reviewed = status.equals("VERIFIED") || status.equals("REJECTED");
         return new MapSqlParameterSource().addValue("code", code).addValue("accountId", owner)
@@ -66,6 +72,11 @@ abstract class DocumentDatabaseTestSupport extends IdentityDatabaseTestSupport {
 
     /** Chạy file fixture riêng, không nối input thành câu SQL. */
     long insert(String resource, MapSqlParameterSource parameters) {
+        if (resource.equals("submission") && "IDENTITY_CARD".equals(parameters.getValue("type"))
+                && "VERIFIED".equals(parameters.getValue("status"))) {
+            // Fixture lịch sử hợp lệ phải có claim như schema V013; test âm dùng JDBC thẳng để bỏ qua.
+            SensitiveSql.execute(() -> jdbc.update(documentSql("register_identity_card_fixture"), parameters));
+        }
         Long id = jdbc.queryForObject(documentSql("insert_" + resource), parameters, Long.class);
         assertNotNull(id);
         return id;
@@ -81,6 +92,9 @@ abstract class DocumentDatabaseTestSupport extends IdentityDatabaseTestSupport {
         return jdbc.queryForObject(sqlLoader.load("sql/identity/read_account_for_test.sql"),
                 Map.of("id", owner), (row, ignored) -> row.getString("code"));
     }
+
+    /** Số chỉ dùng trong test, phân biệt chủ và giữ ổn định qua các phiên bản của cùng chủ. */
+    static String fakeNumber(String ownerCode) { return "LOCAL-FAKE-NUMBER-" + ownerCode; }
 
     /** Sinh mã fixture sáu ký tự khác nhau giữa test; không thay thế BusinessCodeGenerator production. */
     private static String nextCode(String prefix) {

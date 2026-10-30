@@ -84,7 +84,7 @@ class DocumentViewSessionServiceIntegrationTest extends DocumentDatabaseTestSupp
         for (int opened = 1; opened <= 2; opened++) {
             expected.set(opened);
             var result = useCase.open(command);
-            assertEquals(FAKE_NUMBER, result.number().value());
+            assertEquals(fakeNumber(ownerCode), result.number().value());
             assertEquals(ownerCode, result.accountCode()); assertEquals(type, result.submission().documentType());
             assertEquals("DocumentViewSessionDetail[redacted]", result.toString());
             assertCommitted(command, opened);

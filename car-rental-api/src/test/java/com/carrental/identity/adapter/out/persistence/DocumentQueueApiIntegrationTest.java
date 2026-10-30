@@ -87,7 +87,7 @@ class DocumentQueueApiIntegrationTest extends DocumentDatabaseTestSupport {
                     accountCode(owner), type, Instant.parse(AT)));
             for (String field : new String[]{"nonce", "ciphertext", "hash"}) secrets.add((String) parameters.getValue(field));
         }
-        secrets.addAll(List.of(FAKE_NUMBER, "LOCAL FAKE DOCUMENT", "1990-01-01", "signature=", "sealed/"));
+        secrets.addAll(List.of("LOCAL-FAKE-NUMBER-", "LOCAL FAKE DOCUMENT", "1990-01-01", "signature=", "sealed/"));
     }
 
     /** Mỗi test lấy JWT mới để không phụ thuộc hạn token hoặc thứ tự test; kiểm đúng server context. */

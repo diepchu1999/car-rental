@@ -90,7 +90,7 @@ class DocumentStatusApiIntegrationTest extends DocumentDatabaseTestSupport {
             if (status == DocumentSubmissionStatus.REJECTED) assertEquals("ILLEGIBLE", data.path("rejectionCode").asString());
             else assertTrue(data.path("rejectionCode").isNull());
             assertTrue(data.path("rejectionNote").isNull());
-            assertFalse(response.body().contains(FAKE_NUMBER));
+            assertFalse(response.body().contains(fakeNumber(ownerCode)));
             assertFalse(response.body().contains("LOCAL FAKE DOCUMENT"));
         }
     }

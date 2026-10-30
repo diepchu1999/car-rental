@@ -98,7 +98,7 @@ class DocumentViewSessionApiIntegrationTest extends DocumentDatabaseTestSupport 
                     "rejectionNote", "frontImage", "backImage"), keys(data));
             assertEquals(code, data.path("code").asString()); assertEquals(ownerCode, data.path("accountCode").asString());
             assertEquals(type, data.path("documentType").asString()); assertEquals("PENDING", data.path("status").asString());
-            assertEquals(FAKE_NUMBER, data.path("number").asString());
+            assertEquals(fakeNumber(ownerCode), data.path("number").asString());
             assertEquals("2030-01-01", data.path("expiresOn").asString());
             assertEquals(AT, data.path("submittedAt").asString());
             for (String field : new String[]{"reviewedAt", "rejectionCode", "rejectionNote"}) assertTrue(data.path(field).isNull());
@@ -225,7 +225,7 @@ class DocumentViewSessionApiIntegrationTest extends DocumentDatabaseTestSupport 
         binds.setLevel(Level.TRACE);
         try {
             success(open(verifier, code, null));
-            var secrets = List.of(FAKE_NUMBER, "LOCAL FAKE DOCUMENT", "1990-01-01", stored.number().nonceBase64(),
+            var secrets = List.of(fakeNumber(ownerCode), "LOCAL FAKE DOCUMENT", "1990-01-01", stored.number().nonceBase64(),
                     stored.number().ciphertextBase64(), stored.number().lookupHash(), stored.frontImage().sealedObjectKey(),
                     stored.backImage().sealedObjectKey(), "https://local.invalid/", "signature=fake");
             for (var event : List.copyOf(logs.list)) {
@@ -313,7 +313,7 @@ class DocumentViewSessionApiIntegrationTest extends DocumentDatabaseTestSupport 
     /** Response 500 không lộ dữ liệu giấy tờ, URL, SQL, lớp hay stack; log lỗi đã được xử lý riêng. */
     private void safeFailure(HttpResponse<String> response) {
         failure(response, 500, "INTERNAL_ERROR");
-        for (String value : new String[]{FAKE_NUMBER, "LOCAL FAKE DOCUMENT", "signature", "sealed/", "SELECT", "Exception", "com.carrental", "Forced"}) {
+        for (String value : new String[]{"LOCAL-FAKE-NUMBER-", "LOCAL FAKE DOCUMENT", "signature", "sealed/", "SELECT", "Exception", "com.carrental", "Forced"}) {
             assertFalse(response.body().contains(value));
         }
     }

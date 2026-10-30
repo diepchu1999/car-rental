@@ -173,7 +173,7 @@ class DocumentQueueReadIntegrationTest extends DocumentDatabaseTestSupport {
         logs.setContext(root.getLoggerContext()); logs.start(); root.addAppender(logs); binds.setLevel(Level.TRACE);
         try {
             assertEquals(expected, reads.searchPending(21, 0));
-            var secrets = List.of(FAKE_NUMBER, "LOCAL FAKE DOCUMENT", "1990-01-01", (String) parameters.getValue("nonce"),
+            var secrets = List.of("LOCAL-FAKE-NUMBER-", "LOCAL FAKE DOCUMENT", "1990-01-01", (String) parameters.getValue("nonce"),
                     (String) parameters.getValue("ciphertext"), (String) parameters.getValue("hash"));
             for (var event : logs.list) {
                 String text = event.getFormattedMessage();

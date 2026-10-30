@@ -31,13 +31,13 @@ class DocumentConstraintIntegrationTest extends DocumentDatabaseTestSupport {
         var parameters = submission(owner, type, "PENDING");
         long id = insert("submission", parameters);
         var row = jdbc.queryForMap(documentSql("read_submission"), Map.of("id", id));
-        assertFalse(row.containsValue(FAKE_NUMBER));
+        assertFalse(row.containsValue(fakeNumber(accountCode(owner))));
         assertEquals(parameters.getValue("nonce"), row.get("number_nonce"));
         assertEquals(parameters.getValue("ciphertext"), row.get("number_ciphertext"));
         assertEquals(parameters.getValue("hash"), row.get("number_hash"));
         var stored = new ProtectedDocumentNumber((Integer) row.get("number_key_version"),
                 (String) row.get("number_nonce"), (String) row.get("number_ciphertext"), (String) row.get("number_hash"));
-        assertEquals(new DocumentNumber(FAKE_NUMBER), crypto.reveal(stored,
+        assertEquals(new DocumentNumber(fakeNumber(accountCode(owner))), crypto.reveal(stored,
                 new DocumentProtectionContext(accountCode(owner), DocumentType.valueOf(type), (String) row.get("code"))));
     }
 
@@ -45,7 +45,7 @@ class DocumentConstraintIntegrationTest extends DocumentDatabaseTestSupport {
     @Test
     void schemaDoesNotStorePlainNumbersSignedUrlsOrImageBytes() {
         var columns = jdbc.queryForList(documentSql("read_columns"), Map.of());
-        assertEquals(Set.of("document_upload", "document_submission", "document_image", "document_head"),
+        assertEquals(Set.of("document_upload", "document_submission", "document_image", "document_head", "identity_card_registration"),
                 columns.stream().map(row -> row.get("table_name")).collect(java.util.stream.Collectors.toSet()));
         for (var column : columns) {
             String name = (String) column.get("column_name");
@@ -69,8 +69,8 @@ class DocumentConstraintIntegrationTest extends DocumentDatabaseTestSupport {
     void permitsSameUnverifiedNumberAcrossAccountsAndIndependentTypes() {
         long first = newAccount();
         long second = newAccount();
-        var a = submission(first, "IDENTITY_CARD", "PENDING");
-        var b = submission(second, "IDENTITY_CARD", "PENDING");
+        var a = submission(first, "IDENTITY_CARD", "PENDING", FAKE_NUMBER);
+        var b = submission(second, "IDENTITY_CARD", "PENDING", FAKE_NUMBER);
         assertEquals(a.getValue("hash"), b.getValue("hash"));
         insert("submission", a);
         insert("submission", b);

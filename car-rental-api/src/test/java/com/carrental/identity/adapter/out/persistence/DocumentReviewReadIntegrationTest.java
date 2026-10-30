@@ -115,7 +115,7 @@ class DocumentReviewReadIntegrationTest extends DocumentDatabaseTestSupport {
             assertEquals("DocumentReviewDetail[redacted]", actual.toString());
             assertFalse(SensitiveSql.isActive());
             var secrets = List.of(fixture.code(), fixture.ownerCode(), "LOCAL FAKE DOCUMENT", "1990-01-01",
-                    "LOCAL PRIVATE REVIEW NOTE", FAKE_NUMBER, actual.number().nonceBase64(),
+                    "LOCAL PRIVATE REVIEW NOTE", fakeNumber(actual.accountCode()), actual.number().nonceBase64(),
                     actual.number().ciphertextBase64(), actual.number().lookupHash(),
                     actual.frontImage().sealedObjectKey(), actual.backImage().sealedObjectKey());
             for (var event : logs.list) {
@@ -140,7 +140,7 @@ class DocumentReviewReadIntegrationTest extends DocumentDatabaseTestSupport {
         assertEquals(fixture.submission().getValue("ciphertext"), actual.number().ciphertextBase64());
         assertEquals(fixture.submission().getValue("hash"), actual.number().lookupHash());
         var context = new DocumentProtectionContext(actual.accountCode(), actual.submission().documentType(), actual.submission().code());
-        assertEquals(FAKE_NUMBER, crypto.reveal(actual.number(), context).value());
+        assertEquals(fakeNumber(actual.accountCode()), crypto.reveal(actual.number(), context).value());
         for (int i = 0; i < 2; i++) {
             var image = i == 0 ? actual.frontImage() : actual.backImage();
             var expected = fixture.images().get(i);

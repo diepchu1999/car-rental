@@ -1,6 +1,8 @@
 package com.carrental.identity.adapter.out.persistence;
 
 import com.carrental.identity.application.command.RejectDocumentCommand;
+import com.carrental.identity.application.command.VerifyDocumentCommand;
+import com.carrental.identity.domain.DocumentType;
 import com.carrental.identity.application.port.out.WriteDocumentSubmissionPort;
 import com.carrental.identity.domain.DocumentImage;
 import com.carrental.identity.domain.DocumentSubmission;
@@ -35,6 +37,10 @@ class DocumentSubmissionWriteAdapter implements WriteDocumentSubmissionPort {
     private final String latestSql;
     private final String lockReviewSql;
     private final String rejectSql;
+    private final String pendingTypeSql;
+    private final String registerCardSql;
+    private final String verifySql;
+    private final String activeSql;
 
     /** Savepoint không tự mở giao dịch nghiệp vụ; service vẫn sở hữu commit/rollback cuối cùng. */
     DocumentSubmissionWriteAdapter(NamedParameterJdbcTemplate jdbc, SqlLoader loader,
@@ -50,6 +56,40 @@ class DocumentSubmissionWriteAdapter implements WriteDocumentSubmissionPort {
         latestSql = loader.load("sql/identity/update_document_head_latest.sql");
         lockReviewSql = loader.load("sql/identity/lock_document_head_for_review.sql");
         rejectSql = loader.load("sql/identity/reject_pending_document.sql");
+        pendingTypeSql = loader.load("sql/identity/find_pending_document_type_for_review.sql");
+        registerCardSql = loader.load("sql/identity/register_verified_identity_card.sql");
+        verifySql = loader.load("sql/identity/verify_pending_document.sql");
+        activeSql = loader.load("sql/identity/update_document_head_verified.sql");
+    }
+
+    /** Cùng một savepoint cho đăng ký số, VERIFIED và active; lỗi bất kỳ không giữ chỗ số của người khác. */
+    @Override public void verify(VerifyDocumentCommand command, String reviewerAccountCode, Instant reviewedAt) {
+        Objects.requireNonNull(command, "command must not be null.");
+        Objects.requireNonNull(reviewedAt, "reviewedAt must not be null.");
+        if (reviewerAccountCode == null || !reviewerAccountCode.matches("TK-[A-Z0-9]{6}")) {
+            throw new IllegalArgumentException("A valid reviewer account code is required.");
+        }
+        if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+            throw new IllegalStateException("Document review requires a caller transaction.");
+        }
+        nested.executeWithoutResult(status -> {
+            var values = new MapSqlParameterSource().addValue("code", command.code(), Types.VARCHAR)
+                    .addValue("reviewerAccountCode", reviewerAccountCode, Types.VARCHAR)
+                    .addValue("reviewedAt", reviewedAt.atOffset(ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE);
+            var heads = SensitiveSql.execute(() -> jdbc.queryForList(lockReviewSql, values, Long.class));
+            if (heads.isEmpty()) throw DomainException.notFound(ErrorCode.DOCUMENT_NOT_FOUND);
+            if (heads.size() != 1) throw new IllegalStateException("Expected one document head.");
+            var types = SensitiveSql.execute(() -> jdbc.queryForList(pendingTypeSql, values, String.class));
+            if (types.isEmpty()) throw DomainException.conflict(ErrorCode.DOCUMENT_REVIEW_CONFLICT);
+            if (types.size() != 1) throw new IllegalStateException("Expected one pending document.");
+            if (DocumentType.valueOf(types.getFirst()) == DocumentType.IDENTITY_CARD) {
+                int registered = SensitiveSql.execute(() -> jdbc.update(registerCardSql, values));
+                if (registered == 0) throw DomainException.conflict(ErrorCode.IDENTITY_CARD_ALREADY_REGISTERED);
+                requireOne(registered);
+            }
+            requireOne(SensitiveSql.execute(() -> jdbc.update(verifySql, values)));
+            requireOne(SensitiveSql.execute(() -> jdbc.update(activeSql, values)));
+        });
     }
 
     /** Cùng thứ tự head rồi submission với insert; không đụng ảnh, lịch sử hay active VERIFIED. */
