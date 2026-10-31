@@ -2,6 +2,7 @@ package com.carrental.identity.adapter.out.persistence;
 
 import com.carrental.identity.application.port.out.ReadDocumentSubmissionPort;
 import com.carrental.identity.application.view.DocumentSubmissionDetail;
+import com.carrental.identity.application.view.ActiveDocumentDetail;
 import com.carrental.identity.application.view.DocumentStatusDetail;
 import com.carrental.identity.application.view.DocumentHeadSummary;
 import com.carrental.identity.application.view.DocumentReviewDetail;
@@ -35,6 +36,7 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
     private final String reviewSql;
     private final String pendingSql;
     private final String reviewStatusSql;
+    private final String activeSql;
 
     /** Nạp SQL cố định, không nối input thành câu truy vấn. */
     DocumentSubmissionReadAdapter(NamedParameterJdbcTemplate jdbc, SqlLoader loader) {
@@ -45,6 +47,16 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
         reviewSql = loader.load("sql/identity/find_document_submission_for_review.sql");
         pendingSql = loader.load("sql/identity/search_pending_documents.sql");
         reviewStatusSql = loader.load("sql/identity/find_document_status_for_review.sql");
+        activeSql = loader.load("sql/identity/list_active_documents_by_owner.sql");
+    }
+
+    /** Một SELECT đúng chủ và con trỏ active; che truy vấn/row lỗi kể cả khi bật sql-log hoặc TRACE. */
+    @Override public List<ActiveDocumentDetail> listActiveByOwner(String accountCode) {
+        return SensitiveSql.execute(() -> List.copyOf(jdbc.query(activeSql, Map.of("accountCode", accountCode),
+                (row, ignored) -> new ActiveDocumentDetail(row.getString("code"),
+                        DocumentType.valueOf(row.getString("document_type")),
+                        row.getObject("expires_on", LocalDate.class), row.getString("license_class"),
+                        row.getObject("automatic_only", Boolean.class)))));
     }
 
     /** Reload quyết định đúng GT; SensitiveSql che cả ghi chú tự do khi JDBC ghi log hoặc ném lỗi. */

@@ -1,6 +1,7 @@
 package com.carrental.identity.application.port.out;
 
 import com.carrental.identity.application.view.DocumentSubmissionDetail;
+import com.carrental.identity.application.view.ActiveDocumentDetail;
 import com.carrental.identity.application.view.DocumentStatusDetail;
 import com.carrental.identity.application.view.DocumentHeadSummary;
 import com.carrental.identity.application.view.DocumentReviewDetail;
@@ -11,6 +12,15 @@ import java.util.Optional;
 
 /** Cổng đọc bản nộp BR-130; tách rõ đường đúng chủ và đường phục vụ use case xác minh có kiểm quyền. */
 public interface ReadDocumentSubmissionPort {
+    /**
+     * BR-130: metadata các bản active VERIFIED của đúng tài khoản, đọc hai loại trong cùng một snapshot.
+     * Dành cho cổng điều kiện thuê nội bộ; caller của cổng chịu trách nhiệm chọn tài khoản đúng ngữ cảnh.
+     * Không có active thì không có mục tương ứng; chưa có hồ sơ/không có tài khoản đều trả danh sách rỗng.
+     * Không lọc hạn hoặc thay bằng latest/lịch sử; application phân biệt chưa xác minh với hết hạn.
+     * Không mở ảnh/giải mã/audit lượt xem. Danh sách bất biến, thứ tự tên loại tăng dần.
+     */
+    List<ActiveDocumentDetail> listActiveByOwner(String accountCode);
+
     /**
      * Đọc lại kết quả sau quyết định của use case đã kiểm quyền ADMIN/DOCUMENT_VERIFIER.
      * Chỉ metadata trạng thái, không đọc số/nhân thân/ảnh; không phải thao tác mở view-session.
