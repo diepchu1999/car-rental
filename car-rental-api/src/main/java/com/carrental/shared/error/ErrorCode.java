@@ -15,6 +15,24 @@ package com.carrental.shared.error;
  */
 public enum ErrorCode {
 
+    /** BR-130: chưa có CCCD VERIFIED đang được chọn để dùng. */
+    IDENTITY_CARD_NOT_VERIFIED("A verified identity card is required."),
+
+    /** BR-130: CCCD đang dùng không còn hiệu lực tới ngày trả xe thực tế. */
+    IDENTITY_CARD_EXPIRES_BEFORE_TRIP_END("The identity card expires before the trip ends."),
+
+    /** BR-106: khách tự lái chưa có GPLX VERIFIED đang được chọn để dùng. */
+    DRIVER_LICENSE_NOT_VERIFIED("A verified driver license is required."),
+
+    /** BR-106b: GPLX đang dùng không còn hiệu lực tới ngày trả xe thực tế. */
+    DRIVER_LICENSE_EXPIRES_BEFORE_TRIP_END("The driver license expires before the trip ends."),
+
+    /** BR-128: không tự suy quyền lái của hạng chưa được khai báo trong bảng cấu hình. */
+    DRIVER_LICENSE_CLASS_NOT_SUPPORTED("The driver license class is not supported."),
+
+    /** BR-128: hạng không cho phép số chỗ hoặc GPLX chỉ số tự động gặp xe số sàn. */
+    DRIVER_LICENSE_NOT_SUITABLE_FOR_VEHICLE("The driver license is not suitable for this vehicle."),
+
     /** BR-130: GT không tồn tại hoặc không thuộc caller đều trả 404, không tiết lộ chủ hồ sơ. */
     DOCUMENT_NOT_FOUND("Document not found."),
 

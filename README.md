@@ -102,6 +102,14 @@ Bảng hiện là nguồn local theo ADR-0013, chưa có lịch sử hiệu lự
 khởi động lại. Trước khi dùng với khách thật phải xác nhận bảng với người hiểu luật và chuyển nguồn
 sang module config. Cờ `automatic_only` thuộc từng GPLX, không suy ra chỉ từ tên hạng.
 
+**Cổng giấy tờ thuê tự lái (BR-106/106b/128/130):** module khác gọi
+`identity.api.RentalEligibilityDirectory.requireSelfDriveEligible(accountCode, seats, transmission, tripEnd)`
+với tài khoản và thuộc tính xe đã đọc từ nguồn tin cậy. Cổng xét bản VERIFIED đang dùng, kể cả khi bản mới
+đang chờ hoặc bị từ chối; kiểm xác minh/hạn CCCD trước, rồi xác minh/hạn GPLX và quyền lái theo hạng/hộp số.
+Giấy tờ hết hạn ngày D còn dùng được hết ngày D theo múi giờ ứng dụng (Việt Nam);
+`tripEnd` là giờ trả thực tế, không cộng đệm.
+Cổng không giữ chỗ, tạo đơn hoặc thay việc xác thực/phân quyền của bên gọi; hiện chưa nối vào booking.
+
 ### 2. Khởi động hạ tầng
 
 **Build provider trước khi chạy Keycloak** (bytecode Java 21, dùng được JDK 25 ở trên):
