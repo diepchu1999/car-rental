@@ -57,6 +57,56 @@ class RentalEligibilityIntegrationTest extends DocumentDatabaseTestSupport {
         assertDoesNotThrow(() -> eligibility.requireSelfDriveEligible(accountCode(owner), 7, "AUTOMATIC", LAST_INSTANT));
     }
 
+    /** BR-128: SQL lưu đúng ngày cấp; B1 mới không thuê ô tô, B1 cũ hợp lệ, biên bằng thuộc bảng mới. */
+    @ParameterizedTest @CsvSource({"2024-12-31,true", "2025-01-01,false", "2025-01-02,false"})
+    void checksB1IssueDateThroughRealGate(String date, boolean eligible) {
+        long owner = newAccount();
+        active(owner, submission(owner, "IDENTITY_CARD", "VERIFIED"));
+        active(owner, submission(owner, "DRIVER_LICENSE", "VERIFIED").addValue("licenseClass", "B1").addValue("issuedOn", date));
+        if (eligible) assertDoesNotThrow(() -> eligibility.requireSelfDriveEligible(accountCode(owner), 4, "AUTOMATIC", LAST_INSTANT));
+        else assertError(() -> eligibility.requireSelfDriveEligible(accountCode(owner), 4, "AUTOMATIC", LAST_INSTANT),
+                ErrorCode.DRIVER_LICENSE_CLASS_NOT_SUPPORTED);
+    }
+
+    /** NULL ở bản cũ không được suy thành bảng cũ hay ngày mặc định, dù latest mới đã có ngày cấp. */
+    @ParameterizedTest @ValueSource(strings = {"PENDING", "REJECTED"})
+    void legacyActiveWithoutIssueDateRequiresResubmission(String latestStatus) {
+        long owner = newAccount();
+        active(owner, submission(owner, "IDENTITY_CARD", "VERIFIED"));
+        long legacy = insert("submission", submission(owner, "DRIVER_LICENSE", "VERIFIED").addValue("issuedOn", null));
+        long latest = insert("submission", submission(owner, "DRIVER_LICENSE", latestStatus));
+        insert("head", head(owner, "DRIVER_LICENSE", latest, legacy));
+        assertError(() -> check(owner, LAST_INSTANT), ErrorCode.DRIVER_LICENSE_NOT_VERIFIED);
+    }
+
+    /** Cùng hạng B1 nhưng khác ngày: pending/rejected không được đổi chế độ của bản active, kiểm cả hai chiều. */
+    @ParameterizedTest @CsvSource({"2024-12-31,2025-01-01,PENDING,true", "2024-12-31,2025-01-01,REJECTED,true",
+            "2025-01-01,2024-12-31,PENDING,false", "2025-01-01,2024-12-31,REJECTED,false"})
+    void selectsRegimeFromActiveRatherThanLatest(String activeDate, String latestDate, String status, boolean eligible) {
+        long owner = newAccount();
+        active(owner, submission(owner, "IDENTITY_CARD", "VERIFIED"));
+        long activeId = insert("submission", submission(owner, "DRIVER_LICENSE", "VERIFIED")
+                .addValue("licenseClass", "B1").addValue("issuedOn", activeDate));
+        long latest = insert("submission", submission(owner, "DRIVER_LICENSE", status)
+                .addValue("licenseClass", "B1").addValue("issuedOn", latestDate));
+        insert("head", head(owner, "DRIVER_LICENSE", latest, activeId));
+        if (eligible) assertDoesNotThrow(() -> check(owner, LAST_INSTANT));
+        else assertError(() -> check(owner, LAST_INSTANT), ErrorCode.DRIVER_LICENSE_CLASS_NOT_SUPPORTED);
+    }
+
+    /** Khi bản thay thế đã VERIFIED và head chuyển sang nó, cổng phải dùng ngày cấp mới ngay lần gọi sau. */
+    @Test void followsNewIssueDateAfterVerifiedReplacement() {
+        long owner = newAccount();
+        active(owner, submission(owner, "IDENTITY_CARD", "VERIFIED"));
+        active(owner, submission(owner, "DRIVER_LICENSE", "VERIFIED")
+                .addValue("licenseClass", "B1").addValue("issuedOn", "2024-12-31"));
+        check(owner, LAST_INSTANT);
+        long replacement = insert("submission", submission(owner, "DRIVER_LICENSE", "VERIFIED")
+                .addValue("licenseClass", "B1").addValue("issuedOn", "2025-01-01"));
+        jdbc.update(documentSql("update_head"), head(owner, "DRIVER_LICENSE", replacement, replacement));
+        assertError(() -> check(owner, LAST_INSTANT), ErrorCode.DRIVER_LICENSE_CLASS_NOT_SUPPORTED);
+    }
+
     /** Bản đang dùng còn hạn tới đúng cuối ngày D; giờ trả từ 00:00 D+1 bị từ chối cho đúng loại. */
     @ParameterizedTest @EnumSource(DocumentType.class)
     void permitsExpiryDayAndRejectsFollowingVietnamMidnight(DocumentType type) {

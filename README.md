@@ -96,8 +96,10 @@ bản mã cũ hoặc đối chiếu hash cũ. Chưa hỗ trợ xoay vòng khoá;
 Không gửi khoá vào chat, log hay commit. Test dùng khoá giả riêng, không đọc khoá trong `.env`.
 
 **Bảng hạng GPLX (BR-128):** khai báo tại `car-rental.identity.license-classes` trong
-`car-rental-api/src/main/resources/application.yml`. Mỗi hàng gồm `code` và danh sách `seats`;
-bảng thiếu, hàng trùng, số chỗ không dương hoặc dữ liệu sai làm backend không khởi động.
+`car-rental-api/src/main/resources/application.yml`: `cutover-date` hiện là `2025-01-01`,
+`before-cutover` dành cho GPLX cấp trước mốc, `from-cutover` dành cho GPLX cấp đúng hoặc sau mốc.
+Mỗi hàng gồm `code` và danh sách `seats`; không gộp hạng trùng tên giữa hai bảng.
+Thiếu mốc/bảng, ngày không hợp lệ, hàng trùng hoặc số chỗ không dương làm backend không khởi động.
 Bảng hiện là nguồn local theo ADR-0013, chưa có lịch sử hiệu lực; đổi YAML trong JAR cần build và
 khởi động lại. Trước khi dùng với khách thật phải xác nhận bảng với người hiểu luật và chuyển nguồn
 sang module config. Cờ `automatic_only` thuộc từng GPLX, không suy ra chỉ từ tên hạng.
@@ -106,6 +108,9 @@ sang module config. Cờ `automatic_only` thuộc từng GPLX, không suy ra ch�
 `identity.api.RentalEligibilityDirectory.requireSelfDriveEligible(accountCode, seats, transmission, tripEnd)`
 với tài khoản và thuộc tính xe đã đọc từ nguồn tin cậy. Cổng xét bản VERIFIED đang dùng, kể cả khi bản mới
 đang chờ hoặc bị từ chối; kiểm xác minh/hạn CCCD trước, rồi xác minh/hạn GPLX và quyền lái theo hạng/hộp số.
+GPLX đang dùng thiếu ngày cấp trả `403 DRIVER_LICENSE_NOT_VERIFIED`, yêu cầu khách nộp lại.
+Ngày cấp của bản đang dùng chọn bảng hạng; B1 cấp từ mốc trả `422 DRIVER_LICENSE_CLASS_NOT_SUPPORTED`
+khi thuê ô tô. Ngày nộp, ngày kiểm và ngày trả xe không thay thế ngày cấp.
 Giấy tờ hết hạn ngày D còn dùng được hết ngày D theo múi giờ ứng dụng (Việt Nam);
 `tripEnd` là giờ trả thực tế, không cộng đệm.
 Cổng không giữ chỗ, tạo đơn hoặc thay việc xác thực/phân quyền của bên gọi; hiện chưa nối vào booking.

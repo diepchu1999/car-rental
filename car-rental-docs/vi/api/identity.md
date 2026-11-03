@@ -289,9 +289,13 @@ bản mã/hash, key hay URL ảnh. Dùng `data.code` để đọc trạng thái 
 
 `issuedOn` xuất hiện trong kết quả nộp, trạng thái (kể cả latest/active), kết quả duyệt/từ chối
 và phiên xem của người xác minh. CCCD và GPLX lịch sử chưa có ngày cấp trả `null`; không suy đoán
-ngày từ hạng hoặc ngày nộp. Hợp đồng cổng thuê BR-128/130 quy định GPLX đang dùng thiếu ngày cấp
-trả **403 `DRIVER_LICENSE_NOT_VERIFIED`**, yêu cầu khách nộp lại; không trả lỗi hạng không hỗ trợ.
-Việc thực thi tại cổng thuê được bổ sung cùng bảng hạng theo ngày cấp; API nộp không tự xác minh.
+ngày từ hạng hoặc ngày nộp. Cổng thuê BR-128/130 từ chối GPLX đang dùng thiếu ngày cấp bằng
+**403 `DRIVER_LICENSE_NOT_VERIFIED`**, yêu cầu khách nộp lại; không trả lỗi hạng không hỗ trợ.
+Cổng chọn bảng theo ngày cấp của bản VERIFIED đang dùng, không dùng ngày của bản PENDING/REJECTED mới.
+Với mốc cấu hình hiện tại `2025-01-01`, B1 cấp trước mốc được xét theo bảng ô tô cũ;
+B1 cấp đúng hoặc sau mốc trả **422 `DRIVER_LICENSE_CLASS_NOT_SUPPORTED`** vì không có trong bảng ô tô mới.
+Hạng có trong bảng nhưng sai số chỗ hoặc hạn chế số tự động không phù hợp xe số sàn trả
+`422 DRIVER_LICENSE_NOT_SUITABLE_FOR_VEHICLE`. API nộp không tự xác minh hay kết luận đủ điều kiện thuê.
 
 | HTTP | Mã | Khi nào |
 |---|---|---|

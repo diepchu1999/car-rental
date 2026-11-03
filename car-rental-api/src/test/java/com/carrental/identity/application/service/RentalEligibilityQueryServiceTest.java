@@ -6,11 +6,13 @@ import com.carrental.identity.application.query.CheckRentalEligibilityQuery;
 import com.carrental.identity.application.view.ActiveDocumentDetail;
 import com.carrental.identity.domain.DocumentType;
 import com.carrental.identity.domain.LicenseClassTable;
+import com.carrental.identity.domain.LicenseClassPolicy;
 import com.carrental.shared.error.DomainException;
 import com.carrental.shared.error.ErrorCode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import java.time.Clock;
 import java.time.Instant;
@@ -36,7 +38,7 @@ class RentalEligibilityQueryServiceTest {
     /** Một lần đọc cả hai bản; config dùng mốc kiểm hiện tại, không dùng giờ trả xe. */
     @Test void readsOneSnapshotAndPolicyAtEvaluationTime() {
         ready(); service.check(query(END));
-        verify(reads).listActiveByOwner(OWNER); verify(policies).tableAt(NOW); verifyNoMoreInteractions(reads, policies);
+        verify(reads).listActiveByOwner(OWNER); verify(policies).policyAt(NOW); verifyNoMoreInteractions(reads, policies);
     }
 
     /** 17:00 UTC là ngày mới ở VN; không dùng UTC/JVM và không trừ nano ở giờ trả xe. */
@@ -48,13 +50,13 @@ class RentalEligibilityQueryServiceTest {
     /** Không cache metadata/config: lần sau bản active hoặc bảng hạng đã đổi phải được xét lại. */
     @Test void rereadsPolicyAndEvidenceOnEveryCall() {
         ready(); service.check(query(END));
-        when(policies.tableAt(NOW)).thenReturn(new LicenseClassTable(Map.of("D", Set.of(7))));
+        when(policies.policyAt(NOW)).thenReturn(policy(Map.of("D", Set.of(7))));
         assertEquals(ErrorCode.DRIVER_LICENSE_CLASS_NOT_SUPPORTED,
                 assertThrows(DomainException.class, () -> service.check(query(END))).errorCode());
         when(reads.listActiveByOwner(OWNER)).thenReturn(List.of());
         assertEquals(ErrorCode.IDENTITY_CARD_NOT_VERIFIED,
                 assertThrows(DomainException.class, () -> service.check(query(END))).errorCode());
-        verify(reads, times(3)).listActiveByOwner(OWNER); verify(policies, times(3)).tableAt(NOW);
+        verify(reads, times(3)).listActiveByOwner(OWNER); verify(policies, times(3)).policyAt(NOW);
     }
 
     /** Lỗi đọc hoặc cấu hình phải giữ nguyên, không được coi như đủ điều kiện hoặc thiếu hồ sơ. */
@@ -63,8 +65,30 @@ class RentalEligibilityQueryServiceTest {
         when(reads.listActiveByOwner(OWNER)).thenThrow(failure);
         assertSame(failure, assertThrows(IllegalStateException.class, () -> service.check(query(END))));
         verifyNoInteractions(policies);
-        reset(reads, policies); ready(); when(policies.tableAt(NOW)).thenThrow(failure);
+        reset(reads, policies); ready(); when(policies.policyAt(NOW)).thenThrow(failure);
         assertSame(failure, assertThrows(IllegalStateException.class, () -> service.check(query(END))));
+    }
+
+    /** Ngày cấp được truyền từ active vào domain, không dùng NOW, ngày hết hạn hoặc ngày trả xe. */
+    @ParameterizedTest @CsvSource({"2024-12-31,true", "2025-01-01,false", "2025-01-02,false"})
+    void forwardsActiveIssueDateToRegimeSelection(String date, boolean eligible) {
+        ready();
+        when(reads.listActiveByOwner(OWNER)).thenReturn(List.of(card(), new ActiveDocumentDetail(
+                "GT-FAKE02", DocumentType.DRIVER_LICENSE, LocalDate.of(2030, 1, 1), "B1", false, LocalDate.parse(date))));
+        if (eligible) assertDoesNotThrow(() -> service.check(query(END)));
+        else assertEquals(ErrorCode.DRIVER_LICENSE_CLASS_NOT_SUPPORTED,
+                assertThrows(DomainException.class, () -> service.check(query(END))).errorCode());
+        verify(policies).policyAt(NOW);
+    }
+
+    /** Adapter trả bản VERIFIED lịch sử thiếu ngày cấp phải dẫn tới lỗi nộp lại, không tự điền ngày. */
+    @Test void rejectsLegacyActiveWithoutIssueDateAsNotVerified() {
+        ready();
+        when(reads.listActiveByOwner(OWNER)).thenReturn(List.of(card(), new ActiveDocumentDetail(
+                "GT-FAKE02", DocumentType.DRIVER_LICENSE, LocalDate.of(2030, 1, 1), "B", false, null)));
+        var failure = assertThrows(DomainException.class, () -> service.check(query(END)));
+        assertEquals(ErrorCode.DRIVER_LICENSE_NOT_VERIFIED, failure.errorCode());
+        assertEquals(DomainException.Category.FORBIDDEN, failure.category());
     }
 
     /** Trùng loại/null/hạn null từ adapter là lỗi nội bộ; không chọn bừa hàng đầu hoặc coi null là chưa xác minh. */
@@ -115,7 +139,13 @@ class RentalEligibilityQueryServiceTest {
     private void ready() {
         when(reads.listActiveByOwner(OWNER)).thenReturn(List.of(
                 new ActiveDocumentDetail("GT-FAKE02", DocumentType.DRIVER_LICENSE, LocalDate.of(2030, 1, 1), "B", false, LocalDate.of(2025, 1, 1)), card()));
-        when(policies.tableAt(NOW)).thenReturn(new LicenseClassTable(Map.of("B", Set.of(4, 5, 7))));
+        when(policies.policyAt(NOW)).thenReturn(policy(Map.of("B", Set.of(4, 5, 7))));
+    }
+
+    /** Bộ giả giữ hai bảng độc lập để phép chọn sai theo ngày kiểm làm test đỏ. */
+    private static LicenseClassPolicy policy(Map<String, Set<Integer>> current) {
+        return new LicenseClassPolicy(LocalDate.of(2025, 1, 1),
+                new LicenseClassTable(Map.of("B1", Set.of(4, 5, 7))), new LicenseClassTable(current));
     }
 
     /** Metadata CCCD tối thiểu, không có số hoặc thông tin nhận dạng. */

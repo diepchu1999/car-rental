@@ -51,8 +51,8 @@ class RentalEligibilityQueryService implements CheckRentalEligibilityUseCase {
         var license = selected.get(DocumentType.DRIVER_LICENSE);
         var evidence = new RentalDocuments(card == null ? null : card.expiresOn(),
                 license == null ? null : license.expiresOn(), license == null ? null : license.licenseClass(),
-                license == null ? null : license.automaticOnly());
+                license == null ? null : license.automaticOnly(), license == null ? null : license.issuedOn());
         evidence.requireSelfDriveEligible(tripEndDate, query.seats(), "MANUAL".equals(query.transmission()),
-                policies.tableAt(evaluatedAt));
+                policies.policyAt(evaluatedAt));
     }
 }
