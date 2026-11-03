@@ -177,6 +177,13 @@ response không cache. Trong collection giấy tờ, chạy lần lượt các f
 bằng URL ký, không gửi bearer tới MinIO và không lưu URL vào biến. Không chia sẻ response/history
 chứa giấy tờ; chỉ dùng ảnh và thông tin thử ở local.
 
+`DOCUMENT_VERIFIER` và `ADMIN` quyết định tại `POST /api/v1/admin/documents/{documentCode}/verify`
+(không body hoặc `{}`) và `/reject` (JSON gồm `rejectionCode`, `rejectionNote` tuỳ chọn).
+Xác minh trả `VERIFIED`; từ chối trả `REJECTED` và giữ bản VERIFIED đang dùng. Hồ sơ đã xử lý hoặc
+đã bị thay trả `409 DOCUMENT_REVIEW_CONFLICT`. Trong collection giấy tờ, chạy các folder từ
+**Review setup (CUSTOMER)** đến **Read final review (CUSTOMER)** theo thứ tự và đúng vai;
+[hướng dẫn xác minh/từ chối](car-rental-docs/vi/api/identity.md) ghi đủ body, mã lỗi và các bước Runner.
+
 Compose chỉ mount provider lõi và JAR SMS local, không mount JAR `*-tests.jar`. Nếu chưa build,
 mount phải báo thiếu file, không tự tạo thư mục giả mang tên `.jar`. Không đổi image/platform.
 

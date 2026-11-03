@@ -12,7 +12,10 @@ import org.springframework.context.annotation.Configuration;
 /** Che JDBC DEBUG/TRACE ở mọi profile; không tạo datasource proxy hoặc nạp SQL caller formatter. */
 @Configuration(proxyBeanMethods = false)
 class SensitiveSqlLoggingConfiguration {
-    /** Filter thuộc Logback dùng chung, không bị một Spring context đóng gỡ khỏi context khác. */
+    /**
+     * Tái dùng filter đã gắn sớm bởi listener; dự phòng cho context không đi qua SpringApplication.
+     * Filter thuộc Logback dùng chung, không bị một Spring context đóng gỡ khỏi context khác.
+     */
     @Bean(destroyMethod = "")
     SensitiveSqlLogFilter sensitiveSqlLogFilterRegistration() {
         return register((LoggerContext) LoggerFactory.getILoggerFactory());
@@ -64,7 +67,7 @@ class SensitiveSqlLoggingConfiguration {
         /** Cấu hình lại không được mất bảo vệ JDBC của context đang sống. */
         @Override public void onReset(LoggerContext ignored) { install(); }
 
-        /** Logback stop giải phóng filter; Spring context mới đăng ký lại sau stop/reset của Boot. */
+        /** Logback stop giải phóng filter; listener của Boot đăng ký lại trước pha tạo bean. */
         @Override public void onStop(LoggerContext ignored) {
             context.getTurboFilterList().remove(filter);
             filter.stop();

@@ -245,6 +245,69 @@ class DocumentVerificationPersistenceIntegrationTest extends DocumentDatabaseTes
         assertEquals(verified ? List.of(fixture.ownerCode()) : List.of(), registrations(fixture.code()));
     }
 
+    /**
+     * BR-130: ép lượt nộp mới giữ khoá head trước trong khi transaction xác minh đã mở.
+     * Sau commit bản mới, lệnh duyệt GT cũ phải conflict; không được phân giải lại sang latest.
+     * Bổ sung nhánh nộp thắng mà cuộc đua tự do phía trên không bảo đảm luôn thực thi.
+     */
+    @Test @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void resubmissionHoldingHeadRejectsStaleVerification() throws Exception {
+        String number = uniqueNumber();
+        var fixture = tx().execute(status -> pending(DocumentType.IDENTITY_CARD, true, number));
+        String reviewer = tx().execute(status -> accountCode(newAccount()));
+        var next = tx().execute(status -> newSubmission(fixture.ownerCode(), number));
+        var inserted = new CountDownLatch(1);
+        var reviewStarted = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var submission = executor.submit(() -> tx().execute(status -> {
+                assertTrue(writes.insert(next));
+                inserted.countDown();
+                await(reviewStarted);
+                return true;
+            }));
+            var verification = executor.submit(() -> {
+                try {
+                    tx().executeWithoutResult(status -> {
+                        await(inserted);
+                        reviewStarted.countDown();
+                        verify(fixture.code(), reviewer);
+                    });
+                    return true;
+                } catch (DomainException failure) {
+                    assertEquals(ErrorCode.DOCUMENT_REVIEW_CONFLICT, failure.errorCode());
+                    assertEquals(DomainException.Category.CONFLICT, failure.category());
+                    return false;
+                }
+            });
+            try {
+                assertEquals(Boolean.TRUE, submission.get(25, TimeUnit.SECONDS));
+                assertFalse(verification.get(25, TimeUnit.SECONDS), "A stale decision must not verify the replacement.");
+            } finally {
+                inserted.countDown();
+                reviewStarted.countDown();
+            }
+        }
+        var old = read(fixture.code());
+        assertEquals("SUPERSEDED", old.get("status"));
+        assertNull(old.get("reviewer_code"));
+        assertEquals(next.code(), old.get("latest_code"));
+        assertEquals(fixture.activeCode(), old.get("active_code"));
+        var replacement = read(next.code());
+        assertEquals("PENDING", replacement.get("status"));
+        assertNull(replacement.get("reviewer_code"));
+        assertEquals(List.of(), registrations(fixture.code()));
+    }
+
+    /** Chờ có giới hạn trong test đồng thời; timeout hoặc interrupt không được tính là xung đột hợp lệ. */
+    private static void await(CountDownLatch signal) {
+        try {
+            if (!signal.await(10, TimeUnit.SECONDS)) throw new AssertionError("Concurrent review coordination timed out.");
+        } catch (InterruptedException failure) {
+            Thread.currentThread().interrupt();
+            throw new AssertionError(failure);
+        }
+    }
+
     /** Claim, trạng thái và lỗi CHECK không lộ hash/PII, kể cả TRACE và P6Spy thật. */
     @Test void redactsVerificationAndFailureLogs() {
         var fixture = pending(DocumentType.IDENTITY_CARD, true, uniqueNumber());
