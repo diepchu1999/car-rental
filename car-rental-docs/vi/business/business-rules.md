@@ -218,6 +218,9 @@ chỉ còn hạn tại thời điểm đặt.
 Lái xe với bằng hết hạn là vi phạm pháp luật, và bảo hiểm có thể từ chối bồi thường khi có sự cố —
 lúc đó mức miễn thường 2 triệu ở BR-602 không còn ý nghĩa gì.
 
+**Mốc hết hạn:** giấy tờ ghi hết hạn ngày D còn hiệu lực **hết ngày D theo giờ Việt Nam**; chuyến kết thúc từ
+00:00 ngày D+1 thì không đạt. Áp như nhau cho CCCD (BR-130). *Tech Owner chốt khi làm Task 8b.*
+
 Kiểm hai lần: lúc tạo đơn và lúc bàn giao (BR-107).
 *Nguồn: Tech Owner chốt 29/08/2026.*
 
@@ -468,6 +471,10 @@ trước 01/01/2025 vẫn dùng theo phạm vi và thời hạn ghi trên giấy
 | 4, 5, 7 chỗ | B, C1, C, D1, D2, D | B1, B2, C, D, E |
 | 16 chỗ | D1, D2, D | D, E |
 
+**Tra cột nào theo ngày cấp GPLX** (BR-130): cấp **trước 01/01/2025** → cột hạng cũ; cấp **từ 01/01/2025**
+→ cột hạng mới. Không tra theo riêng tên hạng: cùng một tên mang hai nghĩa — **B1 cũ** là ô tô dưới 9 chỗ,
+**B1 mới** là mô tô ba bánh. Gộp hai cột thì người có bằng B1 mới thuê được ô tô.
+
 Bảng là **dữ liệu**, không viết cứng trong code — luật đổi thì sửa dữ liệu. ⚠️ Bảng cần người hiểu luật
 xác nhận trước khi chạy với khách thật (mục "chưa chốt" cuối file).
 
@@ -511,7 +518,8 @@ hiện còn thiếu.*
 Khách **tự nhập** thông tin và **tải ảnh hai mặt** của CCCD và GPLX (BR-120). Nhân viên đối chiếu ảnh với
 thông tin rồi ra một trong hai kết quả: **đã xác minh**, hoặc **từ chối kèm lý do** — khách sửa và tải lại.
 
-**Ai xác minh:** một đội riêng mang vai **`DOCUMENT_VERIFIER`** (BR-801), và `ADMIN`. Vai này **chỉ** có
+**Ai xác minh:** một đội riêng mang vai **`DOCUMENT_VERIFIER`** (BR-801), và `ADMIN`. **Không ai tự xác minh
+giấy tờ của chính mình** — nhân viên cũng có thể là khách (BR-809), giấy tờ của họ do người khác duyệt. Vai này **chỉ** có
 quyền xác minh giấy tờ — không động vào xe, chi nhánh, đơn hay tiền. Nhân viên chi nhánh **không** xác minh.
 Khách không thuộc chi nhánh nào, nên việc xác minh không gắn với chi nhánh (BR-803: vai cấp công ty).
 
@@ -519,7 +527,7 @@ Khách không thuộc chi nhánh nào, nên việc xác minh không gắn với 
 
 | Giấy tờ | Trường |
 |---|---|
-| GPLX | Số · hạng (BR-128) · ngày hết hạn (BR-106b) · ghi chú "chỉ số tự động" (BR-128) · ảnh hai mặt |
+| GPLX | Số · hạng (BR-128) · **ngày cấp** (BR-128 — chọn cột hạng cũ hay mới) · ngày hết hạn (BR-106b) · ghi chú "chỉ số tự động" (BR-128) · ảnh hai mặt |
 | CCCD | Số · họ tên · ngày sinh · **ngày hết hạn** · ảnh hai mặt |
 
 **CCCD phải còn hạn tới hết chuyến** — cùng cách kiểm với GPLX ở BR-106b: lúc tạo đơn và lúc bàn giao. Hợp

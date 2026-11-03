@@ -31,6 +31,8 @@ Keycloak không hỗ trợ sẵn — phải viết Authenticator SPI bằng Java
 - Lưu ở **Keychain (iOS) / Keystore (Android)**. Không lưu ở AsyncStorage hay SharedPreferences.
 - Refresh token có xoay vòng. Phát hiện dùng lại token cũ ⇒ thu hồi cả phiên.
 - Access token có hạn ngắn; giữ phiên bằng refresh token, không bằng access token dài hạn.
+- **Phiên 30 ngày trong `realm-export.json` chỉ dành cho local** (Tech Owner yêu cầu, Task 8b) và đang áp cả
+  cho nhân viên qua `admin-web`. **Trước khi chạy thật phải đặt lại**, tách thời hạn phiên khách và nhân viên.
 - Deep link redirect URI đăng ký chính xác, **không dùng ký tự đại diện**.
 
 ## 2. Phân quyền
