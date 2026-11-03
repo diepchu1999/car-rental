@@ -29,9 +29,9 @@ class IdentityCardRegistrationMigrationIntegrationTest extends DocumentDatabaseT
         var second = submission(owner, "IDENTITY_CARD", "VERIFIED");
         var pending = submission(newAccount(), "IDENTITY_CARD", "PENDING", fakeNumber(accountCode(owner)));
         // V012 chưa có bảng đăng ký: cố ý không dùng helper tạo fixture VERIFIED của V013.
-        jdbc.queryForObject(documentSql("insert_submission"), first, Long.class);
-        jdbc.queryForObject(documentSql("insert_submission"), second, Long.class);
-        jdbc.queryForObject(documentSql("insert_submission"), pending, Long.class);
+        jdbc.queryForObject(documentSql("insert_legacy_submission"), first, Long.class);
+        jdbc.queryForObject(documentSql("insert_legacy_submission"), second, Long.class);
+        jdbc.queryForObject(documentSql("insert_legacy_submission"), pending, Long.class);
         var upgraded = Flyway.configure().configuration(flyway.getConfiguration()).target("13").load();
         assertEquals(1, upgraded.migrate().migrationsExecuted);
         assertEquals(List.of(accountCode(owner)), jdbc.queryForList(documentSql("read_registration_for_test"), Map.of("code", first.getValue("code")), String.class));
@@ -42,8 +42,8 @@ class IdentityCardRegistrationMigrationIntegrationTest extends DocumentDatabaseT
     @Test void refusesConflictingLegacyOwnersWithoutLeakingHash() {
         var first = submission(newAccount(), "IDENTITY_CARD", "VERIFIED", FAKE_NUMBER);
         var second = submission(newAccount(), "IDENTITY_CARD", "VERIFIED", FAKE_NUMBER);
-        jdbc.queryForObject(documentSql("insert_submission"), first, Long.class);
-        jdbc.queryForObject(documentSql("insert_submission"), second, Long.class);
+        jdbc.queryForObject(documentSql("insert_legacy_submission"), first, Long.class);
+        jdbc.queryForObject(documentSql("insert_legacy_submission"), second, Long.class);
         var upgraded = Flyway.configure().configuration(flyway.getConfiguration()).target("13").load();
         var failure = assertThrows(FlywayException.class, upgraded::migrate);
         assertTrue(failure.getMessage().contains("conflicting owners"));

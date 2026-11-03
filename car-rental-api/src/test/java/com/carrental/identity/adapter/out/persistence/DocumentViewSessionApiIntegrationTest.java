@@ -94,7 +94,7 @@ class DocumentViewSessionApiIntegrationTest extends DocumentDatabaseTestSupport 
             var before = clock.instant();
             var data = success(open(bearer, code, "{}"));
             assertEquals(Set.of("code", "accountCode", "documentType", "status", "number", "fullName", "birthDate",
-                    "expiresOn", "licenseClass", "automaticOnly", "submittedAt", "reviewedAt", "rejectionCode",
+                    "expiresOn", "issuedOn", "licenseClass", "automaticOnly", "submittedAt", "reviewedAt", "rejectionCode",
                     "rejectionNote", "frontImage", "backImage"), keys(data));
             assertEquals(code, data.path("code").asString()); assertEquals(ownerCode, data.path("accountCode").asString());
             assertEquals(type, data.path("documentType").asString()); assertEquals("PENDING", data.path("status").asString());
@@ -105,9 +105,11 @@ class DocumentViewSessionApiIntegrationTest extends DocumentDatabaseTestSupport 
             if (type.equals("IDENTITY_CARD")) {
                 assertEquals("LOCAL FAKE DOCUMENT", data.path("fullName").asString());
                 assertEquals("1990-01-01", data.path("birthDate").asString());
+                assertTrue(data.path("issuedOn").isNull());
                 assertTrue(data.path("licenseClass").isNull()); assertTrue(data.path("automaticOnly").isNull());
             } else {
                 assertTrue(data.path("fullName").isNull()); assertTrue(data.path("birthDate").isNull());
+                assertEquals("2025-01-01", data.path("issuedOn").asString());
                 assertEquals("B", data.path("licenseClass").asString()); assertFalse(data.path("automaticOnly").asBoolean());
             }
             for (String side : new String[]{"frontImage", "backImage"}) {

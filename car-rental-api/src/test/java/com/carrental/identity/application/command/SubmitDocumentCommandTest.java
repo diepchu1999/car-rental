@@ -32,6 +32,7 @@ class SubmitDocumentCommandTest {
         assertEquals(LocalDate.of(2035, 12, 31), command.expiresOn());
         assertNull(command.licenseClass());
         assertNull(command.automaticOnly());
+        assertNull(command.issuedOn());
         assertEquals("AN-FRONT1", command.frontUploadCode());
         assertEquals("AN-BACK01", command.backUploadCode());
     }
@@ -44,6 +45,7 @@ class SubmitDocumentCommandTest {
         var command = submit(payload);
         assertEquals(DocumentType.DRIVER_LICENSE, command.documentType());
         assertEquals("B", command.licenseClass());
+        assertEquals(LocalDate.of(2025, 1, 1), command.issuedOn());
         assertEquals(Boolean.valueOf(automaticOnly), command.automaticOnly());
         assertNull(command.fullName());
         assertNull(command.birthDate());
@@ -62,7 +64,7 @@ class SubmitDocumentCommandTest {
         return Stream.concat(
                 Stream.of("documentType", "number", "expiresOn", "frontUploadCode", "backUploadCode", "fullName", "birthDate")
                         .map(field -> Arguments.of("IDENTITY_CARD", field)),
-                Stream.of("number", "expiresOn", "frontUploadCode", "backUploadCode", "licenseClass", "automaticOnly")
+                Stream.of("number", "expiresOn", "frontUploadCode", "backUploadCode", "licenseClass", "automaticOnly", "issuedOn")
                         .map(field -> Arguments.of("DRIVER_LICENSE", field)));
     }
 
@@ -72,6 +74,7 @@ class SubmitDocumentCommandTest {
             var payload = identityCard(); payload.put("licenseClass", value); assertInvalid(payload);
         }
         var identity = identityCard(); identity.put("automaticOnly", false); assertInvalid(identity);
+        identity = identityCard(); identity.put("issuedOn", "2025-01-01"); assertInvalid(identity);
         var license = driverLicense(); license.put("fullName", "Local Other Person"); assertInvalid(license);
         license = driverLicense(); license.put("birthDate", "1995-02-28"); assertInvalid(license);
     }
@@ -85,9 +88,17 @@ class SubmitDocumentCommandTest {
     /** Ngày không có thật hoặc sai ISO không được tự sửa; lỗi không giữ cause chứa ngày khách nhập. */
     @ParameterizedTest @ValueSource(strings = {"", "2025-02-29", "2026-04-31", "31/12/2035", "2035-12-31T00:00:00Z", " 2035-12-31", "private-date"})
     void rejectsInvalidDatesWithoutRetainingParserInput(String value) {
+        var license = driverLicense(); license.put("issuedOn", value); assertInvalid(license);
         for (String field : new String[]{"birthDate", "expiresOn"}) {
             var payload = identityCard(); payload.put(field, value); assertInvalid(payload);
         }
+    }
+
+    /** BR-130: ngày cấp bằng ngày hết hạn hợp lệ; sau ngày hết hạn phải trả INVALID_REQUEST. */
+    @Test void validatesIssueDateAgainstExpiry() {
+        var payload = driverLicense(); payload.put("issuedOn", "2035-12-31");
+        assertEquals(LocalDate.of(2035, 12, 31), submit(payload).issuedOn());
+        payload.put("issuedOn", "2036-01-01"); assertInvalid(payload);
     }
 
     /** Không tự đặt hạn nộp hoặc độ tuổi: kiểm hiệu lực thuộc xác minh/cổng thuê, không thuộc parser. */
@@ -140,17 +151,17 @@ class SubmitDocumentCommandTest {
         var number = new DocumentNumber("local-number");
         var date = LocalDate.of(2035, 12, 31);
         assertThrows(DomainException.class, () -> new SubmitDocumentCommand(null, number,
-                "Local Person", date, date, null, null, "AN-FRONT1", "AN-BACK01"));
+                "Local Person", date, date, null, null, "AN-FRONT1", "AN-BACK01", null));
         assertThrows(DomainException.class, () -> new SubmitDocumentCommand(DocumentType.IDENTITY_CARD, null,
-                "Local Person", date, date, null, null, "AN-FRONT1", "AN-BACK01"));
+                "Local Person", date, date, null, null, "AN-FRONT1", "AN-BACK01", null));
         assertThrows(DomainException.class, () -> new SubmitDocumentCommand(DocumentType.IDENTITY_CARD, number,
-                null, date, date, null, null, "AN-FRONT1", "AN-BACK01"));
+                null, date, date, null, null, "AN-FRONT1", "AN-BACK01", null));
         assertThrows(DomainException.class, () -> new SubmitDocumentCommand(DocumentType.DRIVER_LICENSE, number,
-                null, null, date, "B", null, "AN-FRONT1", "AN-BACK01"));
+                null, null, date, "B", null, "AN-FRONT1", "AN-BACK01", LocalDate.of(2025, 1, 1)));
         assertThrows(DomainException.class, () -> new SubmitDocumentCommand(DocumentType.DRIVER_LICENSE, number,
-                null, null, null, "B", false, "AN-FRONT1", "AN-BACK01"));
+                null, null, null, "B", false, "AN-FRONT1", "AN-BACK01", LocalDate.of(2025, 1, 1)));
         assertThrows(DomainException.class, () -> new SubmitDocumentCommand(DocumentType.DRIVER_LICENSE, number,
-                null, null, date, "B", false, "AN-FRONT1", "AN-FRONT1"));
+                null, null, date, "B", false, "AN-FRONT1", "AN-FRONT1", LocalDate.of(2025, 1, 1)));
     }
 
     /** Record không in thông tin giấy tờ hoặc mã ảnh vào log. */
@@ -170,7 +181,7 @@ class SubmitDocumentCommandTest {
     /** GPLX giả, không hardcode bảng hạng được phép thuê trong command. */
     private static Map<String, Object> driverLicense() {
         var values = common(); values.put("documentType", "DRIVER_LICENSE");
-        values.put("licenseClass", "B"); values.put("automaticOnly", false);
+        values.put("licenseClass", "B"); values.put("automaticOnly", false); values.put("issuedOn", "2025-01-01");
         return values;
     }
 
@@ -187,7 +198,7 @@ class SubmitDocumentCommandTest {
         return SubmitDocumentCommand.from((String) values.get("documentType"), (String) values.get("number"),
                 (String) values.get("fullName"), (String) values.get("birthDate"), (String) values.get("expiresOn"),
                 (String) values.get("licenseClass"), (Boolean) values.get("automaticOnly"),
-                (String) values.get("frontUploadCode"), (String) values.get("backUploadCode"));
+                (String) values.get("frontUploadCode"), (String) values.get("backUploadCode"), (String) values.get("issuedOn"));
     }
 
     /** Đường âm phải đúng INVALID_REQUEST, không giữ cause hoặc dữ liệu thử nhạy cảm trong message. */

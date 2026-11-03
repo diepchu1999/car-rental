@@ -56,7 +56,7 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
                 (row, ignored) -> new ActiveDocumentDetail(row.getString("code"),
                         DocumentType.valueOf(row.getString("document_type")),
                         row.getObject("expires_on", LocalDate.class), row.getString("license_class"),
-                        row.getObject("automatic_only", Boolean.class)))));
+                        row.getObject("automatic_only", Boolean.class), row.getObject("issued_on", LocalDate.class)))));
     }
 
     /** Reload quyết định đúng GT; SensitiveSql che cả ghi chú tự do khi JDBC ghi log hoặc ném lỗi. */
@@ -72,7 +72,7 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
                         row.getString("code"), DocumentType.valueOf(row.getString("document_type")),
                         DocumentSubmissionStatus.valueOf(row.getString("status")),
                         row.getObject("expires_on", LocalDate.class),
-                        row.getObject("submitted_at", OffsetDateTime.class).toInstant()))));
+                        row.getObject("submitted_at", OffsetDateTime.class).toInstant(), row.getObject("issued_on", LocalDate.class)))));
     }
 
     /** Cùng chính sách không tiết lộ tồn tại cho mã sai chủ; che cả ghi chú khi JDBC lỗi. */
@@ -133,6 +133,7 @@ class DocumentSubmissionReadAdapter implements ReadDocumentSubmissionPort {
                 row.getObject(prefix + "expires_on", LocalDate.class),
                 row.getObject(prefix + "submitted_at", OffsetDateTime.class).toInstant(),
                 reviewedAt == null ? null : reviewedAt.toInstant(),
-                row.getString(prefix + "rejection_code"), row.getString(prefix + "rejection_note"));
+                row.getString(prefix + "rejection_code"), row.getString(prefix + "rejection_note"),
+                row.getObject(prefix + "issued_on", LocalDate.class));
     }
 }

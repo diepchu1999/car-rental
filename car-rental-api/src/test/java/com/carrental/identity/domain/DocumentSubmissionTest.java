@@ -63,26 +63,48 @@ class DocumentSubmissionTest {
         var at = Instant.parse("2026-10-26T03:00:00Z");
         var date = LocalDate.of(2035, 1, 1);
         assertThrows(IllegalArgumentException.class, () -> new DocumentSubmission("AN-FRONT1", "TK-OWNER1",
-                DocumentType.IDENTITY_CARD, NUMBER, "LOCAL", date, date, null, null, at, front, back));
+                DocumentType.IDENTITY_CARD, NUMBER, "LOCAL", date, date, null, null, at, front, back, null));
         assertThrows(IllegalArgumentException.class, () -> new DocumentSubmission("GT-DOC001", null,
-                DocumentType.IDENTITY_CARD, NUMBER, "LOCAL", date, date, null, null, at, front, back));
+                DocumentType.IDENTITY_CARD, NUMBER, "LOCAL", date, date, null, null, at, front, back, null));
         assertThrows(IllegalArgumentException.class, () -> new DocumentSubmission("GT-DOC001", "TK-OWNER1",
-                DocumentType.IDENTITY_CARD, null, "LOCAL", date, date, null, null, at, front, back));
+                DocumentType.IDENTITY_CARD, null, "LOCAL", date, date, null, null, at, front, back, null));
         assertThrows(IllegalArgumentException.class, () -> new DocumentSubmission("GT-DOC001", "TK-OWNER1",
-                DocumentType.IDENTITY_CARD, NUMBER, "LOCAL", null, date, null, null, at, front, back));
+                DocumentType.IDENTITY_CARD, NUMBER, "LOCAL", null, date, null, null, at, front, back, null));
         assertThrows(IllegalArgumentException.class, () -> new DocumentSubmission("GT-DOC001", "TK-OWNER1",
-                DocumentType.DRIVER_LICENSE, NUMBER, "LOCAL", null, date, "B", false, at, front, back));
+                DocumentType.DRIVER_LICENSE, NUMBER, "LOCAL", null, date, "B", false, at, front, back, LocalDate.of(2025, 1, 1)));
         assertThrows(IllegalArgumentException.class, () -> new DocumentSubmission("GT-DOC001", "TK-OWNER1",
-                DocumentType.DRIVER_LICENSE, NUMBER, null, null, date, "B", null, at, front, back));
+                DocumentType.DRIVER_LICENSE, NUMBER, null, null, date, "B", null, at, front, back, LocalDate.of(2025, 1, 1)));
         assertDoesNotThrow(() -> new DocumentSubmission("GT-DOC001", "TK-OWNER1",
-                DocumentType.DRIVER_LICENSE, NUMBER, null, null, date, "B", false, at, front, back));
+                DocumentType.DRIVER_LICENSE, NUMBER, null, null, date, "B", false, at, front, back, LocalDate.of(2025, 1, 1)));
+    }
+
+    /** BR-130: cửa ghi domain cũng chặn thiếu ngày, ngày tương lai và ngày sau hạn. */
+    @Test void rejectsInvalidLicenseIssueDate() {
+        var at = Instant.parse("2026-01-01T16:59:59Z");
+        assertThrows(IllegalArgumentException.class, () -> license(null, LocalDate.of(2035, 1, 1), at));
+        assertThrows(IllegalArgumentException.class, () -> license(LocalDate.of(2026, 1, 2), LocalDate.of(2035, 1, 1), at));
+        assertThrows(IllegalArgumentException.class, () -> license(LocalDate.of(2025, 1, 2), LocalDate.of(2025, 1, 1), at));
+    }
+
+    /** Đúng 00:00 Việt Nam nhận ngày mới; ngày cấp bằng hạn vẫn hợp lệ ở cửa nộp. */
+    @Test void acceptsVietnamCalendarBoundaryAndEqualExpiry() {
+        var date = LocalDate.of(2026, 1, 2);
+        assertEquals(date, license(date, date, Instant.parse("2026-01-01T17:00:00Z")).issuedOn());
+    }
+
+    /** Dựng GPLX ở cửa ghi trực tiếp để không phụ thuộc validation của command/service. */
+    private static DocumentSubmission license(LocalDate issue, LocalDate expiry, Instant at) {
+        return new DocumentSubmission("GT-DOC001", "TK-OWNER1", DocumentType.DRIVER_LICENSE, NUMBER,
+                null, null, expiry, "B", false, at,
+                image("AN-FRONT1", DocumentSide.FRONT, FRONT_KEY),
+                image("AN-BACK01", DocumentSide.BACK, BACK_KEY), issue);
     }
 
     /** CCCD nội bộ giả chỉ phục vụ kiểm cấu trúc; phong bì thật được kiểm ở integration/crypto test. */
     private static DocumentSubmission card(DocumentImage front, DocumentImage back) {
         return new DocumentSubmission("GT-DOC001", "TK-OWNER1", DocumentType.IDENTITY_CARD, NUMBER,
                 "LOCAL PRIVATE NAME", LocalDate.of(1990, 1, 1), LocalDate.of(2035, 1, 1), null, null,
-                Instant.parse("2026-10-26T03:00:00Z"), front, back);
+                Instant.parse("2026-10-26T03:00:00Z"), front, back, null);
     }
 
     /** Tham chiếu ảnh giả không có URL ký hoặc bytes. */

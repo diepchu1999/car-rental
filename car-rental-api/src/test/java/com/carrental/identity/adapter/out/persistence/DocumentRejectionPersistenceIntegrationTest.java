@@ -300,7 +300,7 @@ class DocumentRejectionPersistenceIntegrationTest extends DocumentDatabaseTestSu
         String code = nextCode("GT");
         var number = crypto.protect(new DocumentNumber(FAKE_NUMBER), new DocumentProtectionContext(owner, DocumentType.IDENTITY_CARD, code));
         return new DocumentSubmission(code, owner, DocumentType.IDENTITY_CARD, number, "LOCAL FAKE PERSON",
-                LocalDate.of(1990, 1, 1), LocalDate.of(2035, 1, 1), null, null, REVIEWED_AT, front, back);
+                LocalDate.of(1990, 1, 1), LocalDate.of(2035, 1, 1), null, null, REVIEWED_AT, front, back, null);
     }
 
     /** Metadata ảnh thử dùng khoá riêng; không gọi MinIO vì đây là cuộc đua transaction PostgreSQL. */

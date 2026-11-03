@@ -1,7 +1,7 @@
 -- BR-130: chỉ use case xác minh đã kiểm quyền được dùng; không đọc xuyên schema hay chọn lại head.
 -- LEFT JOIN để adapter phát hiện bản nộp thiếu ảnh thay vì âm thầm trả không tồn tại.
 SELECT s.code, a.code AS account_code, s.document_type, s.status,
-       s.expires_on, s.submitted_at, s.reviewed_at, s.rejection_code, s.rejection_note,
+       s.expires_on, s.issued_on, s.submitted_at, s.reviewed_at, s.rejection_code, s.rejection_note,
        s.number_key_version, s.number_nonce, s.number_ciphertext, s.number_hash,
        s.full_name, s.birth_date, s.license_class, s.automatic_only,
        fu.code AS front_upload_code, f.sealed_object_key AS front_object_key,

@@ -189,7 +189,7 @@ class DocumentViewSessionCommandServiceTest {
     /** Hồ sơ giả đủ hai mặt sealed; số mã hoá không được dùng làm số rõ trong kết quả. */
     private static DocumentReviewDetail document(String code) {
         var status = new DocumentStatusDetail(code, DocumentType.IDENTITY_CARD, DocumentSubmissionStatus.PENDING,
-                LocalDate.of(2030, 1, 1), NOW.minusSeconds(10), null, null, null);
+                LocalDate.of(2030, 1, 1), NOW.minusSeconds(10), null, null, null, null);
         return new DocumentReviewDetail("TK-OWNER1", status, new ProtectedDocumentNumber(1, "nonce", "ciphertext", "hash"),
                 "LOCAL FAKE DOCUMENT", LocalDate.of(1990, 1, 1), null, null,
                 new DocumentImage("AN-FRONT1", DocumentSide.FRONT, "sealed/00000000-0000-0000-0000-000000000001", "image/png", 100, 10, 10),

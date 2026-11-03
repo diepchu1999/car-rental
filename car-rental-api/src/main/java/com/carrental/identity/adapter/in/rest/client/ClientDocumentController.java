@@ -35,12 +35,12 @@ class ClientDocumentController {
         this.submissions = submissions; this.statuses = statuses; this.heads = heads;
     }
 
-    /** Trả 201 sau commit, không cache; giữ nguyên hợp đồng POST năm trường. */
+    /** Trả 201 sau commit, không cache; kèm ngày cấp GPLX để chủ kiểm lại dữ liệu đã nộp. */
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     ResponseEntity<ApiResponse<DocumentSubmissionResponse>> submit(@RequestBody SubmitDocumentRequest request) {
         var result = submissions.submit(SubmitDocumentCommand.from(request.documentType(), request.number(),
                 request.fullName(), request.birthDate(), request.expiresOn(), request.licenseClass(),
-                request.automaticOnly(), request.frontUploadCode(), request.backUploadCode()));
+                request.automaticOnly(), request.frontUploadCode(), request.backUploadCode(), request.issuedOn()));
         return ResponseEntity.status(HttpStatus.CREATED).cacheControl(CacheControl.noStore())
                 .body(ApiResponse.success(DocumentSubmissionResponse.fromDomain(result)));
     }

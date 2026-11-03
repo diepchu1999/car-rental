@@ -47,8 +47,8 @@ class ActiveDocumentReadIntegrationTest extends DocumentDatabaseTestSupport {
         active(owner, card); active(owner, license);
         var result = reads.listActiveByOwner(accountCode(owner));
         assertEquals(List.of(
-                new ActiveDocumentDetail(code(license), DocumentType.DRIVER_LICENSE, LocalDate.of(2032, 4, 5), "D1", automaticOnly),
-                new ActiveDocumentDetail(code(card), DocumentType.IDENTITY_CARD, LocalDate.of(2031, 2, 3), null, null)), result);
+                new ActiveDocumentDetail(code(license), DocumentType.DRIVER_LICENSE, LocalDate.of(2032, 4, 5), "D1", automaticOnly, LocalDate.of(2025, 1, 1)),
+                new ActiveDocumentDetail(code(card), DocumentType.IDENTITY_CARD, LocalDate.of(2031, 2, 3), null, null, null)), result);
     }
 
     /** Bản mới PENDING/REJECTED không được che active cũ của cả CCCD/GPLX; phép thử đảo nhắm con trỏ này. */
@@ -90,6 +90,7 @@ class ActiveDocumentReadIntegrationTest extends DocumentDatabaseTestSupport {
     void expiredSelectionDoesNotFallBackToHistoricalVerified(DocumentType type) {
         long owner = newAccount();
         var selected = submission(owner, type.name(), "VERIFIED").addValue("expiresOn", "2000-01-01");
+        if (type == DocumentType.DRIVER_LICENSE) selected.addValue("issuedOn", "1999-01-01");
         long selectedId = insert("submission", selected);
         var historical = submission(owner, type.name(), "VERIFIED").addValue("expiresOn", "2040-01-01");
         insert("submission", historical);
@@ -150,11 +151,11 @@ class ActiveDocumentReadIntegrationTest extends DocumentDatabaseTestSupport {
         active(owner, selected); assertEquals("LOCAL_UNKNOWN", reads.listActiveByOwner(accountCode(owner)).getFirst().licenseClass());
     }
 
-    /** Khoá năm trường cần thiết; số, hash, tên, ngày sinh, ảnh, reviewer hoặc ghi chú không thuộc view. */
+    /** Khoá sáu trường cần thiết; số, hash, tên, ngày sinh, ảnh, reviewer hoặc ghi chú không thuộc view. */
     @Test void exposesOnlyMinimalMetadataAndRedactsToString() {
-        assertEquals(List.of("code", "documentType", "expiresOn", "licenseClass", "automaticOnly"),
+        assertEquals(List.of("code", "documentType", "expiresOn", "licenseClass", "automaticOnly", "issuedOn"),
                 Arrays.stream(ActiveDocumentDetail.class.getRecordComponents()).map(java.lang.reflect.RecordComponent::getName).toList());
-        var view = new ActiveDocumentDetail("GT-FAKE01", DocumentType.DRIVER_LICENSE, LocalDate.of(2030, 1, 1), "B", true);
+        var view = new ActiveDocumentDetail("GT-FAKE01", DocumentType.DRIVER_LICENSE, LocalDate.of(2030, 1, 1), "B", true, LocalDate.of(2025, 1, 1));
         assertEquals("ActiveDocumentDetail[redacted]", view.toString());
     }
 

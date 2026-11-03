@@ -113,7 +113,7 @@ class DocumentSubmissionPersistenceIntegrationTest extends DocumentDatabaseTestS
         assertTrue(writes.insert(rejected));
         SensitiveSql.execute(() -> jdbc.update(documentSql("update_review"), new MapSqlParameterSource()
                 .addValue("id", read(rejected).get("id")).addValue("status", "REJECTED")
-                .addValue("reviewedAt", AT).addValue("reviewerId", ownerId)
+                .addValue("reviewedAt", AT).addValue("reviewerId", newAccount())
                 .addValue("rejectionCode", "ILLEGIBLE").addValue("rejectionNote", null)));
         var current = fixture(owner, DocumentType.IDENTITY_CARD);
         assertTrue(writes.insert(current));
@@ -314,7 +314,7 @@ class DocumentSubmissionPersistenceIntegrationTest extends DocumentDatabaseTestS
         boolean card = type == DocumentType.IDENTITY_CARD;
         return new DocumentSubmission(code, owner, type, protectedNumber, card ? "LOCAL PRIVATE DOCUMENT" : null,
                 card ? LocalDate.of(1990, 1, 1) : null, LocalDate.of(2035, 1, 1), card ? null : "B",
-                card ? null : false, NOW, front, back);
+                card ? null : false, NOW, front, back, card ? null : LocalDate.of(2025, 1, 1));
     }
 
     /** AN thực sự có trong PostgreSQL; không giả danh chủ bằng cách chỉ truyền mã đúng định dạng. */
@@ -329,7 +329,7 @@ class DocumentSubmissionPersistenceIntegrationTest extends DocumentDatabaseTestS
         var number = crypto.protect(new DocumentNumber(FAKE_NUMBER),
                 new DocumentProtectionContext(source.accountCode(), source.documentType(), code));
         return new DocumentSubmission(code, source.accountCode(), source.documentType(), number, source.fullName(),
-                source.birthDate(), source.expiresOn(), source.licenseClass(), source.automaticOnly(), source.submittedAt(), front, back);
+                source.birthDate(), source.expiresOn(), source.licenseClass(), source.automaticOnly(), source.submittedAt(), front, back, source.issuedOn());
     }
 
     /** Tái dùng AN nhưng key mới để test chỉ có lỗi uq_document_image_upload, không trùng sealed key. */

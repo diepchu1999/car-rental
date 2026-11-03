@@ -24,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
@@ -66,23 +67,28 @@ class DocumentSubmissionCommandService implements SubmitDocumentUseCase {
         if (!owner.equals(account.code())) throw new IllegalStateException("Account lookup is inconsistent.");
         if (account.consent().isEmpty()) throw DomainException.forbidden(ErrorCode.CONSENT_REQUIRED);
 
+        // BR-128/130: dùng một mốc nộp duy nhất; chặn ngày cấp tương lai trước đọc/chốt ảnh.
+        var submittedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
+        if (command.issuedOn() != null && command.issuedOn().isAfter(
+                submittedAt.atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate())) {
+            throw DomainException.invalidInput("issuedOn must not be after the submission date.");
+        }
         // Kiểm xong cả hai tham chiếu trước khi đọc/chốt bất kỳ object nào.
         var frontUpload = requireUpload(command.frontUploadCode(), owner, command.documentType(), DocumentSide.FRONT);
         var backUpload = requireUpload(command.backUploadCode(), owner, command.documentType(), DocumentSide.BACK);
         var front = seal(frontUpload);
         var back = seal(backUpload);
-        var submittedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         for (int attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
             String code = codes.generate("GT");
             var number = crypto.protect(command.number(), new DocumentProtectionContext(owner, command.documentType(), code));
             var submission = new DocumentSubmission(code, owner, command.documentType(), number,
                     command.fullName(), command.birthDate(), command.expiresOn(), command.licenseClass(),
-                    command.automaticOnly(), submittedAt, front, back);
+                    command.automaticOnly(), submittedAt, front, back, command.issuedOn());
             if (!writes.insert(submission)) continue;
             var stored = reads.findByCodeAndOwner(code, owner)
                     .orElseThrow(() -> new IllegalStateException("Created document submission could not be reloaded."));
             var expected = new DocumentSubmissionDetail(code, command.documentType(),
-                    DocumentSubmissionStatus.PENDING, command.expiresOn(), submittedAt);
+                    DocumentSubmissionStatus.PENDING, command.expiresOn(), submittedAt, command.issuedOn());
             if (!expected.equals(stored)) throw new IllegalStateException("Document submission reload is inconsistent.");
             return stored;
         }

@@ -2,6 +2,7 @@ package com.carrental.identity.domain;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 /**
  * BR-130: dữ liệu bất biến của một lần nộp mới, số đã bảo vệ và đủ hai mặt ảnh đã chốt.
@@ -10,7 +11,7 @@ import java.time.LocalDate;
 public record DocumentSubmission(String code, String accountCode, DocumentType documentType,
         ProtectedDocumentNumber number, String fullName, LocalDate birthDate, LocalDate expiresOn,
         String licenseClass, Boolean automaticOnly, Instant submittedAt,
-        DocumentImage frontImage, DocumentImage backImage) {
+        DocumentImage frontImage, DocumentImage backImage, LocalDate issuedOn) {
     /** Ép đủ dữ liệu ở cửa ghi, không cho gọi port với một ảnh hoặc bộ trường sai loại. */
     public DocumentSubmission {
         if (code == null || !code.matches("GT-[A-Z0-9]{6}")
@@ -24,9 +25,11 @@ public record DocumentSubmission(String code, String accountCode, DocumentType d
         }
         boolean validFields = switch (documentType) {
             case IDENTITY_CARD -> fullName != null && !fullName.isBlank() && birthDate != null
-                    && licenseClass == null && automaticOnly == null;
+                    && licenseClass == null && automaticOnly == null && issuedOn == null;
             case DRIVER_LICENSE -> fullName == null && birthDate == null
-                    && licenseClass != null && !licenseClass.isBlank() && automaticOnly != null;
+                    && licenseClass != null && !licenseClass.isBlank() && automaticOnly != null
+                    && issuedOn != null && !issuedOn.isAfter(expiresOn)
+                    && !issuedOn.isAfter(submittedAt.atZone(ZoneId.of("Asia/Ho_Chi_Minh")).toLocalDate());
         };
         if (!validFields) throw new IllegalArgumentException("Invalid document submission fields.");
     }

@@ -52,16 +52,18 @@ class DocumentStatusReadIntegrationTest extends DocumentDatabaseTestSupport {
             assertEquals(type, actual.documentType());
             assertEquals(status, actual.status());
             assertEquals(LocalDate.of(2030, 1, 1), actual.expiresOn());
+            assertEquals(type == DocumentType.DRIVER_LICENSE ? LocalDate.of(2025, 1, 1) : null, actual.issuedOn());
             assertEquals(Instant.parse(AT), actual.submittedAt());
             boolean reviewed = status == DocumentSubmissionStatus.VERIFIED || status == DocumentSubmissionStatus.REJECTED;
             assertEquals(reviewed ? Instant.parse(AT) : null, actual.reviewedAt());
             assertEquals(status == DocumentSubmissionStatus.REJECTED ? "ILLEGIBLE" : null, actual.rejectionCode());
             assertNull(actual.rejectionNote());
-            // Kết quả reload dùng bởi POST vẫn giữ đúng hợp đồng năm trường hiện có.
+            // Kết quả reload dùng bởi POST giữ ngày cấp đã lưu, không dựng lại từ command.
             var reload = reads.findByCodeAndOwner(code(parameters), accountCode(owner)).orElseThrow();
             assertEquals(actual.code(), reload.code());
             assertEquals(actual.status(), reload.status());
             assertEquals(actual.expiresOn(), reload.expiresOn());
+            assertEquals(actual.issuedOn(), reload.issuedOn());
         }
     }
 
@@ -159,6 +161,7 @@ class DocumentStatusReadIntegrationTest extends DocumentDatabaseTestSupport {
         var historical = submission(owner, type.name(), "VERIFIED").addValue("expiresOn", "2040-01-01");
         insert("submission", historical);
         var selected = submission(owner, type.name(), "VERIFIED").addValue("expiresOn", "2000-01-01");
+        if (type == DocumentType.DRIVER_LICENSE) selected.addValue("issuedOn", "1999-01-01");
         long selectedId = insert("submission", selected);
         var pending = submission(owner, type.name(), "PENDING");
         insert("head", head(owner, type.name(), insert("submission", pending), selectedId));
@@ -238,7 +241,7 @@ class DocumentStatusReadIntegrationTest extends DocumentDatabaseTestSupport {
     @Test
     void statusViewsExposeOnlyTrackingMetadata() {
         assertEquals(List.of("code", "documentType", "status", "expiresOn", "submittedAt", "reviewedAt",
-                "rejectionCode", "rejectionNote"), Arrays.stream(DocumentStatusDetail.class.getRecordComponents())
+                "rejectionCode", "rejectionNote", "issuedOn"), Arrays.stream(DocumentStatusDetail.class.getRecordComponents())
                 .map(java.lang.reflect.RecordComponent::getName).toList());
         assertEquals(List.of("documentType", "latestSubmission", "activeVerifiedSubmission"),
                 Arrays.stream(DocumentHeadSummary.class.getRecordComponents())

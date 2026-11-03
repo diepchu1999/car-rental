@@ -163,7 +163,7 @@ class DocumentReviewCommandServiceTest {
     /** View metadata cố định phục vụ test, không có số giấy tờ hoặc tham chiếu ảnh. */
     private static DocumentStatusDetail detail(String code, DocumentSubmissionStatus status, Instant at, String reason, String note) {
         return new DocumentStatusDetail(code, DocumentType.IDENTITY_CARD, status, LocalDate.of(2030, 1, 1),
-                NOW.minusSeconds(100), at, reason, note);
+                NOW.minusSeconds(100), at, reason, note, null);
     }
 
     /** 403 phải đúng ACCESS_DENIED, không chấp nhận NPE hoặc lỗi mock thay cho kiểm quyền. */

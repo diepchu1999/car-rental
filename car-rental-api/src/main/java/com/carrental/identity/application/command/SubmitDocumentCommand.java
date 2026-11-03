@@ -16,7 +16,7 @@ import java.time.format.DateTimeParseException;
  */
 public record SubmitDocumentCommand(DocumentType documentType, DocumentNumber number,
         String fullName, LocalDate birthDate, LocalDate expiresOn,
-        String licenseClass, Boolean automaticOnly, String frontUploadCode, String backUploadCode) {
+        String licenseClass, Boolean automaticOnly, String frontUploadCode, String backUploadCode, LocalDate issuedOn) {
 
     /**
      * Giữ validation kể cả khi gọi constructor trực tiếp; hai bộ trường không được trộn lẫn.
@@ -35,7 +35,7 @@ public record SubmitDocumentCommand(DocumentType documentType, DocumentNumber nu
             case IDENTITY_CARD -> {
                 requireSafeText(fullName, "fullName");
                 Validations.required(birthDate, "birthDate");
-                if (licenseClass != null || automaticOnly != null) {
+                if (licenseClass != null || automaticOnly != null || issuedOn != null) {
                     throw DomainException.invalidInput("Driver license fields are not allowed for an identity card.");
                 }
             }
@@ -43,6 +43,10 @@ public record SubmitDocumentCommand(DocumentType documentType, DocumentNumber nu
                 requireSafeText(licenseClass, "licenseClass");
                 // Boolean bắt buộc: thiếu không được tự hiểu là false.
                 Validations.required(automaticOnly, "automaticOnly");
+                Validations.required(issuedOn, "issuedOn");
+                if (issuedOn.isAfter(expiresOn)) {
+                    throw DomainException.invalidInput("issuedOn must not be after expiresOn.");
+                }
                 if (fullName != null || birthDate != null) {
                     throw DomainException.invalidInput("Identity card fields are not allowed for a driver license.");
                 }
@@ -56,10 +60,10 @@ public record SubmitDocumentCommand(DocumentType documentType, DocumentNumber nu
      */
     public static SubmitDocumentCommand from(String documentType, String number, String fullName,
             String birthDate, String expiresOn, String licenseClass, Boolean automaticOnly,
-            String frontUploadCode, String backUploadCode) {
+            String frontUploadCode, String backUploadCode, String issuedOn) {
         return new SubmitDocumentCommand(parseType(documentType), new DocumentNumber(number), fullName,
                 parseDate(birthDate, "birthDate"), parseDate(expiresOn, "expiresOn"), licenseClass,
-                automaticOnly, frontUploadCode, backUploadCode);
+                automaticOnly, frontUploadCode, backUploadCode, parseDate(issuedOn, "issuedOn"));
     }
 
     /** Chỉ nhận enum đúng chính tả; bỏ exception gốc để không mang giá trị khách nhập vào log. */

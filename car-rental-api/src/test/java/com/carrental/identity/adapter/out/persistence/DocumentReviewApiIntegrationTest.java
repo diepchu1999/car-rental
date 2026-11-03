@@ -303,12 +303,14 @@ class DocumentReviewApiIntegrationTest extends DocumentDatabaseTestSupport {
         try (var http = HttpClient.newHttpClient()) { return http.send(builder.GET().build(), HttpResponse.BodyHandlers.ofString()); }
     }
 
-    /** Kiểm đủ hợp đồng tám trường, envelope, cache và requestId; không lộ dữ liệu ngoài metadata. */
+    /** Kiểm đủ hợp đồng chín trường, envelope, cache và requestId; không lộ dữ liệu ngoài metadata. */
     private JsonNode success(HttpResponse<String> response, Fixture fixture, String status) {
         assertEquals(200, response.statusCode()); headers(response); var body = json.readTree(response.body());
         assertEquals(Set.of("success", "data", "error"), keys(body)); assertTrue(body.path("success").asBoolean()); assertTrue(body.path("error").isNull());
         var data = body.path("data");
-        assertEquals(Set.of("code", "documentType", "status", "expiresOn", "submittedAt", "reviewedAt", "rejectionCode", "rejectionNote"), keys(data));
+        assertEquals(Set.of("code", "documentType", "status", "expiresOn", "issuedOn", "submittedAt", "reviewedAt", "rejectionCode", "rejectionNote"), keys(data));
+        if (fixture.type().equals("DRIVER_LICENSE")) assertEquals("2025-01-01", data.path("issuedOn").asString());
+        else assertTrue(data.path("issuedOn").isNull());
         assertEquals(fixture.code(), data.path("code").asString()); assertEquals(fixture.type(), data.path("documentType").asString());
         assertEquals(status, data.path("status").asString()); assertEquals("2030-01-01", data.path("expiresOn").asString());
         assertEquals(Instant.parse(AT), Instant.parse(data.path("submittedAt").asString())); assertFalse(data.path("reviewedAt").isNull());

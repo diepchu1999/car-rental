@@ -69,7 +69,7 @@ class DocumentStatusApiIntegrationTest extends DocumentDatabaseTestSupport {
     /** GET không chốt/đọc/ký ảnh hoặc gọi write port, kể cả khi gặp lỗi. */
     @AfterEach void doesNotWriteDocumentsOrAccessObjects() { verifyNoInteractions(objects, writes); }
 
-    /** Mọi trạng thái trả đủ tám trường metadata; reviewed/rejection null đúng, không có ID/số/key ảnh. */
+    /** Mọi trạng thái trả đủ chín trường metadata; reviewed/rejection null đúng, không có ID/số/key ảnh. */
     @ParameterizedTest @EnumSource(DocumentSubmissionStatus.class)
     void readsOwnVersionWithExactResponseShape(DocumentSubmissionStatus status) throws Exception {
         for (String type : new String[]{"IDENTITY_CARD", "DRIVER_LICENSE"}) {
@@ -142,6 +142,7 @@ class DocumentStatusApiIntegrationTest extends DocumentDatabaseTestSupport {
     void separatesPendingOrRejectedLatestFromVerifiedActive(String status) throws Exception {
         for (String type : new String[]{"IDENTITY_CARD", "DRIVER_LICENSE"}) {
             var active = submission(ownerId, type, "VERIFIED").addValue("expiresOn", "2000-01-01");
+            if (type.equals("DRIVER_LICENSE")) active.addValue("issuedOn", "1999-01-01");
             long activeId = insert("submission", active);
             var latest = submission(ownerId, type, status);
             insert("head", head(ownerId, type, insert("submission", latest), activeId));
@@ -151,7 +152,7 @@ class DocumentStatusApiIntegrationTest extends DocumentDatabaseTestSupport {
         assertEquals("DRIVER_LICENSE", result.get(0).path("documentType").asString());
         assertEquals("IDENTITY_CARD", result.get(1).path("documentType").asString());
         for (var head : result) {
-            assertHead(head);
+            assertHead(head, "1999-01-01");
             assertEquals(status, head.path("latestSubmission").path("status").asString());
             assertEquals("VERIFIED", head.path("activeVerifiedSubmission").path("status").asString());
             assertEquals("2000-01-01", head.path("activeVerifiedSubmission").path("expiresOn").asString());
@@ -201,7 +202,7 @@ class DocumentStatusApiIntegrationTest extends DocumentDatabaseTestSupport {
     /** DTO response không được tự in ghi chú riêng tư khi logger nhận cả object. */
     @Test void redactsResponseStrings() {
         var detail = new DocumentStatusResponse("GT-LOCAL1", "IDENTITY_CARD", "REJECTED", null, null, null,
-                "ILLEGIBLE", "LOCAL PRIVATE REVIEW NOTE");
+                "ILLEGIBLE", "LOCAL PRIVATE REVIEW NOTE", null);
         assertEquals("DocumentStatusResponse[redacted]", detail.toString());
         assertEquals("DocumentHeadResponse[redacted]", new DocumentHeadResponse("IDENTITY_CARD", detail, null).toString());
     }
@@ -240,15 +241,27 @@ class DocumentStatusApiIntegrationTest extends DocumentDatabaseTestSupport {
 
     /** Danh sách chỉ trả loại và hai con trỏ dạng metadata, không có trường nội bộ phát sinh. */
     private static void assertHead(JsonNode data) {
-        assertEquals(Set.of("documentType", "latestSubmission", "activeVerifiedSubmission"), keys(data));
-        assertMetadata(data.path("latestSubmission"));
-        if (!data.path("activeVerifiedSubmission").isNull()) assertMetadata(data.path("activeVerifiedSubmission"));
+        assertHead(data, "2025-01-01");
     }
 
-    /** Khoá chính xác bộ tám trường, nên thêm ID/key/số giấy tờ vào response làm test đỏ. */
+    /** Ngày cấp bản active được kỳ vọng riêng với bản mới nhất, không suy từ ngày hết hạn. */
+    private static void assertHead(JsonNode data, String activeIssuedOn) {
+        assertEquals(Set.of("documentType", "latestSubmission", "activeVerifiedSubmission"), keys(data));
+        assertMetadata(data.path("latestSubmission"));
+        if (!data.path("activeVerifiedSubmission").isNull()) assertMetadata(data.path("activeVerifiedSubmission"), activeIssuedOn);
+    }
+
+    /** Khoá chính xác bộ chín trường, nên thêm ID/key/số giấy tờ vào response làm test đỏ. */
     private static void assertMetadata(JsonNode data) {
-        assertEquals(Set.of("code", "documentType", "status", "expiresOn", "submittedAt", "reviewedAt",
+        assertMetadata(data, "2025-01-01");
+    }
+
+    /** Khóa đúng bộ trường và giá trị ngày cấp của fixture, gồm GPLX lịch sử đã hết hạn. */
+    private static void assertMetadata(JsonNode data, String issuedOn) {
+        assertEquals(Set.of("code", "documentType", "status", "expiresOn", "issuedOn", "submittedAt", "reviewedAt",
                 "rejectionCode", "rejectionNote"), keys(data));
+        if (data.path("documentType").asString().equals("DRIVER_LICENSE")) assertEquals(issuedOn, data.path("issuedOn").asString());
+        else assertTrue(data.path("issuedOn").isNull());
     }
 
     /** Đọc tên thuộc tính JSON mà không ghi nội dung giá trị ra log. */

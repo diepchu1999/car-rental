@@ -48,10 +48,11 @@ abstract class DocumentDatabaseTestSupport extends IdentityDatabaseTestSupport {
                 .addValue("fullName", card ? "LOCAL FAKE DOCUMENT" : null, Types.VARCHAR)
                 .addValue("birthDate", card ? "1990-01-01" : null, Types.VARCHAR)
                 .addValue("expiresOn", "2030-01-01", Types.VARCHAR)
+                .addValue("issuedOn", card ? null : "2025-01-01", Types.VARCHAR)
                 .addValue("licenseClass", card ? null : "B", Types.VARCHAR)
                 .addValue("automaticOnly", card ? null : false, Types.BOOLEAN)
                 .addValue("submittedAt", AT).addValue("reviewedAt", reviewed ? AT : null, Types.VARCHAR)
-                .addValue("reviewerId", reviewed ? owner : null, Types.BIGINT)
+                .addValue("reviewerId", reviewed ? newAccount() : null, Types.BIGINT)
                 .addValue("rejectionCode", status.equals("REJECTED") ? "ILLEGIBLE" : null, Types.VARCHAR)
                 .addValue("rejectionNote", null, Types.VARCHAR);
     }

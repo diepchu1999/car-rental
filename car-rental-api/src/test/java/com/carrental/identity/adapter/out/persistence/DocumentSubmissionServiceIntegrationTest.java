@@ -104,7 +104,7 @@ class DocumentSubmissionServiceIntegrationTest extends DocumentDatabaseTestSuppo
         SensitiveSql.execute(() -> insert("upload", foreign));
         var invalid = new SubmitDocumentCommand(command.documentType(), command.number(), command.fullName(),
                 command.birthDate(), command.expiresOn(), null, null,
-                command.frontUploadCode(), (String) foreign.getValue("code"));
+                command.frontUploadCode(), (String) foreign.getValue("code"), command.issuedOn());
         var failure = assertThrows(DomainException.class, () -> useCase.submit(invalid));
         assertEquals(ErrorCode.DOCUMENT_UPLOAD_NOT_FOUND, failure.errorCode());
         assertEquals(DomainException.Category.NOT_FOUND, failure.category());
@@ -185,7 +185,7 @@ class DocumentSubmissionServiceIntegrationTest extends DocumentDatabaseTestSuppo
         boolean card = type == DocumentType.IDENTITY_CARD;
         return new SubmitDocumentCommand(type, new DocumentNumber(FAKE_NUMBER), card ? "LOCAL FAKE NAME" : null,
                 card ? LocalDate.of(1990, 1, 1) : null, LocalDate.of(2035, 1, 1), card ? null : "B",
-                card ? null : false, (String) front.getValue("code"), (String) back.getValue("code"));
+                card ? null : false, (String) front.getValue("code"), (String) back.getValue("code"), card ? null : LocalDate.of(2025, 1, 1));
     }
 
     /** Đọc bằng SQL kiểm chứng độc lập sau transaction service, không phụ thuộc spy reload. */

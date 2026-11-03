@@ -142,6 +142,6 @@ class DocumentStatusQueryServiceTest {
     /** Một phiên bản pending mẫu, không dùng dữ liệu người thật. */
     private static DocumentStatusDetail detail(String code) {
         return new DocumentStatusDetail(code, DocumentType.IDENTITY_CARD, DocumentSubmissionStatus.PENDING,
-                LocalDate.of(2035, 1, 1), Instant.EPOCH, null, null, null);
+                LocalDate.of(2035, 1, 1), Instant.EPOCH, null, null, null, null);
     }
 }

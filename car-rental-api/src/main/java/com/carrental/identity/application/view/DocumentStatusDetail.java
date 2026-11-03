@@ -11,7 +11,7 @@ import java.time.LocalDate;
  * Không mang số giấy tờ, thông tin nhân thân, người duyệt, phong bì mật mã hoặc tham chiếu ảnh.
  */
 public record DocumentStatusDetail(String code, DocumentType documentType, DocumentSubmissionStatus status,
-        LocalDate expiresOn, Instant submittedAt, Instant reviewedAt, String rejectionCode, String rejectionNote) {
+        LocalDate expiresOn, Instant submittedAt, Instant reviewedAt, String rejectionCode, String rejectionNote, LocalDate issuedOn) {
     /** Ghi chú tự do có thể chứa dữ liệu cá nhân; không cho logger in cả view. */
     @Override public String toString() { return "DocumentStatusDetail[redacted]"; }
 }

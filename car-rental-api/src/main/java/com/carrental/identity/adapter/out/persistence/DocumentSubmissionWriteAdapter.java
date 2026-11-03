@@ -166,6 +166,7 @@ class DocumentSubmissionWriteAdapter implements WriteDocumentSubmissionPort {
                 .addValue("fullName", submission.fullName(), Types.VARCHAR)
                 .addValue("birthDate", submission.birthDate(), Types.DATE)
                 .addValue("expiresOn", submission.expiresOn(), Types.DATE)
+                .addValue("issuedOn", submission.issuedOn(), Types.DATE)
                 .addValue("licenseClass", submission.licenseClass(), Types.VARCHAR)
                 .addValue("automaticOnly", submission.automaticOnly(), Types.BOOLEAN)
                 .addValue("submittedAt", submission.submittedAt().atOffset(ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE);

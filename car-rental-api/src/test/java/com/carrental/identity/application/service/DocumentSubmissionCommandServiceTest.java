@@ -77,6 +77,7 @@ class DocumentSubmissionCommandServiceTest {
         assertEquals(command.birthDate(), saved.birthDate());
         assertEquals(command.licenseClass(), saved.licenseClass());
         assertEquals(command.automaticOnly(), saved.automaticOnly());
+        assertEquals(command.issuedOn(), saved.issuedOn());
         assertEquals(NOW.truncatedTo(ChronoUnit.MICROS), saved.submittedAt());
         assertEquals(detail(saved), result);
         assertEquals("DocumentSubmissionDetail[redacted]", result.toString());
@@ -90,6 +91,27 @@ class DocumentSubmissionCommandServiceTest {
         order.verify(writes).insert(saved); order.verify(reads).findByCodeAndOwner(saved.code(), OWNER);
         verify(storage, never()).createUpload(); verify(storage, never()).createView(anyString());
         verify(crypto, never()).reveal(any(), any());
+    }
+
+    /** BR-130: chặn ngày cấp tương lai trước đọc AN, chốt ảnh hoặc bảo vệ số. */
+    @Test void rejectsFutureIssueDateBeforeStorage() {
+        var command = new SubmitDocumentCommand(DocumentType.DRIVER_LICENSE, new DocumentNumber("local-license"),
+                null, null, LocalDate.of(2035, 1, 1), "B", false, FRONT, BACK, LocalDate.of(2026, 10, 27));
+        var failure = assertThrows(DomainException.class, () -> service.submit(command));
+        assertEquals(ErrorCode.INVALID_REQUEST, failure.errorCode());
+        verifyNoInteractions(uploads, storage, crypto, writes, reads, codes);
+    }
+
+    /** Ngày nộp theo giờ Việt Nam; 17:00 UTC đã thuộc ngày kế tiếp dù Clock dùng UTC. */
+    @Test void acceptsIssueDateAtVietnamMidnight() {
+        configureUploads(DocumentType.DRIVER_LICENSE);
+        var at = Instant.parse("2026-10-26T17:00:00Z");
+        var localService = new DocumentSubmissionCommandService(callers, accounts, uploads, storage, crypto,
+                writes, reads, codes, Clock.fixed(at, ZoneOffset.UTC));
+        var command = new SubmitDocumentCommand(DocumentType.DRIVER_LICENSE, new DocumentNumber("local-license"),
+                null, null, LocalDate.of(2035, 1, 1), "B", false, FRONT, BACK, LocalDate.of(2026, 10, 27));
+        assertEquals(command.issuedOn(), localService.submit(command).issuedOn());
+        assertEquals(at, attempts.getFirst().submittedAt());
     }
 
     /** Nhân viên có thêm CUSTOMER vẫn nộp hồ sơ của chính mình theo BR-809, không kế thừa quyền admin. */
@@ -159,7 +181,7 @@ class DocumentSubmissionCommandServiceTest {
     /** URL PUT hết hạn không làm mất quyền nộp ảnh đã tải; không tự áp điều kiện thuê lúc tự khai. */
     @Test void acceptsUploadedImagesAfterPutDeadlineAndExpiredDocument() {
         var command = new SubmitDocumentCommand(DocumentType.IDENTITY_CARD, new DocumentNumber("000000000000"),
-                "LOCAL FAKE NAME", LocalDate.of(1990, 1, 1), LocalDate.of(2020, 1, 1), null, null, FRONT, BACK);
+                "LOCAL FAKE NAME", LocalDate.of(1990, 1, 1), LocalDate.of(2020, 1, 1), null, null, FRONT, BACK, null);
         assertTrue(upload(FRONT, OWNER, DocumentType.IDENTITY_CARD, DocumentSide.FRONT).expiresAt().isBefore(NOW));
         assertEquals(command.expiresOn(), service.submit(command).expiresOn());
     }
@@ -224,7 +246,7 @@ class DocumentSubmissionCommandServiceTest {
     }
 
     /** Không dựng view thành công từ command nếu đọc lại thiếu hoặc khác mã/loại/trạng thái/hạn/mốc. */
-    @ParameterizedTest @ValueSource(strings = {"missing", "code", "type", "status", "expiry", "time"})
+    @ParameterizedTest @ValueSource(strings = {"missing", "code", "type", "status", "expiry", "time", "issuedOn"})
     void rejectsMissingOrInconsistentReload(String field) {
         when(reads.findByCodeAndOwner(anyString(), eq(OWNER))).thenAnswer(invocation -> {
             var row = detail(attempts.getLast());
@@ -233,7 +255,7 @@ class DocumentSubmissionCommandServiceTest {
                     field.equals("type") ? DocumentType.DRIVER_LICENSE : row.documentType(),
                     field.equals("status") ? DocumentSubmissionStatus.VERIFIED : row.status(),
                     field.equals("expiry") ? row.expiresOn().plusDays(1) : row.expiresOn(),
-                    field.equals("time") ? row.submittedAt().plusSeconds(1) : row.submittedAt()));
+                    field.equals("time") ? row.submittedAt().plusSeconds(1) : row.submittedAt(), field.equals("issuedOn") ? LocalDate.of(2025, 1, 1) : row.issuedOn()));
         });
         assertThrows(IllegalStateException.class, () -> service.submit(command(DocumentType.IDENTITY_CARD)));
         verify(writes, times(1)).insert(any());
@@ -271,7 +293,7 @@ class DocumentSubmissionCommandServiceTest {
         boolean card = type == DocumentType.IDENTITY_CARD;
         return new SubmitDocumentCommand(type, new DocumentNumber("000000000000"), card ? "LOCAL FAKE NAME" : null,
                 card ? LocalDate.of(1990, 1, 1) : null, LocalDate.of(2035, 1, 1), card ? null : "B",
-                card ? null : false, FRONT, BACK);
+                card ? null : false, FRONT, BACK, card ? null : LocalDate.of(2025, 1, 1));
     }
 
     /** Tài khoản local giả có/không consent để kiểm cổng application độc lập HTTP. */
@@ -283,6 +305,6 @@ class DocumentSubmissionCommandServiceTest {
     /** View mock chỉ để điều khiển reload; adapter thật được kiểm riêng với PostgreSQL. */
     private static DocumentSubmissionDetail detail(DocumentSubmission value) {
         return new DocumentSubmissionDetail(value.code(), value.documentType(), DocumentSubmissionStatus.PENDING,
-                value.expiresOn(), value.submittedAt());
+                value.expiresOn(), value.submittedAt(), value.issuedOn());
     }
 }

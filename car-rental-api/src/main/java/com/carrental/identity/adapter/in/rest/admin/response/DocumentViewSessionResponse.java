@@ -8,7 +8,7 @@ import java.time.LocalDate;
 public record DocumentViewSessionResponse(String code, String accountCode, String documentType, String status,
         String number, String fullName, LocalDate birthDate, LocalDate expiresOn, String licenseClass,
         Boolean automaticOnly, Instant submittedAt, Instant reviewedAt, String rejectionCode, String rejectionNote,
-        DocumentViewImageResponse frontImage, DocumentViewImageResponse backImage) {
+        DocumentViewImageResponse frontImage, DocumentViewImageResponse backImage, LocalDate issuedOn) {
     /** Map tường minh từ view, không trả row CSDL hoặc serialization của domain ra ngoài. */
     public static DocumentViewSessionResponse fromDomain(DocumentViewSessionDetail view) {
         var submission = view.submission();
@@ -16,7 +16,7 @@ public record DocumentViewSessionResponse(String code, String accountCode, Strin
                 submission.status().name(), view.number().value(), view.fullName(), view.birthDate(), submission.expiresOn(),
                 view.licenseClass(), view.automaticOnly(), submission.submittedAt(), submission.reviewedAt(),
                 submission.rejectionCode(), submission.rejectionNote(),
-                DocumentViewImageResponse.fromDomain(view.frontImage()), DocumentViewImageResponse.fromDomain(view.backImage()));
+                DocumentViewImageResponse.fromDomain(view.frontImage()), DocumentViewImageResponse.fromDomain(view.backImage()), submission.issuedOn());
     }
 
     /** Che toàn bộ số giấy tờ, nhân thân, ghi chú và URL khi logger vô tình nhận DTO. */

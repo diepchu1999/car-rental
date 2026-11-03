@@ -6,11 +6,11 @@ import java.time.LocalDate;
 
 /** Kết quả nộp BR-130; chỉ mã nghiệp vụ và metadata, không mang số, tên, ngày sinh hoặc tham chiếu ảnh. */
 public record DocumentSubmissionResponse(String code, String documentType, String status,
-        LocalDate expiresOn, Instant submittedAt) {
+        LocalDate expiresOn, Instant submittedAt, LocalDate issuedOn) {
     /** Map view đã reload sau transaction; không tự gán trạng thái hoặc thời điểm ở REST. */
     public static DocumentSubmissionResponse fromDomain(DocumentSubmissionDetail view) {
         return new DocumentSubmissionResponse(view.code(), view.documentType().name(), view.status().name(),
-                view.expiresOn(), view.submittedAt());
+                view.expiresOn(), view.submittedAt(), view.issuedOn());
     }
 
     /** Che metadata hồ sơ nếu logger vô tình nhận response. */

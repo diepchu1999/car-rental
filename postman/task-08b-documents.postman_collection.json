@@ -1143,7 +1143,7 @@
                   "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
                   "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
-                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('IDENTITY_CARD'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
+                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.data.issuedOn).to.equal(null); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('IDENTITY_CARD'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
                   "if (pm.response.code === 201) pm.collectionVariables.set('submittedIdentityCardCode', pm.response.json().data.code);"
                 ]
               }
@@ -1422,7 +1422,7 @@
             "description": "BR-120/130: nộp của chính CUSTOMER; kiểm đúng HTTP/mã lỗi. AN được truyền tự động từ request tạo lượt tải.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{submitNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{driverFrontCode}}\",\n  \"backUploadCode\": \"{{driverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false\n}",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{submitNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{driverFrontCode}}\",\n  \"backUploadCode\": \"{{driverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false,\n  \"issuedOn\": \"2025-01-01\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1448,7 +1448,7 @@
                   "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
                   "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
-                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
+                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.data.issuedOn).to.equal('2025-01-01'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
                   "if (pm.response.code === 201) pm.collectionVariables.set('submittedDriverLicenseCode', pm.response.json().data.code);"
                 ]
               }
@@ -2222,7 +2222,7 @@
             "description": "BR-120/130: nộp của chính CUSTOMER; kiểm đúng HTTP/mã lỗi. AN được truyền tự động từ request tạo lượt tải.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{submitNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{driverFrontCode}}\",\n  \"backUploadCode\": \"{{driverBackCode}}\",\n  \"licenseClass\": \"B\"\n}",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{submitNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{driverFrontCode}}\",\n  \"backUploadCode\": \"{{driverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"issuedOn\": \"2025-01-01\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2409,7 +2409,7 @@
                   "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
                   "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
                   "pm.test('Two submitted document types are present', () => { const rows=pm.response.json().data; pm.expect(rows).to.be.an('array').with.lengthOf(2); pm.expect(rows.map(x=>x.documentType)).to.eql(['DRIVER_LICENSE','IDENTITY_CARD']); });",
-                  "pm.test('Separate latest and selected verified version', () => { for(const h of pm.response.json().data) { pm.expect(h).to.have.all.keys('documentType','latestSubmission','activeVerifiedSubmission'); const v=h.latestSubmission; pm.expect(v).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(v.documentType).to.equal(h.documentType); pm.expect(v.code).to.match(/^GT-[A-Z0-9]{6}$/); if(h.activeVerifiedSubmission!==null) { pm.expect(h.activeVerifiedSubmission).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(h.activeVerifiedSubmission.status).to.equal('VERIFIED'); pm.expect(h.activeVerifiedSubmission.documentType).to.equal(h.documentType); } } });",
+                  "pm.test('Separate latest and selected verified version', () => { for(const h of pm.response.json().data) { pm.expect(h).to.have.all.keys('documentType','latestSubmission','activeVerifiedSubmission'); const v=h.latestSubmission; pm.expect(v).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(v.documentType).to.equal(h.documentType); pm.expect(v.code).to.match(/^GT-[A-Z0-9]{6}$/); if(h.activeVerifiedSubmission!==null) { pm.expect(h.activeVerifiedSubmission).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(h.activeVerifiedSubmission.status).to.equal('VERIFIED'); pm.expect(h.activeVerifiedSubmission.documentType).to.equal(h.documentType); } } });",
                   "if(pm.response.code===200 && Array.isArray(pm.response.json().data)) { for(const h of pm.response.json().data) { if(h.documentType==='IDENTITY_CARD') pm.collectionVariables.set('documentStatusCardCode',h.latestSubmission.code); if(h.documentType==='DRIVER_LICENSE') pm.collectionVariables.set('documentStatusLicenseCode',h.latestSubmission.code); } }"
                 ]
               }
@@ -2456,7 +2456,7 @@
                   "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
                   "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact private status response', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('documentStatusCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); if(['PENDING','SUPERSEDED'].includes(d.status)) pm.expect(d.reviewedAt).to.equal(null); if(d.status==='REJECTED') pm.expect(['ILLEGIBLE','MISSING_SIDE','DATA_MISMATCH','EXPIRED','HOLDER_MISMATCH','SUSPECTED_FORGERY']).to.include(d.rejectionCode); else { pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); } });"
+                  "pm.test('Exact private status response', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('documentStatusCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); if(['PENDING','SUPERSEDED'].includes(d.status)) pm.expect(d.reviewedAt).to.equal(null); if(d.status==='REJECTED') pm.expect(['ILLEGIBLE','MISSING_SIDE','DATA_MISMATCH','EXPIRED','HOLDER_MISMATCH','SUSPECTED_FORGERY']).to.include(d.rejectionCode); else { pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); } });"
                 ]
               }
             }
@@ -2502,7 +2502,7 @@
                   "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
                   "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact private status response', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('documentStatusLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); if(['PENDING','SUPERSEDED'].includes(d.status)) pm.expect(d.reviewedAt).to.equal(null); if(d.status==='REJECTED') pm.expect(['ILLEGIBLE','MISSING_SIDE','DATA_MISMATCH','EXPIRED','HOLDER_MISMATCH','SUSPECTED_FORGERY']).to.include(d.rejectionCode); else { pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); } });"
+                  "pm.test('Exact private status response', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('documentStatusLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); if(['PENDING','SUPERSEDED'].includes(d.status)) pm.expect(d.reviewedAt).to.equal(null); if(d.status==='REJECTED') pm.expect(['ILLEGIBLE','MISSING_SIDE','DATA_MISMATCH','EXPIRED','HOLDER_MISMATCH','SUSPECTED_FORGERY']).to.include(d.rejectionCode); else { pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); } });"
                 ]
               }
             }
@@ -4265,7 +4265,7 @@
                   "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
                   "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','issuedOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
                   "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('viewCardCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('viewOwnerCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
                   "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
                   "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
@@ -4322,7 +4322,7 @@
                   "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
                   "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','issuedOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
                   "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('viewCardCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('viewOwnerCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
                   "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
                   "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
@@ -4374,7 +4374,7 @@
                   "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
                   "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','issuedOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
                   "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('viewLicenseCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('viewOwnerCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
                   "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
                   "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
@@ -4629,7 +4629,7 @@
                   "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
                   "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','issuedOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
                   "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('viewCardCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('viewOwnerCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
                   "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
                   "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
@@ -4803,7 +4803,7 @@
                   "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
                   "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','issuedOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
                   "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('viewLicenseCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('viewOwnerCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
                   "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
                   "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
@@ -6537,7 +6537,7 @@
                   "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
                   "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
-                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('IDENTITY_CARD'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
+                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.data.issuedOn).to.equal(null); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('IDENTITY_CARD'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
                   "if (pm.response.code === 201) pm.collectionVariables.set('reviewCardCode', pm.response.json().data.code);"
                 ]
               }
@@ -6794,7 +6794,7 @@
             "description": "BR-120/130: nộp của chính CUSTOMER; kiểm đúng HTTP/mã lỗi. AN được truyền tự động từ request tạo lượt tải.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{reviewNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{reviewDriverFrontCode}}\",\n  \"backUploadCode\": \"{{reviewDriverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false\n}",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{reviewNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{reviewDriverFrontCode}}\",\n  \"backUploadCode\": \"{{reviewDriverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false,\n  \"issuedOn\": \"2025-01-01\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -6829,7 +6829,7 @@
                   "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
                   "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
-                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
+                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.data.issuedOn).to.equal('2025-01-01'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
                   "if (pm.response.code === 201) pm.collectionVariables.set('reviewLicenseCode', pm.response.json().data.code);"
                 ]
               }
@@ -7559,7 +7559,7 @@
                   "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
                   "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
                   "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
                 ]
               }
             }
@@ -7737,7 +7737,7 @@
                   "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
                   "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
                   "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('REJECTED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(\"ILLEGIBLE\"); pm.expect(d.rejectionNote).to.equal(\"Local fake review note\"); });"
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('REJECTED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(\"ILLEGIBLE\"); pm.expect(d.rejectionNote).to.equal(\"Local fake review note\"); });"
                 ]
               }
             }
@@ -7976,7 +7976,7 @@
                   "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
                   "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
                   "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
                 ]
               }
             }
@@ -8027,7 +8027,7 @@
                   "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
                   "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
                   "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('REJECTED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(\"ILLEGIBLE\"); pm.expect(d.rejectionNote).to.equal(\"Local fake review note\"); });"
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('REJECTED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(\"ILLEGIBLE\"); pm.expect(d.rejectionNote).to.equal(\"Local fake review note\"); });"
                 ]
               }
             }
@@ -8415,7 +8415,7 @@
             "description": "BR-120/130: nộp của chính CUSTOMER; kiểm đúng HTTP/mã lỗi. AN được truyền tự động từ request tạo lượt tải.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{reviewNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{reviewDriverFrontCode}}\",\n  \"backUploadCode\": \"{{reviewDriverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false\n}",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{reviewNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{reviewDriverFrontCode}}\",\n  \"backUploadCode\": \"{{reviewDriverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false,\n  \"issuedOn\": \"2025-01-01\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -8450,7 +8450,7 @@
                   "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
                   "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
                   "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
-                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
+                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.data.issuedOn).to.equal('2025-01-01'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
                   "if (pm.response.code === 201) pm.collectionVariables.set('reviewReplacementCode', pm.response.json().data.code);"
                 ]
               }
@@ -8640,7 +8640,7 @@
                   "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
                   "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
                   "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewReplacementCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewReplacementCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
                 ]
               }
             }
@@ -8879,7 +8879,7 @@
                   "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
                   "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
                   "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('REJECTED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(\"ILLEGIBLE\"); pm.expect(d.rejectionNote).to.equal(\"Local fake review note\"); });"
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('REJECTED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(\"ILLEGIBLE\"); pm.expect(d.rejectionNote).to.equal(\"Local fake review note\"); });"
                 ]
               }
             }
@@ -8930,7 +8930,7 @@
                   "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
                   "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
                   "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewReplacementCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewReplacementCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
                 ]
               }
             }
@@ -8981,7 +8981,719 @@
                   "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
                   "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
                   "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
-                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('reviewCardCode')); pm.expect(d.documentType).to.equal('IDENTITY_CARD'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Review L1 - Issue date (CUSTOMER)",
+      "description": "BR-128/130: chạy cả thư mục, 1 iteration, cùng CUSTOMER đã consent; ảnh giả trong repo. Không cần copy mã AN/GT. Ngày cấp được kiểm trước chốt ảnh; cuối lượt nộp GPLX mới PENDING, giữ active cũ.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Documents Submission Customer",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check customer and start fresh run",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-120/130: dùng CUSTOMER local thử; khởi tạo biến riêng cho lượt Runner, không dùng giấy tờ thật."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "['submitNumber','cardFrontCode','cardBackCode','driverFrontCode','driverBackCode','spareBackCode','missingFrontCode','invalidFrontCode','largeFrontCode','cardFrontUrl','cardBackUrl','driverFrontUrl','driverBackUrl','spareBackUrl','missingFrontUrl','invalidFrontUrl','largeFrontUrl'].forEach(k => pm.variables.unset(k));",
+                  "pm.variables.set('submitNumber', 'LOCAL-TEST-' + pm.variables.replaceIn('{{$guid}}'));",
+                  "pm.collectionVariables.unset('submittedIdentityCardCode'); pm.collectionVariables.unset('submittedDriverLicenseCode');",
+                  "pm.variables.set('issueDateTomorrow', new Date(Date.now() + 31 * 60 * 60 * 1000).toISOString().slice(0, 10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Customer has consent', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.data.roles).to.include('CUSTOMER'); pm.expect(Boolean(b.data.termsVersion)).to.equal(true); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Create driverFront upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: AN mới cho đúng loại/mặt; URL chỉ ở biến local của Runner, không lưu vào environment/collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload metadata', () => { const d = pm.response.json().data; pm.expect(/^AN-[A-Z0-9]{6}$/.test(d.code)).to.equal(true); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.side).to.equal('FRONT'); pm.expect(typeof d.uploadUrl === 'string' && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl)).to.equal(true); });",
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.variables.set('driverFrontCode', d.code); pm.variables.set('driverFrontUrl', d.uploadUrl); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - PUT driverFront fixture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/octet-stream"
+              }
+            ],
+            "url": "{{driverFrontUrl}}",
+            "description": "BR-130: PUT binary bằng URL ký, không gửi bearer token. Body file lấy tương đối từ working directory repo; MIME khai không quyết định nội dung hợp lệ.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "postman/fixtures/documents/local-front.png"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('driverFrontUrl')) throw new Error('Run this entire folder from request 01. The upload URL is run-local.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MinIO accepts fixture bytes', () => pm.response.to.have.status(200));",
+                  "pm.variables.unset('driverFrontUrl');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Create driverBack upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: AN mới cho đúng loại/mặt; URL chỉ ở biến local của Runner, không lưu vào environment/collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"side\": \"BACK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload metadata', () => { const d = pm.response.json().data; pm.expect(/^AN-[A-Z0-9]{6}$/.test(d.code)).to.equal(true); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.side).to.equal('BACK'); pm.expect(typeof d.uploadUrl === 'string' && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl)).to.equal(true); });",
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.variables.set('driverBackCode', d.code); pm.variables.set('driverBackUrl', d.uploadUrl); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - PUT driverBack fixture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/octet-stream"
+              }
+            ],
+            "url": "{{driverBackUrl}}",
+            "description": "BR-130: PUT binary bằng URL ký, không gửi bearer token. Body file lấy tương đối từ working directory repo; MIME khai không quyết định nội dung hợp lệ.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "postman/fixtures/documents/local-back.png"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('driverBackUrl')) throw new Error('Run this entire folder from request 01. The upload URL is run-local.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MinIO accepts fixture bytes', () => pm.response.to.have.status(200));",
+                  "pm.variables.unset('driverBackUrl');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Missing issue date",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-130: ngày cấp không hợp lệ trả 400 INVALID_REQUEST trước chốt ảnh; dùng lại AN ở bước cuối để chứng minh chưa bị tiêu thụ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{submitNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{driverFrontCode}}\",\n  \"backUploadCode\": \"{{driverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('submitNumber')) throw new Error('Run this entire folder from request 01.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected INVALID_REQUEST', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 - Null issue date",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-130: ngày cấp không hợp lệ trả 400 INVALID_REQUEST trước chốt ảnh; dùng lại AN ở bước cuối để chứng minh chưa bị tiêu thụ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{submitNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{driverFrontCode}}\",\n  \"backUploadCode\": \"{{driverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false,\n  \"issuedOn\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('submitNumber')) throw new Error('Run this entire folder from request 01.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected INVALID_REQUEST', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 - Invalid calendar date",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-130: ngày cấp không hợp lệ trả 400 INVALID_REQUEST trước chốt ảnh; dùng lại AN ở bước cuối để chứng minh chưa bị tiêu thụ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{submitNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{driverFrontCode}}\",\n  \"backUploadCode\": \"{{driverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false,\n  \"issuedOn\": \"2025-02-29\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('submitNumber')) throw new Error('Run this entire folder from request 01.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected INVALID_REQUEST', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 - Issue date after expiry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-130: ngày cấp không hợp lệ trả 400 INVALID_REQUEST trước chốt ảnh; dùng lại AN ở bước cuối để chứng minh chưa bị tiêu thụ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{submitNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{driverFrontCode}}\",\n  \"backUploadCode\": \"{{driverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false,\n  \"issuedOn\": \"2036-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('submitNumber')) throw new Error('Run this entire folder from request 01.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected INVALID_REQUEST', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 - Issue date after submission",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-130: ngày cấp không hợp lệ trả 400 INVALID_REQUEST trước chốt ảnh; dùng lại AN ở bước cuối để chứng minh chưa bị tiêu thụ.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{submitNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{driverFrontCode}}\",\n  \"backUploadCode\": \"{{driverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false,\n  \"issuedOn\": \"{{issueDateTomorrow}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('submitNumber')) throw new Error('Run this entire folder from request 01.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Expected INVALID_REQUEST', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 - Submit DRIVER_LICENSE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-120/130: nộp của chính CUSTOMER; kiểm đúng HTTP/mã lỗi. AN được truyền tự động từ request tạo lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{submitNumber}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{driverFrontCode}}\",\n  \"backUploadCode\": \"{{driverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false,\n  \"issuedOn\": \"2025-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('submitNumber')) throw new Error('Run this entire folder from request 01.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.data.issuedOn).to.equal('2025-01-01'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('submittedDriverLicenseCode', pm.response.json().data.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 - Read stored issue date",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{submittedDriverLicenseCode}}",
+            "description": "BR-130: khách chỉ đọc trạng thái hồ sơ của chính mình."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if(!/^GT-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('submittedDriverLicenseCode')||'')) throw new Error('Run the preceding owner and head checks after submitting both document types.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Success envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact private status response', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('submittedDriverLicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); if(['PENDING','SUPERSEDED'].includes(d.status)) pm.expect(d.reviewedAt).to.equal(null); if(d.status==='REJECTED') pm.expect(['ILLEGIBLE','MISSING_SIDE','DATA_MISMATCH','EXPIRED','HOLDER_MISMATCH','SUSPECTED_FORGERY']).to.include(d.rejectionCode); else { pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); } });",
+                  "pm.test('Issue date persisted', () => pm.expect(pm.response.json().data.issuedOn).to.equal('2025-01-01'));"
                 ]
               }
             }

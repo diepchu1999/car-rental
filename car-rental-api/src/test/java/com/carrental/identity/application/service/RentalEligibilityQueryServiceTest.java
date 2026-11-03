@@ -71,8 +71,8 @@ class RentalEligibilityQueryServiceTest {
     @Test void rejectsCorruptReadResults() {
         var card = card();
         for (List<ActiveDocumentDetail> rows : List.of(List.of(card, card), Arrays.asList((ActiveDocumentDetail) null),
-                List.of(new ActiveDocumentDetail("GT-FAKE01", null, LocalDate.of(2030, 1, 1), null, null)),
-                List.of(new ActiveDocumentDetail("GT-FAKE01", DocumentType.IDENTITY_CARD, null, null, null)))) {
+                List.of(new ActiveDocumentDetail("GT-FAKE01", null, LocalDate.of(2030, 1, 1), null, null, null)),
+                List.of(new ActiveDocumentDetail("GT-FAKE01", DocumentType.IDENTITY_CARD, null, null, null, null)))) {
             when(reads.listActiveByOwner(OWNER)).thenReturn(rows);
             assertThrows(IllegalStateException.class, () -> service.check(query(END)));
         }
@@ -114,13 +114,13 @@ class RentalEligibilityQueryServiceTest {
     /** Fixture VERIFIED có hạn hết ngày 01/01/2030; thứ tự danh sách cố ý GPLX trước CCCD. */
     private void ready() {
         when(reads.listActiveByOwner(OWNER)).thenReturn(List.of(
-                new ActiveDocumentDetail("GT-FAKE02", DocumentType.DRIVER_LICENSE, LocalDate.of(2030, 1, 1), "B", false), card()));
+                new ActiveDocumentDetail("GT-FAKE02", DocumentType.DRIVER_LICENSE, LocalDate.of(2030, 1, 1), "B", false, LocalDate.of(2025, 1, 1)), card()));
         when(policies.tableAt(NOW)).thenReturn(new LicenseClassTable(Map.of("B", Set.of(4, 5, 7))));
     }
 
     /** Metadata CCCD tối thiểu, không có số hoặc thông tin nhận dạng. */
     private static ActiveDocumentDetail card() {
-        return new ActiveDocumentDetail("GT-FAKE01", DocumentType.IDENTITY_CARD, LocalDate.of(2030, 1, 1), null, null);
+        return new ActiveDocumentDetail("GT-FAKE01", DocumentType.IDENTITY_CARD, LocalDate.of(2030, 1, 1), null, null, null);
     }
 
     /** Tạo đầu vào hợp lệ từ API nội bộ. */

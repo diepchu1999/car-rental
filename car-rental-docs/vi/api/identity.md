@@ -241,6 +241,7 @@ Ví dụ GPLX:
   "number": "LOCAL-TEST-DRIVER-LICENSE",
   "licenseClass": "B",
   "automaticOnly": false,
+  "issuedOn": "2025-01-01",
   "expiresOn": "2035-01-01",
   "frontUploadCode": "AN-FRONT2",
   "backUploadCode": "AN-BACK02"
@@ -248,8 +249,10 @@ Ví dụ GPLX:
 ```
 
 - Các trường trong mỗi ví dụ đều bắt buộc; ngày dùng ISO `YYYY-MM-DD`. Hai AN phải khác nhau.
-- CCCD không nhận `licenseClass`/`automaticOnly`; GPLX không nhận `fullName`/`birthDate`.
+- CCCD không nhận `licenseClass`/`automaticOnly`/`issuedOn`; GPLX không nhận `fullName`/`birthDate`.
   Trường không áp dụng phải vắng hoặc null. `automaticOnly=false` khác thiếu/null.
+- GPLX bắt buộc `issuedOn`; ngày cấp không sau ngày nộp (giờ Việt Nam) và không sau `expiresOn`.
+  Thiếu/null, sai định dạng hoặc sai thứ tự ngày trả `400 INVALID_REQUEST` trước khi chốt ảnh.
 - Trường ngoài hợp đồng bị từ chối, gồm chủ, ID số, trạng thái, người duyệt, key và URL.
   Danh tính luôn từ JWT; cả hai AN phải đúng chủ, loại và mặt trước khi đọc/chốt bất kỳ ảnh nào.
 - Số được bỏ khoảng trắng hai đầu rồi băm/mã hoá; server không OCR hoặc xác nhận giấy tờ thật lúc nộp.
@@ -273,6 +276,7 @@ Response 201 sau commit:
     "documentType": "IDENTITY_CARD",
     "status": "PENDING",
     "expiresOn": "2035-01-01",
+    "issuedOn": null,
     "submittedAt": "2026-10-27T03:00:00Z"
   },
   "error": null
@@ -282,6 +286,12 @@ Response 201 sau commit:
 Response có `Cache-Control: no-store` và `X-Request-Id`; không có ID số, số giấy tờ, họ tên/ngày sinh,
 bản mã/hash, key hay URL ảnh. Dùng `data.code` để đọc trạng thái qua GET theo GT.
 `PENDING` không có nghĩa đủ điều kiện thuê. Xác minh và xét hiệu lực/hạng GPLX là thao tác riêng.
+
+`issuedOn` xuất hiện trong kết quả nộp, trạng thái (kể cả latest/active), kết quả duyệt/từ chối
+và phiên xem của người xác minh. CCCD và GPLX lịch sử chưa có ngày cấp trả `null`; không suy đoán
+ngày từ hạng hoặc ngày nộp. Hợp đồng cổng thuê BR-128/130 quy định GPLX đang dùng thiếu ngày cấp
+trả **403 `DRIVER_LICENSE_NOT_VERIFIED`**, yêu cầu khách nộp lại; không trả lỗi hạng không hỗ trợ.
+Việc thực thi tại cổng thuê được bổ sung cùng bảng hạng theo ngày cấp; API nộp không tự xác minh.
 
 | HTTP | Mã | Khi nào |
 |---|---|---|
@@ -331,6 +341,7 @@ Response 200 gồm danh sách tối đa hai mục, một mục cho mỗi loại 
         "documentType": "IDENTITY_CARD",
         "status": "PENDING",
         "expiresOn": "2035-01-01",
+        "issuedOn": null,
         "submittedAt": "2026-10-27T03:00:00Z",
         "reviewedAt": null,
         "rejectionCode": null,
@@ -354,12 +365,13 @@ Response 200 gồm danh sách tối đa hai mục, một mục cho mỗi loại 
 
 `documentCode` phải đúng `GT-` cộng sáu chữ hoa ASCII/chữ số, không tự cắt trắng hoặc đổi chữ hoa.
 Chỉ đọc đúng chủ, kể cả bản lịch sử SUPERSEDED. Không có tham số accountCode.
-Response 200 dùng envelope chuẩn; `data` có đúng tám trường như `latestSubmission` ở trên.
+Response 200 dùng envelope chuẩn; `data` có đúng chín trường như `latestSubmission` ở trên.
 
 | Trường | Ý nghĩa |
 |---|---|
 | `code`, `documentType` | Mã phiên bản và loại IDENTITY_CARD/DRIVER_LICENSE |
 | `status` | PENDING, VERIFIED, REJECTED hoặc SUPERSEDED |
+| `issuedOn` | Ngày cấp GPLX; null với CCCD hoặc GPLX lịch sử chưa có ngày cấp |
 | `expiresOn`, `submittedAt` | Ngày hết hạn đã khai và thời điểm nộp đã lưu |
 | `reviewedAt` | Mốc duyệt/từ chối; null với PENDING/SUPERSEDED |
 | `rejectionCode` | Một trong sáu mã BR-130 khi REJECTED; ngoài ra null |
@@ -436,6 +448,7 @@ vì lượt mở không tạo resource có endpoint đọc riêng. Ví dụ dư�
     "fullName": "LOCAL TEST ONLY",
     "birthDate": "1990-01-01",
     "expiresOn": "2030-01-01",
+    "issuedOn": null,
     "licenseClass": null,
     "automaticOnly": null,
     "submittedAt": "2026-10-28T03:00:00Z",
@@ -455,7 +468,7 @@ vì lượt mở không tạo resource có endpoint đọc riêng. Ví dụ dư�
 }
 ```
 
-CCCD có `fullName`/`birthDate`; GPLX có `licenseClass`/`automaticOnly`, hai trường của CCCD là null.
+CCCD có `fullName`/`birthDate`; GPLX có `licenseClass`/`automaticOnly`/`issuedOn`, hai trường của CCCD là null.
 Các trường trạng thái, thời điểm duyệt và lý do từ chối giữ ý nghĩa như endpoint đọc trạng thái.
 Không trả ID số, phong bì mã hoá, HMAC, mã AN hoặc object key riêng thành trường response.
 URL ký có thể chứa đường dẫn object ngẫu nhiên, là bí mật ngắn hạn: không ghi log hoặc chia sẻ.
@@ -607,6 +620,7 @@ Cả hai trả **200**, `Cache-Control: no-store`, `X-Request-Id`, envelope khô
     "documentType": "IDENTITY_CARD",
     "status": "VERIFIED",
     "expiresOn": "2035-01-01",
+    "issuedOn": null,
     "submittedAt": "2026-10-30T03:00:00Z",
     "reviewedAt": "2026-10-30T03:05:00Z",
     "rejectionCode": null,
@@ -616,7 +630,7 @@ Cả hai trả **200**, `Cache-Control: no-store`, `X-Request-Id`, envelope khô
 }
 ```
 
-Từ chối có cùng tám trường, `status: REJECTED`, lý do/ghi chú đúng nội dung đã lưu. Response không
+Từ chối có cùng chín trường, `status: REJECTED`, lý do/ghi chú đúng nội dung đã lưu. Response không
 chứa ID số, số giấy tờ, họ tên, ngày sinh, hash/phong bì mã hoá, reviewer nội bộ hay liên kết ảnh.
 Chỉ trả kết quả sau khi transaction quyết định đã commit; lỗi đọc lại sẽ rollback toàn bộ quyết định.
 

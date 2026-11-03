@@ -74,7 +74,7 @@ class DocumentSubmissionApiIntegrationTest {
         }).when(objects).put(anyString(), any(byte[].class), anyString());
     }
 
-    /** Cả CCCD/GPLX trả đúng năm trường sau commit; ảnh đã chốt khác key tạm và có bytes đã kiểm. */
+    /** Cả CCCD/GPLX trả đúng sáu trường sau commit; ảnh đã chốt khác key tạm và có bytes đã kiểm. */
     @ParameterizedTest @ValueSource(strings = {"IDENTITY_CARD", "DRIVER_LICENSE"})
     void submitsDocumentWithRealImageInspection(String type) throws Exception {
         String token = tokens.customerToken(clock);
@@ -86,7 +86,9 @@ class DocumentSubmissionApiIntegrationTest {
         var envelope = json.readTree(response.body());
         assertTrue(envelope.path("success").asBoolean()); assertTrue(envelope.path("error").isNull());
         var data = envelope.path("data");
-        assertEquals(5, data.size());
+        assertEquals(6, data.size());
+        if (type.equals("DRIVER_LICENSE")) assertEquals("2025-01-01", data.path("issuedOn").asString());
+        else assertTrue(data.path("issuedOn").isNull());
         assertTrue(data.path("code").asString().matches("GT-[A-Z0-9]{6}"));
         assertEquals(type, data.path("documentType").asString());
         assertEquals("PENDING", data.path("status").asString());
@@ -95,6 +97,7 @@ class DocumentSubmissionApiIntegrationTest {
         assertFalse(submitted.isBefore(before.minusMillis(1))); assertFalse(submitted.isAfter(clock.instant()));
         var saved = reads.findByCodeAndOwner(data.path("code").asString(), owner(token)).orElseThrow();
         assertEquals(submitted, saved.submittedAt());
+        assertEquals(type.equals("DRIVER_LICENSE") ? java.time.LocalDate.of(2025, 1, 1) : null, saved.issuedOn());
         var captured = ArgumentCaptor.forClass(DocumentSubmission.class);
         verify(writes).insert(captured.capture());
         var record = captured.getValue();
@@ -132,12 +135,23 @@ class DocumentSubmissionApiIntegrationTest {
     /** GPLX thiếu Boolean không được tự biến thành false; false hợp lệ đã có ở test thành công. */
     @Test void requiresExplicitDriverLicenseFields() throws Exception {
         String token = tokens.customerToken(clock);
-        for (String field : new String[]{"licenseClass", "automaticOnly"}) {
+        for (String field : new String[]{"licenseClass", "automaticOnly", "issuedOn"}) {
             var body = shape("DRIVER_LICENSE", "AN-FRONT1", "AN-BACK01"); body.remove(field);
             assertFailure(post(token, PATH, json.writeValueAsString(body)), 400, "INVALID_REQUEST");
             body.put(field, null);
             assertFailure(post(token, PATH, json.writeValueAsString(body)), 400, "INVALID_REQUEST");
         }
+        verifyNoInteractions(objects, writes);
+    }
+
+    /** BR-130: ngày cấp sai bị 400 trước khi đọc hoặc chốt ảnh, không lộ giá trị đã nhập. */
+    @ParameterizedTest @ValueSource(strings = {"2036-01-01", "private-invalid", "", "2025-02-29", "tomorrow"})
+    void rejectsInvalidIssueDateBeforeStorage(String date) throws Exception {
+        String token = tokens.customerToken(clock);
+        var body = shape("DRIVER_LICENSE", "AN-FRONT1", "AN-BACK01");
+        body.put("issuedOn", date.equals("tomorrow")
+                ? java.time.LocalDate.now(clock.withZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"))).plusDays(1).toString() : date);
+        assertFailure(post(token, PATH, json.writeValueAsString(body)), 400, "INVALID_REQUEST");
         verifyNoInteractions(objects, writes);
     }
 
@@ -236,9 +250,9 @@ class DocumentSubmissionApiIntegrationTest {
     /** DTO không tự in số/họ tên hay metadata hồ sơ qua toString mặc định của record. */
     @Test void redactsDtoStrings() {
         assertEquals("SubmitDocumentRequest[redacted]", new SubmitDocumentRequest("IDENTITY_CARD", "PRIVATE",
-                "PRIVATE NAME", "1990-01-01", "2035-01-01", null, null, "AN-FRONT1", "AN-BACK01").toString());
+                "PRIVATE NAME", "1990-01-01", "2035-01-01", null, null, "AN-FRONT1", "AN-BACK01", null).toString());
         assertEquals("DocumentSubmissionResponse[redacted]", new DocumentSubmissionResponse("GT-LOCAL1", "IDENTITY_CARD",
-                "PENDING", java.time.LocalDate.of(2035, 1, 1), Instant.EPOCH).toString());
+                "PENDING", java.time.LocalDate.of(2035, 1, 1), Instant.EPOCH, null).toString());
     }
 
     /** Cấp AN qua HTTP thật; đặt bytes ở biên S3 giả, không bỏ qua quan hệ chủ/loại/mặt trong PostgreSQL. */
@@ -258,7 +272,7 @@ class DocumentSubmissionApiIntegrationTest {
         body.put("documentType", type); body.put("number", "000000000000"); body.put("expiresOn", "2035-01-01");
         body.put("frontUploadCode", front); body.put("backUploadCode", back);
         if (type.equals("IDENTITY_CARD")) { body.put("fullName", "LOCAL PRIVATE NAME"); body.put("birthDate", "1990-01-01"); }
-        else { body.put("licenseClass", "B"); body.put("automaticOnly", false); }
+        else { body.put("licenseClass", "B"); body.put("automaticOnly", false); body.put("issuedOn", "2025-01-01"); }
         return body;
     }
 

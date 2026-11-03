@@ -96,7 +96,8 @@ class RentalEligibilityIntegrationTest extends DocumentDatabaseTestSupport {
                 var replacement = submission(owner, type.name(), status).addValue("expiresOn", "2000-01-01")
                         .addValue("submittedAt", "2026-10-14T03:00:00Z");
                 if (status.equals("REJECTED")) replacement.addValue("reviewedAt", "2026-10-14T04:00:00Z");
-                if (type == DocumentType.DRIVER_LICENSE) replacement.addValue("licenseClass", "LOCAL_UNKNOWN").addValue("automaticOnly", true);
+                if (type == DocumentType.DRIVER_LICENSE) replacement.addValue("licenseClass", "LOCAL_UNKNOWN")
+                        .addValue("automaticOnly", true).addValue("issuedOn", "1999-01-01");
                 insert("head", head(owner, type.name(), insert("submission", replacement), verifiedId));
             }
         }

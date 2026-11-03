@@ -404,7 +404,7 @@ class DocumentVerificationPersistenceIntegrationTest extends DocumentDatabaseTes
         var front = newImage(owner, DocumentSide.FRONT); var back = newImage(owner, DocumentSide.BACK);
         String code = nextCode("GT"); var number = crypto.protect(new DocumentNumber(plaintext), new DocumentProtectionContext(owner, DocumentType.IDENTITY_CARD, code));
         return new DocumentSubmission(code, owner, DocumentType.IDENTITY_CARD, number, "LOCAL FAKE PERSON", LocalDate.of(1990, 1, 1),
-                LocalDate.of(2035, 1, 1), null, null, REVIEWED_AT, front, back);
+                LocalDate.of(2035, 1, 1), null, null, REVIEWED_AT, front, back, null);
     }
 
     /** Metadata ảnh giả đúng shape, không gọi storage trong test persistence. */
