@@ -423,7 +423,9 @@ Các folder đọc không sửa dữ liệu, chạy lại được nhiều lần
 Đường đầy đủ: `/api/v1/admin/documents/{documentCode}/view-sessions` (BR-130/803).
 Chỉ `DOCUMENT_VERIFIER` và `ADMIN` được gọi bằng JWT nhân viên `admin-web`.
 Không yêu cầu chi nhánh; `BRANCH_STAFF`, các vai vận hành khác và `CUSTOMER` (kể cả chủ hồ sơ)
-không có quyền này. Đây là POST có tác dụng ghi audit, không có GET tương đương.
+không có quyền này. **Chủ hồ sơ luôn bị `403 ACCESS_DENIED`**, kể cả kiêm `DOCUMENT_VERIFIER`
+hoặc `ADMIN`: kiểm tại use case trước audit, giải mã và ký URL (BR-130). Lượt bị từ chối này
+không tạo `DOCUMENT_VIEW_OPENED`. Đây là POST có tác dụng ghi audit, không có GET tương đương.
 
 Request không body hoặc JSON `{}`. Không nhận trường khác: người mở lấy từ JWT, chủ hồ sơ
 lấy từ bản nộp đã lưu, `requestId` lấy từ filter đã chuẩn hoá `X-Request-Id`.
@@ -483,7 +485,7 @@ Dùng lại URL còn hạn không tạo audit mới; audit đếm lượt POST m
 | Trường hợp | HTTP | Mã lỗi |
 |---|---|---|
 | Thiếu/sai token | 401 | `UNAUTHENTICATED` |
-| Sai vai hoặc client | 403 | `ACCESS_DENIED` |
+| Sai vai/client hoặc người gọi chính là chủ hồ sơ (kể cả ADMIN/verifier) | 403 | `ACCESS_DENIED` |
 | Sai định dạng GT, body có trường ngoài hợp đồng | 400 | `INVALID_REQUEST` |
 | GT hợp lệ không tồn tại | 404 | `DOCUMENT_NOT_FOUND` |
 | Commit audit, giải mã hoặc storage lỗi | 500 | `INTERNAL_ERROR` |
@@ -561,7 +563,7 @@ bị xê dịch; đọc trang không giữ chỗ hoặc nhận quyền xác minh
 | Trường hợp | HTTP | Mã lỗi |
 |---|---|---|
 | Thiếu/sai/hết hạn token | 401 | `UNAUTHENTICATED` |
-| Sai vai hoặc client | 403 | `ACCESS_DENIED` |
+| Sai vai/client hoặc người gọi chính là chủ hồ sơ (kể cả ADMIN/verifier) | 403 | `ACCESS_DENIED` |
 | Sai kiểu/giới hạn phân trang | 400 | `INVALID_REQUEST` |
 | Lỗi đọc nội bộ | 500 | `INTERNAL_ERROR` |
 
@@ -594,6 +596,10 @@ các HTTP 400/401/403 có chủ đích. Các folder chỉ đọc, chạy lại �
 Cần JWT `admin-web` của `DOCUMENT_VERIFIER` hoặc `ADMIN`, không cần chi nhánh. Khách và nhân viên
 chi nhánh không có quyền. `documentCode` phải là `GT-<6>`. Người duyệt lấy từ tài khoản hiện tại,
 thời điểm lấy từ đồng hồ server; client không được tự khai hai giá trị này hoặc chủ/trạng thái hồ sơ.
+**Không ai tự duyệt hoặc tự từ chối giấy tờ của mình**, kể cả `ADMIN` hoặc `DOCUMENT_VERIFIER`
+kiêm `CUSTOMER`: trả `403 ACCESS_DENIED` tại use case, trước khi ghi quyết định (BR-130).
+Kiểm này áp dụng cả bản đã xử lý; không chuyển thành lỗi xung đột trạng thái. CSDL còn có CHECK
+`chk_document_submission_reviewer_not_owner` để bảo vệ đường ghi bỏ qua use case.
 
 Trước khi ra quyết định, nhân viên dùng API `view-sessions` để đối chiếu thông tin và ảnh; mỗi lần mở
 được audit theo hợp đồng ở trên. Hai API quyết định chỉ ghi quyết định và đọc lại metadata, không mở
@@ -646,11 +652,36 @@ bản VERIFIED cũ. Lịch sử bản cũ không bị sửa thành quyết đị
 |---|---|---|
 | 400 | `INVALID_REQUEST` | Mã GT/body/lý do/ghi chú sai, có trường ngoài hợp đồng |
 | 401 | `UNAUTHENTICATED` | Thiếu hoặc sai JWT |
-| 403 | `ACCESS_DENIED` | Sai audience hoặc không có quyền xác minh |
+| 403 | `ACCESS_DENIED` | Sai audience, không có quyền xác minh hoặc người gọi chính là chủ giấy tờ |
 | 404 | `DOCUMENT_NOT_FOUND` | Không tồn tại mã GT hợp lệ |
 | 409 | `DOCUMENT_REVIEW_CONFLICT` | Bản không còn là PENDING mới nhất; quyết định lặp hoặc thua cuộc đua |
 | 409 | `IDENTITY_CARD_ALREADY_REGISTERED` | Số CCCD đã xác minh cho tài khoản khác |
 | 500 | `INTERNAL_ERROR` | Lỗi nội bộ; response không lộ SQL, tên lớp hoặc stack trace |
+
+### Kiểm chống tự xác minh bằng Postman
+
+Trong collection `postman/task-08b-documents.postman_collection.json`, chạy bốn folder sau bằng
+Runner, **1 iteration**, đúng thứ tự. Working directory là thư mục gốc repo; ảnh đều là fixture local.
+
+| Thứ tự | Folder | Token | Số request / kết quả |
+|---|---|---|---|
+| 1 | `Review Q1 - Owner setup (CUSTOMER + DOCUMENT_VERIFIER)` | `customer-web`, token có CUSTOMER, đã consent | 6; tạo hai ảnh và GPLX mới PENDING |
+| 2 | `Review Q1 - Deny self review (DOCUMENT_VERIFIER)` | `admin-web`, **cùng tài khoản** bước 1, token có DOCUMENT_VERIFIER | 4; kiểm danh tính 200, tự verify/reject/view-sessions đều 403 ACCESS_DENIED |
+| 3 | `Review Q1 - Different reviewer (ADMIN or DOCUMENT_VERIFIER)` | `admin-web`, **tài khoản khác** có ADMIN hoặc DOCUMENT_VERIFIER | 3; kiểm danh tính 200, mở 201 và duyệt 200 |
+| 4 | `Review Q1 - Owner reads result (CUSTOMER)` | `customer-web`, cùng tài khoản bước 1 | 2; đọc lại VERIFIED 200 |
+
+Chuẩn bị tài khoản thử: ADMIN hạ tầng đăng nhập Keycloak Admin Console, chọn realm `car-rental`,
+vào **Users**, mở khách thử đã consent, **Role mapping → Assign role → Filter by realm roles**,
+chọn `DOCUMENT_VERIFIER` và **Assign**; giữ vai `CUSTOMER`. Nếu khách chưa có mật khẩu nhân viên,
+vào **Credentials → Set password**, đặt mật khẩu tạm ít nhất 12 ký tự, bật **Temporary** rồi lưu.
+Lần đăng nhập `admin-web` đầu phải đổi mật khẩu, sau đó xác minh OTP. Tài khoản này chỉ dùng dữ liệu giả.
+
+Tài khoản có cả hai vai trong realm; scope của `customer-web` chỉ đưa CUSTOMER vào token,
+còn `admin-web` đưa DOCUMENT_VERIFIER. Không yêu cầu một token chứa cả hai vai.
+Lấy token mới cho cả hai client sau khi gán vai. Mỗi folder chọn đúng token trong Authorization;
+đừng đổi token giữa lượt Runner. Script `/accounts/me` kiểm vai và chủ, dừng khi sai danh tính.
+GT và mã chủ tự lưu ở collection; URL tải chỉ tồn tại trong lượt Runner, không cần copy biến.
+Muốn lặp kịch bản, chạy lại từ folder 1 để tạo bản PENDING mới; không chạy lại duyệt trên bản đã VERIFIED.
 
 ### Chạy luồng quyết định bằng Postman
 

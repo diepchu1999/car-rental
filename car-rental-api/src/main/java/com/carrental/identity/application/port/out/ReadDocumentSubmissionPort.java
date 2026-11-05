@@ -13,6 +13,12 @@ import java.util.Optional;
 /** Cổng đọc bản nộp BR-130; tách rõ đường đúng chủ và đường phục vụ use case xác minh có kiểm quyền. */
 public interface ReadDocumentSubmissionPort {
     /**
+     * BR-130: chỉ đọc mã chủ bất biến để use case chặn tự xác minh trước khi ghi quyết định.
+     * Không đọc trạng thái để phân xử tranh chấp, số giấy tờ hoặc ảnh; mã không tồn tại trả rỗng.
+     */
+    Optional<String> findOwnerCodeByCode(String code);
+
+    /**
      * BR-130: metadata các bản active VERIFIED của đúng tài khoản, đọc hai loại trong cùng một snapshot.
      * Dành cho cổng điều kiện thuê nội bộ; caller của cổng chịu trách nhiệm chọn tài khoản đúng ngữ cảnh.
      * Không có active thì không có mục tương ứng; chưa có hồ sơ/không có tài khoản đều trả danh sách rỗng.

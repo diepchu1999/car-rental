@@ -52,6 +52,9 @@ class DocumentViewSessionCommandService implements OpenDocumentViewSessionUseCas
         if (!command.code().equals(document.submission().code())) {
             throw new IllegalStateException("Document lookup is inconsistent.");
         }
+        if (caller.accountCode().equals(document.accountCode())) {
+            throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+        }
         audit.recordDocumentView(caller.accountCode(), document.accountCode(), command.code(), command.requestId());
         var number = crypto.reveal(document.number(), new DocumentProtectionContext(
                 document.accountCode(), document.submission().documentType(), command.code()));

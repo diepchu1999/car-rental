@@ -42,6 +42,19 @@ class DocumentReviewReadIntegrationTest extends DocumentDatabaseTestSupport {
     @Autowired ReadDocumentSubmissionPort reads;
     @Autowired Environment environment;
 
+    /** Lookup quyền không cần ảnh hoặc head, chọn chủ của đúng GT ở mọi trạng thái và cả hai loại. */
+    @ParameterizedTest @EnumSource(DocumentSubmissionStatus.class)
+    void ownerLookupReturnsExactBusinessCodeWithoutImages(DocumentSubmissionStatus status) {
+        for (DocumentType type : DocumentType.values()) {
+            var first = create(newAccount(), type, status, "NONE");
+            var second = create(newAccount(), type, status, "NONE");
+            assertEquals(first.ownerCode(), reads.findOwnerCodeByCode(first.code()).orElseThrow());
+            assertEquals(second.ownerCode(), reads.findOwnerCodeByCode(second.code()).orElseThrow());
+        }
+        assertTrue(reads.findOwnerCodeByCode("GT-ZZZZZZ").isEmpty());
+        assertTrue(reads.findOwnerCodeByCode("GT-ZZZZZZ' OR '1'='1").isEmpty());
+    }
+
     /** Cả hai loại, bốn trạng thái và mọi metadata phải khớp hàng thật, không chỉ kiểm có kết quả. */
     @ParameterizedTest @EnumSource(DocumentSubmissionStatus.class)
     void readsBothTypesInEveryPersistedStatus(DocumentSubmissionStatus status) {
@@ -111,6 +124,7 @@ class DocumentReviewReadIntegrationTest extends DocumentDatabaseTestSupport {
         var logs = new ListAppender<ILoggingEvent>();
         logs.setContext(root.getLoggerContext()); logs.start(); root.addAppender(logs); binds.setLevel(Level.TRACE);
         try {
+            assertEquals(fixture.ownerCode(), reads.findOwnerCodeByCode(fixture.code()).orElseThrow());
             var actual = reads.findForReviewByCode(fixture.code()).orElseThrow();
             assertEquals("DocumentReviewDetail[redacted]", actual.toString());
             assertFalse(SensitiveSql.isActive());
@@ -125,8 +139,8 @@ class DocumentReviewReadIntegrationTest extends DocumentDatabaseTestSupport {
             }
             var p6 = logs.list.stream().filter(e -> e.getLoggerName().equals("p6spy")).toList();
             if (environment.acceptsProfiles(Profiles.of("sql-log"))) {
-                assertEquals(1, p6.size());
-                assertTrue(p6.getFirst().getFormattedMessage().contains("[REDACTED sensitive SQL]"));
+                assertEquals(2, p6.size());
+                assertTrue(p6.stream().allMatch(event -> event.getFormattedMessage().contains("[REDACTED sensitive SQL]")));
             } else assertTrue(p6.isEmpty());
         } finally { binds.setLevel(previous); root.detachAppender(logs); logs.stop(); }
     }

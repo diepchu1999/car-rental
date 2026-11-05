@@ -114,15 +114,29 @@ public class HttpIdentityTestConfiguration {
             return token(clock, staffSubject, "+84910000009", "BRANCH_STAFF", "admin-web");
         }
 
+        /** BR-130/809: danh tính mới có vai khách và quyền xác minh, dùng JWT thật để thử tự xác minh. */
+        public String newReviewerCustomerToken(Clock clock, String reviewerRole) {
+            if (!List.of("ADMIN", "DOCUMENT_VERIFIER").contains(reviewerRole)) {
+                throw new IllegalArgumentException("A document reviewer role is required.");
+            }
+            return token(clock, UUID.randomUUID().toString(), "+8492%07d".formatted(FRESH_CUSTOMERS.incrementAndGet()),
+                    List.of(reviewerRole, "CUSTOMER"), "admin-web");
+        }
+
         /** Ký RS256 theo Clock của ứng dụng test, kể cả test dùng mốc cố định khác đồng hồ máy. */
         private String token(Clock clock, String subject, String phone, String role, String client) {
+            return token(clock, subject, phone, List.of(role), client);
+        }
+
+        /** Ký bộ vai tường minh; thêm bằng chứng điều khoản khi có CUSTOMER, không giả CallerDirectory. */
+        private String token(Clock clock, String subject, String phone, List<String> roles, String client) {
             var now = clock.instant();
             var claims = new JWTClaimsSet.Builder().issuer(baseUrl() + "/realms/http-test")
                     .subject(subject).audience("car-rental-api").issueTime(Date.from(now.minusSeconds(1)))
                     .expirationTime(Date.from(now.plusSeconds(300))).claim("typ", "Bearer")
                     .claim("azp", client).claim("phone_number", phone)
-                    .claim("realm_access", Map.of("roles", List.of(role)));
-            if ("CUSTOMER".equals(role)) {
+                    .claim("realm_access", Map.of("roles", roles));
+            if (roles.contains("CUSTOMER")) {
                 claims.claim("terms_version", "http-test-terms-v1")
                         .claim("consented_at", "2026-01-01T00:00:00Z");
             }

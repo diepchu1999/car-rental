@@ -128,6 +128,25 @@ class DocumentViewSessionApiIntegrationTest extends DocumentDatabaseTestSupport 
         verify(objects, times(4)).viewUrl(anyString(), any());
     }
 
+    /** BR-130: chủ kiêm vai xác minh bị 403 cho cả CCCD/GPLX; người khác mở được và ghi đúng một audit. */
+    @ParameterizedTest @ValueSource(strings = {"ADMIN", "DOCUMENT_VERIFIER"})
+    void reviewerCustomerCannotOpenOwnDocuments(String role) throws Exception {
+        String self = tokens.newReviewerCustomerToken(clock, role);
+        ownerCode = account(self, true);
+        ownerId = jdbc.queryForObject(documentSql("find_account_id_by_code"), Map.of("code", ownerCode), Long.class);
+        String actor = account(verifier, true);
+        for (String type : new String[]{"IDENTITY_CARD", "DRIVER_LICENSE"}) {
+            requestId = UUID.randomUUID().toString();
+            String code = prepare(type, "PENDING");
+            clearInvocations(auditWrites, objects);
+            failure(open(self, code, "{}"), 403, "ACCESS_DENIED");
+            assertTrue(events().isEmpty()); verifyNoInteractions(auditWrites, objects);
+            success(open(verifier, code, "{}"));
+            assertAudit(code, actor, 1);
+            verify(auditWrites).insert(any()); verify(objects, times(2)).viewUrl(anyString(), any());
+        }
+    }
+
     /** Hai lần cùng requestId phải thành hai event; connection test thấy commit trước lúc ký ở thread HTTP. */
     @Test void everyHttpOpenCommitsItsOwnAuditBeforeSigning() throws Exception {
         String code = prepare("IDENTITY_CARD", "PENDING"); String actor = account(verifier, true);

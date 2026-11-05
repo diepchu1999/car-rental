@@ -41,6 +41,7 @@ class DocumentReviewCommandService implements VerifyDocumentUseCase, RejectDocum
     public DocumentStatusDetail verify(VerifyDocumentCommand command) {
         String reviewer = requireReviewer();
         Objects.requireNonNull(command, "command must not be null.");
+        requireDifferentOwner(command.code(), reviewer);
         var reviewedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         writes.verify(command, reviewer, reviewedAt);
         return reload(command.code(), DocumentSubmissionStatus.VERIFIED, reviewedAt, null, null);
@@ -51,6 +52,7 @@ class DocumentReviewCommandService implements VerifyDocumentUseCase, RejectDocum
     public DocumentStatusDetail reject(RejectDocumentCommand command) {
         String reviewer = requireReviewer();
         Objects.requireNonNull(command, "command must not be null.");
+        requireDifferentOwner(command.code(), reviewer);
         var reviewedAt = clock.instant().truncatedTo(ChronoUnit.MICROS);
         writes.reject(command, reviewer, reviewedAt);
         return reload(command.code(), DocumentSubmissionStatus.REJECTED, reviewedAt,
@@ -64,6 +66,15 @@ class DocumentReviewCommandService implements VerifyDocumentUseCase, RejectDocum
             throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
         }
         return caller.accountCode();
+    }
+
+    /** BR-130: ADMIN cũng không tự quyết định; chủ bất biến, trạng thái vẫn do câu ghi nguyên tử phân xử. */
+    private void requireDifferentOwner(String code, String reviewer) {
+        String owner = reads.findOwnerCodeByCode(code)
+                .orElseThrow(() -> DomainException.notFound(ErrorCode.DOCUMENT_NOT_FOUND));
+        if (reviewer.equals(owner)) {
+            throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
+        }
     }
 
     /** Chỉ đọc metadata kết quả; không mở ảnh, giải mã hoặc tự chuyển sang latest của một bản khác. */

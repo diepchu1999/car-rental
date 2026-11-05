@@ -9700,6 +9700,1145 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Review Q1 - Owner setup (CUSTOMER + DOCUMENT_VERIFIER)",
+      "description": "BR-130/809: tài khoản thử có CUSTOMER và DOCUMENT_VERIFIER, đã consent. Token customer-web. Runner 1 iteration từ đầu, tạo ảnh/GPLX mới mỗi lượt; giữ mã chủ và GT vào collection, URL chỉ run-local. Working directory là thư mục gốc repo; chỉ dùng ảnh giả.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Q1 customer-web",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check setup identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-130/809: kiểm vai và quan hệ chủ hồ sơ trước các request sau; sai thì dừng Runner."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('q1IdentityChecked');",
+                  "['q1OwnerCode','q1LicenseCode'].forEach(k=>pm.collectionVariables.unset(k));",
+                  "['q1DriverFrontCode','q1DriverBackCode','q1DriverFrontUrl','q1DriverBackUrl'].forEach(k=>pm.variables.unset(k));",
+                  "pm.variables.set('q1Number','LOCAL-TEST-'+pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response is private', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "const b=pm.response.code===200?pm.response.json():null; const d=b && b.success?b.data:null;",
+                  "const correct=Boolean(d && /^TK-[A-Z0-9]{6}$/.test(d.code||'') && Array.isArray(d.roles) && d.roles.includes('CUSTOMER') && Boolean(d.termsVersion));",
+                  "pm.test('Required role and owner relationship', () => pm.expect(correct).to.equal(true));",
+                  "if(!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong account or role. Select the expected token and restart this folder.'); }",
+                  "pm.variables.set('q1IdentityChecked',true);",
+                  "pm.collectionVariables.set('q1OwnerCode',d.code);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Create q1DriverFront upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: AN mới cho đúng loại/mặt; URL chỉ ở biến local của Runner, không lưu vào environment/collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"side\": \"FRONT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload metadata', () => { const d = pm.response.json().data; pm.expect(/^AN-[A-Z0-9]{6}$/.test(d.code)).to.equal(true); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.side).to.equal('FRONT'); pm.expect(typeof d.uploadUrl === 'string' && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl)).to.equal(true); });",
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.variables.set('q1DriverFrontCode', d.code); pm.variables.set('q1DriverFrontUrl', d.uploadUrl); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - PUT q1DriverFront fixture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/octet-stream"
+              }
+            ],
+            "url": "{{q1DriverFrontUrl}}",
+            "description": "BR-130: PUT binary bằng URL ký, không gửi bearer token. Body file lấy tương đối từ working directory repo; MIME khai không quyết định nội dung hợp lệ.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "postman/fixtures/documents/local-front.png"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                  "if (!pm.variables.get('q1DriverFrontUrl')) throw new Error('Run this entire folder from request 01. The upload URL is run-local.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MinIO accepts fixture bytes', () => pm.response.to.have.status(200));",
+                  "pm.variables.unset('q1DriverFrontUrl');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Create q1DriverBack upload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/document-uploads",
+            "description": "BR-130: AN mới cho đúng loại/mặt; URL chỉ ở biến local của Runner, không lưu vào environment/collection.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"side\": \"BACK\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Upload metadata', () => { const d = pm.response.json().data; pm.expect(/^AN-[A-Z0-9]{6}$/.test(d.code)).to.equal(true); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.side).to.equal('BACK'); pm.expect(typeof d.uploadUrl === 'string' && /[?&]X-Amz-Expires=300(?:&|$)/i.test(d.uploadUrl)).to.equal(true); });",
+                  "if (pm.response.code === 201) { const d = pm.response.json().data; pm.variables.set('q1DriverBackCode', d.code); pm.variables.set('q1DriverBackUrl', d.uploadUrl); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 - PUT q1DriverBack fixture",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/octet-stream"
+              }
+            ],
+            "url": "{{q1DriverBackUrl}}",
+            "description": "BR-130: PUT binary bằng URL ký, không gửi bearer token. Body file lấy tương đối từ working directory repo; MIME khai không quyết định nội dung hợp lệ.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "file",
+              "file": {
+                "src": "postman/fixtures/documents/local-back.png"
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                  "if (!pm.variables.get('q1DriverBackUrl')) throw new Error('Run this entire folder from request 01. The upload URL is run-local.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('MinIO accepts fixture bytes', () => pm.response.to.have.status(200));",
+                  "pm.variables.unset('q1DriverBackUrl');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 - Submit DRIVER_LICENSE",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents",
+            "description": "BR-120/130: nộp của chính CUSTOMER; kiểm đúng HTTP/mã lỗi. AN được truyền tự động từ request tạo lượt tải.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"DRIVER_LICENSE\",\n  \"number\": \"{{q1Number}}\",\n  \"expiresOn\": \"2035-01-01\",\n  \"frontUploadCode\": \"{{q1DriverFrontCode}}\",\n  \"backUploadCode\": \"{{q1DriverBackCode}}\",\n  \"licenseClass\": \"B\",\n  \"automaticOnly\": false,\n  \"issuedOn\": \"2025-01-01\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                  "if (!pm.variables.get('q1Number')) throw new Error('Run this entire folder from request 01.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Request ID is present', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Response must not be cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Submission metadata only', () => { const b = pm.response.json(); pm.expect(b.data.issuedOn).to.equal('2025-01-01'); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt'); pm.expect(/^GT-[A-Z0-9]{6}$/.test(b.data.code)).to.equal(true); pm.expect(b.data.documentType).to.equal('DRIVER_LICENSE'); pm.expect(b.data.status).to.equal('PENDING'); pm.expect(b.data.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(b.data.submittedAt))).to.equal(true); });",
+                  "if (pm.response.code === 201) pm.collectionVariables.set('q1LicenseCode', pm.response.json().data.code);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Review Q1 - Deny self review (DOCUMENT_VERIFIER)",
+      "description": "BR-130: cùng tài khoản của Owner setup, token admin-web mới có DOCUMENT_VERIFIER. Tài khoản có cả hai vai trong realm, nhưng mỗi client chỉ nhận các vai thuộc scope của mình. Chạy cả folder từ request 01, giữ cùng token. Ba POST đều 403 ACCESS_DENIED.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Q1 admin-web",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check self identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130/809: kiểm vai và quan hệ chủ hồ sơ trước các request sau; sai thì dừng Runner."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('q1IdentityChecked');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response is private', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "const b=pm.response.code===200?pm.response.json():null; const d=b && b.success?b.data:null;",
+                  "const correct=Boolean(d && /^TK-[A-Z0-9]{6}$/.test(d.code||'') && Array.isArray(d.roles) && d.roles.includes('DOCUMENT_VERIFIER') && /^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('q1OwnerCode')||'') && d.code === pm.collectionVariables.get('q1OwnerCode'));",
+                  "pm.test('Required role and owner relationship', () => pm.expect(correct).to.equal(true));",
+                  "if(!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong account or role. Select the expected token and restart this folder.'); }",
+                  "pm.variables.set('q1IdentityChecked',true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Reject own verify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{q1LicenseCode}}/verify",
+            "description": "BR-130: chính chủ kiêm DOCUMENT_VERIFIER vẫn bị 403; không có ngoại lệ theo vai.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                  "const code=pm.collectionVariables.get('q1LicenseCode'); if(!/^GT-[A-Z0-9]{6}$/.test(code||'')) throw new Error('Run Q1 owner setup first.'); pm.variables.set('q1LicenseCode',code);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response is private', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Self access is denied without data', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Reject own reject",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{q1LicenseCode}}/reject",
+            "description": "BR-130: chính chủ kiêm DOCUMENT_VERIFIER vẫn bị 403; không có ngoại lệ theo vai.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionCode\": \"ILLEGIBLE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                  "const code=pm.collectionVariables.get('q1LicenseCode'); if(!/^GT-[A-Z0-9]{6}$/.test(code||'')) throw new Error('Run Q1 owner setup first.'); pm.variables.set('q1LicenseCode',code);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response is private', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Self access is denied without data', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 - Reject own view-sessions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{q1LicenseCode}}/view-sessions",
+            "description": "BR-130: chính chủ kiêm DOCUMENT_VERIFIER vẫn bị 403; không có ngoại lệ theo vai.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                  "const code=pm.collectionVariables.get('q1LicenseCode'); if(!/^GT-[A-Z0-9]{6}$/.test(code||'')) throw new Error('Run Q1 owner setup first.'); pm.variables.set('q1LicenseCode',code);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response is private', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Self access is denied without data', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Review Q1 - Different reviewer (ADMIN or DOCUMENT_VERIFIER)",
+      "description": "BR-130: tài khoản KHÁC chủ của Owner setup, có ADMIN hoặc DOCUMENT_VERIFIER. Token admin-web. Chạy sau Deny self review; mở 201, duyệt 200. Muốn chạy lại bắt đầu từ Owner setup để có GT mới.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "admin-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Q1 admin-web",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check other identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+            "description": "BR-130/809: kiểm vai và quan hệ chủ hồ sơ trước các request sau; sai thì dừng Runner."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('q1IdentityChecked');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response is private', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "const b=pm.response.code===200?pm.response.json():null; const d=b && b.success?b.data:null;",
+                  "const correct=Boolean(d && /^TK-[A-Z0-9]{6}$/.test(d.code||'') && Array.isArray(d.roles) && (d.roles.includes('ADMIN') || d.roles.includes('DOCUMENT_VERIFIER')) && /^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('q1OwnerCode')||'') && d.code !== pm.collectionVariables.get('q1OwnerCode'));",
+                  "pm.test('Required role and owner relationship', () => pm.expect(correct).to.equal(true));",
+                  "if(!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong account or role. Select the expected token and restart this folder.'); }",
+                  "pm.variables.set('q1IdentityChecked',true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Other reviewer opens license",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{q1LicenseCode}}/view-sessions",
+            "description": "BR-130: người khác mở GPLX thành công; audit commit trước URL, tự tải ảnh bằng URL ký không kèm bearer.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                  "const code=pm.collectionVariables.get('q1LicenseCode'); if(!/^GT-[A-Z0-9]{6}$/.test(code||'')) throw new Error('Run Q1 owner setup first.'); pm.variables.set('q1LicenseCode',code);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Safe request ID', () => pm.expect(/^[A-Za-z0-9-]{1,64}$/.test(pm.response.headers.get('X-Request-Id') || '')).to.equal(true));",
+                  "pm.test('Private response is not cached', () => pm.expect((pm.response.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true));",
+                  "pm.test('Successful private envelope', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact response fields', () => { const d=pm.response.json().data; pm.expect(d).to.have.all.keys('code','accountCode','documentType','status','number','fullName','birthDate','expiresOn','issuedOn','licenseClass','automaticOnly','submittedAt','reviewedAt','rejectionCode','rejectionNote','frontImage','backImage'); });",
+                  "pm.test('Correct owner and version', () => { const d=pm.response.json().data; pm.expect(d.code).to.equal(pm.collectionVariables.get('q1LicenseCode')); pm.expect(d.accountCode).to.equal(pm.collectionVariables.get('q1OwnerCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(['PENDING','VERIFIED','REJECTED','SUPERSEDED']).to.include(d.status); pm.expect(typeof d.number==='string' && d.number.length>0).to.equal(true); });",
+                  "pm.test('Two short-lived image links', () => { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d[side]; pm.expect(image).to.have.all.keys('url','expiresAt'); pm.expect(/^https?:\\/\\//.test(image.url)).to.equal(true); pm.expect(Date.parse(image.expiresAt)>Date.now()).to.equal(true); } pm.expect(d.frontImage.url!==d.backImage.url).to.equal(true); });",
+                  "// Tải ảnh ngay trong bộ nhớ, không lưu URL vào collection/environment và không gửi bearer tới MinIO.",
+                  "if (pm.response.code===201) { const d=pm.response.json().data; for(const side of ['frontImage','backImage']) { const image=d && d[side]; if(image && /^https?:\\/\\//.test(image.url)) pm.sendRequest({url:image.url,method:'GET',auth:{type:'noauth'}}, (err,res) => { pm.test(side+' signed GET succeeds without bearer', () => { pm.expect(Boolean(err)).to.equal(false); pm.expect(res.code).to.equal(200); pm.expect(/^(image\\/jpeg|image\\/png|image\\/heic)(;|$)/i.test(res.headers.get('Content-Type') || '')).to.equal(true); pm.expect((res.headers.get('Cache-Control') || '').includes('no-store')).to.equal(true); }); }); } }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 - Other reviewer verifies license",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/admin/documents/{{q1LicenseCode}}/verify",
+            "description": "BR-130: người khác duyệt GPLX mà chính chủ không thể tự duyệt; vẫn PENDING sau các lần bị 403.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                  "const code=pm.collectionVariables.get('q1LicenseCode'); if(!/^GT-[A-Z0-9]{6}$/.test(code||'')) throw new Error('Run Q1 owner setup first.'); pm.variables.set('q1LicenseCode',code);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response must not be cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Success envelope', () => { const b = pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                  "pm.test('Exact review metadata', () => { const d = pm.response.json().data; pm.expect(d).to.have.all.keys('code','documentType','status','expiresOn','issuedOn','submittedAt','reviewedAt','rejectionCode','rejectionNote'); pm.expect(d.code).to.equal(pm.collectionVariables.get('q1LicenseCode')); pm.expect(d.documentType).to.equal('DRIVER_LICENSE'); pm.expect(d.status).to.equal('VERIFIED'); pm.expect(d.expiresOn).to.equal('2035-01-01'); pm.expect(Number.isFinite(Date.parse(d.submittedAt))).to.equal(true); pm.expect(Number.isFinite(Date.parse(d.reviewedAt))).to.equal(true); pm.expect(d.rejectionCode).to.equal(null); pm.expect(d.rejectionNote).to.equal(null); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Review Q1 - Owner reads result (CUSTOMER)",
+      "description": "BR-130: cùng chủ Owner setup, token customer-web. Chạy sau Different reviewer; đọc trạng thái VERIFIED 200. Không copy mã thủ công.",
+      "auth": {
+        "type": "oauth2",
+        "oauth2": [
+          {
+            "key": "grant_type",
+            "value": "authorization_code_with_pkce",
+            "type": "string"
+          },
+          {
+            "key": "authUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+            "type": "string"
+          },
+          {
+            "key": "accessTokenUrl",
+            "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+            "type": "string"
+          },
+          {
+            "key": "clientId",
+            "value": "customer-web",
+            "type": "string"
+          },
+          {
+            "key": "clientSecret",
+            "value": "",
+            "type": "string"
+          },
+          {
+            "key": "redirect_uri",
+            "value": "https://oauth.pstmn.io/v1/callback",
+            "type": "string"
+          },
+          {
+            "key": "scope",
+            "value": "openid",
+            "type": "string"
+          },
+          {
+            "key": "challengeAlgorithm",
+            "value": "S256",
+            "type": "string"
+          },
+          {
+            "key": "state",
+            "value": "{{$guid}}",
+            "type": "string"
+          },
+          {
+            "key": "client_authentication",
+            "value": "body",
+            "type": "string"
+          },
+          {
+            "key": "addTokenTo",
+            "value": "header",
+            "type": "string"
+          },
+          {
+            "key": "tokenName",
+            "value": "Car Rental Q1 customer-web",
+            "type": "string"
+          },
+          {
+            "key": "useBrowser",
+            "value": false,
+            "type": "boolean"
+          }
+        ]
+      },
+      "item": [
+        {
+          "name": "01 - Check final identity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/accounts/me",
+            "description": "BR-130/809: kiểm vai và quan hệ chủ hồ sơ trước các request sau; sai thì dừng Runner."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.variables.unset('q1IdentityChecked');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response is private', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "const b=pm.response.code===200?pm.response.json():null; const d=b && b.success?b.data:null;",
+                  "const correct=Boolean(d && /^TK-[A-Z0-9]{6}$/.test(d.code||'') && Array.isArray(d.roles) && d.roles.includes('CUSTOMER') && Boolean(d.termsVersion) && /^TK-[A-Z0-9]{6}$/.test(pm.collectionVariables.get('q1OwnerCode')||'') && d.code === pm.collectionVariables.get('q1OwnerCode'));",
+                  "pm.test('Required role and owner relationship', () => pm.expect(correct).to.equal(true));",
+                  "if(!correct) { pm.execution.setNextRequest(null); throw new Error('Wrong account or role. Select the expected token and restart this folder.'); }",
+                  "pm.variables.set('q1IdentityChecked',true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 - Owner reads verified license",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Client-Platform",
+                "value": "web"
+              },
+              {
+                "key": "X-Client-Version",
+                "value": "0.0.1"
+              }
+            ],
+            "url": "{{baseUrl}}/api/v1/client/documents/{{q1LicenseCode}}",
+            "description": "BR-130: quyền đọc trạng thái của khách giữ nguyên; bản đã được người khác xác minh."
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.variables.get('q1IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                  "const code=pm.collectionVariables.get('q1LicenseCode'); if(!/^GT-[A-Z0-9]{6}$/.test(code||'')) throw new Error('Run Q1 owner setup first.'); pm.variables.set('q1LicenseCode',code);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                  "pm.test('Response is private', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                  "pm.test('Other reviewer decision persisted', () => { const b=pm.response.json(); pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); pm.expect(b.data.code).to.equal(pm.collectionVariables.get('q1LicenseCode')); pm.expect(b.data.status).to.equal('VERIFIED'); pm.expect(b.data.issuedOn).to.equal('2025-01-01'); pm.expect(b.data.rejectionCode).to.equal(null); pm.expect(b.data.rejectionNote).to.equal(null); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ]
 }

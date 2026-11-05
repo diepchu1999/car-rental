@@ -186,6 +186,8 @@ chứa giấy tờ; chỉ dùng ảnh và thông tin thử ở local.
 
 `DOCUMENT_VERIFIER` và `ADMIN` quyết định tại `POST /api/v1/admin/documents/{documentCode}/verify`
 (không body hoặc `{}`) và `/reject` (JSON gồm `rejectionCode`, `rejectionNote` tuỳ chọn).
+Chính chủ không được gọi `verify`, `reject` hoặc `view-sessions`, kể cả có vai xác minh hay ADMIN:
+trả `403 ACCESS_DENIED`; nhờ người xác minh khác xử lý. Lượt tự mở bị từ chối không ghi audit mở ảnh.
 Xác minh trả `VERIFIED`; từ chối trả `REJECTED` và giữ bản VERIFIED đang dùng. Hồ sơ đã xử lý hoặc
 đã bị thay trả `409 DOCUMENT_REVIEW_CONFLICT`. Trong collection giấy tờ, chạy các folder từ
 **Review setup (CUSTOMER)** đến **Read final review (CUSTOMER)** theo thứ tự và đúng vai;

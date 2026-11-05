@@ -89,6 +89,17 @@ class DocumentViewSessionCommandServiceTest {
         assertEquals("TK-OWNER1", service.open(COMMAND).accountCode());
     }
 
+    /** BR-130: chính chủ dù ADMIN/verifier kiêm CUSTOMER vẫn không có audit, số rõ hoặc URL ký. */
+    @ParameterizedTest @ValueSource(strings = {"ADMIN", "DOCUMENT_VERIFIER"})
+    void rejectsOwnViewBeforeAuditDecryptionAndSigning(String role) {
+        when(callers.current()).thenReturn(new CallerRef("TK-OWNER1", Set.of(role, "CUSTOMER"), null));
+        var failure = assertThrows(DomainException.class, () -> service.open(COMMAND));
+        assertEquals(ErrorCode.ACCESS_DENIED, failure.errorCode());
+        assertEquals(DomainException.Category.FORBIDDEN, failure.category());
+        verify(reads).findForReviewByCode(COMMAND.code()); verifyNoMoreInteractions(reads);
+        verifyNoInteractions(audit, crypto, storage);
+    }
+
     /** Ngoài request giữ lỗi rõ của CallerDirectory, không có audit hoặc dữ liệu cấp theo quyền mặc định. */
     @Test void rejectsMissingRequestContext() {
         var failure = new IllegalStateException("CallerDirectory requires an active HTTP request.");

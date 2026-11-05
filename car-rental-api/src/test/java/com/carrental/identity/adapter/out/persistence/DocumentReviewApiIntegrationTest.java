@@ -104,6 +104,27 @@ class DocumentReviewApiIntegrationTest extends DocumentDatabaseTestSupport {
         assertEquals(data, json.readTree(get(customer, "/api/v1/client/documents/" + fixture.code()).body()).path("data"));
     }
 
+    /** BR-130: JWT kiêm CUSTOMER tự quyết định bị 403; dữ liệu giữ nguyên, người khác vẫn duyệt được. */
+    @ParameterizedTest @CsvSource({"ADMIN,IDENTITY_CARD", "ADMIN,DRIVER_LICENSE", "DOCUMENT_VERIFIER,IDENTITY_CARD", "DOCUMENT_VERIFIER,DRIVER_LICENSE"})
+    void reviewerCustomerCannotDecideOwnDocument(String role, String type) throws Exception {
+        String self = tokens.newReviewerCustomerToken(clock, role);
+        owner = account(self, "admin");
+        ownerId = jdbc.queryForObject(documentSql("find_account_id_by_code"), Map.of("code", owner), Long.class);
+        var fixture = pending(type);
+        failure(post(self, fixture.code(), "verify", "{}"), 403, "ACCESS_DENIED");
+        assertPending(fixture);
+        failure(post(self, fixture.code(), "reject", REJECTION), 403, "ACCESS_DENIED");
+        assertPending(fixture);
+        assertTrue(SensitiveSql.execute(() -> jdbc.queryForList(documentSql("read_registration_for_test"),
+                Map.of("code", fixture.code()), String.class)).isEmpty());
+        success(post(verifier, fixture.code(), "verify", "{}"), fixture, "VERIFIED");
+        assertEquals(reviewer, row(fixture.code()).get("reviewer_code"));
+        // Quyền chính chủ luôn 403 kể cả sau khi người khác đã chốt, không lộ thành 409.
+        failure(post(self, fixture.code(), "verify", "{}"), 403, "ACCESS_DENIED");
+        failure(post(self, fixture.code(), "reject", REJECTION), 403, "ACCESS_DENIED");
+        assertEquals("VERIFIED", row(fixture.code()).get("status"));
+    }
+
     /** Endpoint xác minh không bắt buộc gửi JSON rỗng. */
     @Test void permitsVerificationWithoutBody() throws Exception {
         var fixture = pending("IDENTITY_CARD"); success(post(verifier, fixture.code(), "verify", null), fixture, "VERIFIED");
@@ -243,6 +264,13 @@ class DocumentReviewApiIntegrationTest extends DocumentDatabaseTestSupport {
                 assertTrue(p6.stream().anyMatch(e -> e.getFormattedMessage().contains("[REDACTED sensitive SQL]")));
             else assertTrue(p6.isEmpty());
         } finally { binds.setLevel(previous); root.detachAppender(logs); logs.stop(); }
+    }
+
+    /** Tách dải số fixture SQL khỏi JWT cố định và khách JWT mới; chạy riêng lớp vẫn không trùng số. */
+    @Override long newAccount() {
+        var parameters = accountParameters();
+        parameters.addValue("phone", "+8494" + ((String) parameters.getValue("code")).substring(3) + "0");
+        return insertAccount(parameters);
     }
 
     /** Tạo số mới, không dùng dữ liệu local hoặc số giấy tờ thật. */
