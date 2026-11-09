@@ -374,7 +374,11 @@ hưởng tới đơn đã tạo — cùng nguyên tắc với hoa hồng (BR-208
 **Báo giá có hạn dùng 15 phút** (tham số BR-225). Đặt xe bằng báo giá đã hết hạn bị từ chối
 (`QUOTE_EXPIRED`) — khách xin báo giá lại. Hạn ngắn để khách không đặt được theo một giá đã cũ; đủ dài
 để khách điền xong thông tin.
-*Nguồn: nguyên tắc nhất quán với BR-208, BR-225.*
+
+**Báo giá thuộc về khách đã tạo nó.** Chỉ chủ báo giá được đọc và dùng nó để đặt xe; mã báo giá của người
+khác trả như không tồn tại. Báo giá lộ ra ai quan tâm xe nào vào lúc nào, và mã trên URL không bao giờ là
+đủ (security-guideline §2).
+*Nguồn: nguyên tắc nhất quán với BR-208, BR-225. Báo giá có chủ: Tech Owner duyệt 09/11/2026.*
 
 ### BR-123 — Xoá tài khoản khách ✅ GĐ1
 Khách được yêu cầu xoá tài khoản: tài khoản ngừng đăng nhập được và không còn xuất hiện trong hệ thống.
@@ -573,6 +577,14 @@ khoản mới.
 Làm rõ cùng ngày theo kế hoạch Task 8b: hạn liên kết, định nghĩa "mở", bản cũ dùng tới khi bản mới được duyệt,
 một CCCD một tài khoản.*
 
+### BR-131 — Mỗi khách tối đa một đơn chờ trả cọc ✅ GĐ1
+Tại mọi thời điểm, một khách có **tối đa một** đơn ở trạng thái `PENDING_PAYMENT`. Muốn đặt xe khác thì
+trả cọc hoặc huỷ đơn đang chờ trước.
+
+Không giới hạn thì một người tạo nhiều đơn, mỗi đơn giữ một xe trong 1 tiếng (BR-103), chiếm xe mà không
+trả cọc. Ép bằng ràng buộc CSDL, không bằng kiểm tra đọc-rồi-ghi — hai lần bấm đặt song song vẫn chỉ ra một đơn.
+*Nguồn: Tech Owner duyệt 09/11/2026.*
+
 ---
 
 ## 2xx — Tiền
@@ -585,9 +597,14 @@ một CCCD một tài khoản.*
 ### BR-201 — Tỷ lệ cọc ✅ GĐ1
 | Hình thức thuê | Cọc |
 |---|---|
+| Thuê theo giờ | **30%** giá trị đơn |
 | Thuê ngày | **30%** giá trị đơn |
 | Thuê dài hạn theo tháng | **40%** giá trị đơn |
-*Nguồn: §10.4, §7.*
+
+**"Giá trị đơn" là tổng báo giá, gồm cả bảo hiểm** (BR-231) và mọi phí đã có trên báo giá — cùng cách với
+phí tài xế ở BR-219. Cọc làm tròn tới 1.000đ (BR-236); **phần còn lại = tổng − cọc**, nên cọc cộng phần còn
+lại luôn đúng bằng tổng. Cả hai số đóng băng vào đơn lúc tạo (BR-122, ADR-0014).
+*Nguồn: §10.4, §7. Làm rõ 09/11/2026 — thêm dòng gói giờ cho khớp glossary, chốt cọc tính trên tổng gồm bảo hiểm.*
 
 ### BR-202 — Cọc không hoàn, trừ vào tiền thuê ✅ GĐ1
 Cọc là **trả trước một phần tiền thuê**. Khi đơn hoàn tất, cọc được trừ vào tổng tiền thuê.
