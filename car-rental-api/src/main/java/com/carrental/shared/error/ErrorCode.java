@@ -15,6 +15,48 @@ package com.carrental.shared.error;
  */
 public enum ErrorCode {
 
+    /** BR-130: chưa có CCCD VERIFIED đang được chọn để dùng. */
+    IDENTITY_CARD_NOT_VERIFIED("A verified identity card is required."),
+
+    /** BR-130: CCCD đang dùng không còn hiệu lực tới ngày trả xe thực tế. */
+    IDENTITY_CARD_EXPIRES_BEFORE_TRIP_END("The identity card expires before the trip ends."),
+
+    /** BR-106: khách tự lái chưa có GPLX VERIFIED đang được chọn để dùng. */
+    DRIVER_LICENSE_NOT_VERIFIED("A verified driver license is required."),
+
+    /** BR-106b: GPLX đang dùng không còn hiệu lực tới ngày trả xe thực tế. */
+    DRIVER_LICENSE_EXPIRES_BEFORE_TRIP_END("The driver license expires before the trip ends."),
+
+    /** BR-128: không tự suy quyền lái của hạng chưa được khai báo trong bảng cấu hình. */
+    DRIVER_LICENSE_CLASS_NOT_SUPPORTED("The driver license class is not supported."),
+
+    /** BR-128: hạng không cho phép số chỗ hoặc GPLX chỉ số tự động gặp xe số sàn. */
+    DRIVER_LICENSE_NOT_SUITABLE_FOR_VEHICLE("The driver license is not suitable for this vehicle."),
+
+    /** BR-130: GT không tồn tại hoặc không thuộc caller đều trả 404, không tiết lộ chủ hồ sơ. */
+    DOCUMENT_NOT_FOUND("Document not found."),
+
+    /** BR-130: bản nộp đã được xử lý hoặc bị thay; đọc lại thay vì tự thử lại quyết định. */
+    DOCUMENT_REVIEW_CONFLICT("The document has already been reviewed or superseded."),
+
+    /** BR-130: số CCCD đã được xác minh cho tài khoản khác, không tiết lộ tài khoản đó. */
+    IDENTITY_CARD_ALREADY_REGISTERED("The identity card is already registered to another account."),
+
+    /** BR-130: ảnh vượt giới hạn byte trong cấu hình. */
+    DOCUMENT_IMAGE_TOO_LARGE("The document image exceeds the size limit."),
+
+    /** BR-130: nội dung không phải ảnh được hỗ trợ hoặc kích thước ảnh không hợp lệ. */
+    DOCUMENT_IMAGE_INVALID("The document image is invalid or unsupported."),
+
+    /** BR-130: chưa tải object lên vùng tạm. */
+    DOCUMENT_UPLOAD_NOT_READY("The document upload is not ready."),
+
+    /** BR-130: lượt tải không tồn tại hoặc không thuộc khách đang gọi; cùng trả 404. */
+    DOCUMENT_UPLOAD_NOT_FOUND("Document upload not found."),
+
+    /** BR-130: một lượt tải không được gắn vào nhiều lần nộp giấy tờ. */
+    DOCUMENT_UPLOAD_ALREADY_USED("The document upload has already been used."),
+
     /** ADR-0006: thiếu token hoặc token không vượt qua kiểm chứng của resource server. */
     UNAUTHENTICATED("Authentication is required."),
 

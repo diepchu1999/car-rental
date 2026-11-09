@@ -4,6 +4,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.spi.ThrowableProxy;
 import com.carrental.shared.logging.LogEventCapture;
 import com.carrental.shared.logging.RequestIdFilter;
+import com.carrental.shared.sql.SensitiveSqlFailure;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.TestComponent;
 import org.springframework.http.MediaType;
@@ -73,6 +74,29 @@ class ApiFailureLoggingTest {
                     .andExpect(header().string("X-Request-Id", "client-invalid-123"))
                     .andExpect(jsonPath("$.error.code").value("INVALID_REQUEST"));
             assertTrue(logs.events().isEmpty());
+        }
+    }
+
+    /** Lỗi JDBC giấy tờ tới handler đã che; response vẫn chung và stack/tóm tắt không có payload. */
+    @Test
+    void hidesSensitiveJdbcPayloadInResponseAndServerLog() throws Exception {
+        var original = new java.sql.SQLException("secret-document-row-and-object-key", "23505");
+        var safe = SensitiveSqlFailure.from(original);
+        var mvc = MockMvcBuilders.standaloneSetup(new FailureController(safe))
+                .setControllerAdvice(new ApiExceptionHandler()).addFilters(new RequestIdFilter()).build();
+        try (var logs = new LogEventCapture(ApiExceptionHandler.class.getName())) {
+            mvc.perform(post("/test/failure-log").header("X-Request-Id", "document-failure-123"))
+                    .andExpect(status().isInternalServerError())
+                    .andExpect(content().json("""
+                            {"success":false,"data":null,"error":{"code":"INTERNAL_ERROR",
+                             "message":"An unexpected error occurred."}}
+                            """, JsonCompareMode.STRICT));
+            assertEquals(1, logs.events().size());
+            var event = logs.events().getFirst();
+            assertTrue(event.getFormattedMessage().contains("Failure summary:"));
+            assertFalse(event.getFormattedMessage().contains("secret-document"));
+            assertFalse(ch.qos.logback.classic.spi.ThrowableProxyUtil.asString(event.getThrowableProxy())
+                    .contains("secret-document"));
         }
     }
 

@@ -97,6 +97,18 @@ Mã lỗi là **hợp đồng ổn định** — mobile bản cũ hiển thị t
 | `CANCELLATION_WINDOW_PASSED` | 422 | Ngoài cửa sổ huỷ |
 | `DRIVER_LICENSE_NOT_VERIFIED` | 403 | Chưa xác minh GPLX (BR-106) |
 | `DRIVER_LICENSE_EXPIRES_BEFORE_TRIP_END` | 422 | GPLX hết hạn trước khi chuyến kết thúc (BR-106b, BR-503b) |
+| `DRIVER_LICENSE_CLASS_NOT_SUPPORTED` | 422 | Hạng GPLX không có trong bảng đối chiếu (BR-128) |
+| `DRIVER_LICENSE_NOT_SUITABLE_FOR_VEHICLE` | 422 | Hạng GPLX không cho phép số chỗ, hoặc GPLX chỉ số tự động mà xe số sàn (BR-128) |
+| `IDENTITY_CARD_NOT_VERIFIED` | 403 | CCCD chưa xác minh (BR-120, BR-130) |
+| `IDENTITY_CARD_EXPIRES_BEFORE_TRIP_END` | 422 | CCCD hết hạn trước khi chuyến kết thúc (BR-130) |
+| `IDENTITY_CARD_ALREADY_REGISTERED` | 409 | Số CCCD đã được xác minh cho tài khoản khác (BR-130) |
+| `DOCUMENT_NOT_FOUND` | 404 | Không tìm thấy giấy tờ theo mã `GT-<6>`, hoặc giấy tờ không thuộc người gọi |
+| `DOCUMENT_UPLOAD_NOT_FOUND` | 404 | Không tìm thấy lượt tải ảnh theo mã `AN-<6>`, hoặc không thuộc người gọi |
+| `DOCUMENT_UPLOAD_NOT_READY` | 422 | Lượt tải ảnh chưa có ảnh trong kho |
+| `DOCUMENT_UPLOAD_ALREADY_USED` | 409 | Lượt tải ảnh đã gắn vào một lần nộp |
+| `DOCUMENT_IMAGE_TOO_LARGE` | 422 | Ảnh vượt 5.000.000 byte (BR-130) |
+| `DOCUMENT_IMAGE_INVALID` | 422 | Sai loại, hỏng cấu trúc, hoặc vượt 40 triệu pixel (BR-130) |
+| `DOCUMENT_REVIEW_CONFLICT` | 409 | Giấy tờ đã được xử lý, hoặc đã bị bản nộp mới thay — đọc lại, không tự thử lại |
 | `VEHICLE_DOCUMENT_EXPIRED` | 409 | Đăng kiểm hoặc TNDS hết hạn trong khoảng thuê (BR-015, BR-016) |
 | `DECLARED_DRIVER_REQUIRED` | 422 | Chuyến có tài xế mà chưa khai báo người lái (BR-502) |
 | `PAYMENT_ALREADY_CONFIRMED` | 409 | Xác nhận lại khoản đã xác nhận |

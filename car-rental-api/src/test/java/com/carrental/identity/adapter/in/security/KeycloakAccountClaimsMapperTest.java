@@ -64,7 +64,7 @@ class KeycloakAccountClaimsMapperTest {
     /** Nhân viên chưa đăng ký thuê không bị buộc có consent và không được tự cấp CUSTOMER. */
     @ParameterizedTest
     @EnumSource(value = AccountRole.class, names = {"BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF",
-            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN"})
+            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN", "DOCUMENT_VERIFIER"})
     void acceptsEmployeeWithoutCustomerConsent(AccountRole role) {
         var claims = employeeClaims();
         claims.put("realm_access", Map.of("roles", List.of(role.name())));

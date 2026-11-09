@@ -14,7 +14,7 @@ tài liệu · Principal Engineer (codex) hiện thực theo tài liệu đã ch
 |---|---|
 | Nghiệp vụ giai đoạn 1 | ✅ **166 quy tắc BR đã chốt** |
 | Kiến trúc | ✅ 15 ADR ACCEPTED, 10 guideline, 12 rule khoá bằng test |
-| Code | 🟡 Đang làm — `shared`, `branch`, `vehicle`, `availability`, `search`, `pricing`, `identity` (8a: đăng nhập, vai, chi nhánh) xong; 3.012 test xanh ở `car-rental-api`, 170 ở `car-rental-keycloak` |
+| Code | 🟡 Đang làm — `shared`, `branch`, `vehicle`, `availability`, `search`, `pricing`, `identity` (đăng nhập, vai, chi nhánh, giấy tờ, cổng kiểm điều kiện thuê) xong; 4.056 test xanh ở `car-rental-api`, 177 ở `car-rental-keycloak` |
 | Môi trường | Local, chưa build production |
 
 ## Quy tắc số một
@@ -97,7 +97,7 @@ Cách xây: **lát cắt dọc từng luồng** (ADR-0012), không xây hết ba
 | `if` trên `ownership_type` hoặc `rental_type` ngoài `*PolicyResolver` | Rải rác thì không ai dám sửa |
 | Code quyết toán đọc `config` thay vì bản sao trong đơn | Âm thầm tính lại đơn cũ |
 | `search` biết xe thuộc ai | BR-112 |
-| Xoá cứng dữ liệu trong `handover` và `compliance` | Bằng chứng pháp lý |
+| Xoá cứng dữ liệu trong `handover`, `compliance` và `audit`; sửa dữ liệu `audit` | Bằng chứng pháp lý và nhật ký thao tác nhạy cảm |
 | JPA repository cho truy vấn nghiệp vụ | ADR-0003 |
 | Quy tắc nghiệp vụ trong controller · trả row CSDL làm response | — |
 | Trả khoá chính số trong response hay cursor — tham chiếu ra ngoài bằng mã nghiệp vụ | Số tuần tự mời người ta dò — database-guideline §2 |

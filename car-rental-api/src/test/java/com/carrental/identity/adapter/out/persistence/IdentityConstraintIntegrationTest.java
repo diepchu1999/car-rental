@@ -165,11 +165,14 @@ class IdentityConstraintIntegrationTest extends IdentityDatabaseTestSupport {
         assertConstraint(() -> insertAssignment(parameters), "23514", "staff_branch_assignment", "chk_staff_branch_assigned_at");
     }
 
-    /** ADR-0008: duy nhất FK account nội bộ, không có FK sang branch hoặc database Keycloak. */
+    /** ADR-0008: gán chi nhánh và các bảng identity mới chỉ được có FK nội bộ, không sang branch/Keycloak. */
     @Test
-    void hasOnlyTheInternalAccountForeignKey() {
+    void hasOnlyInternalIdentityForeignKeys() {
         var keys = jdbc.query(sqlLoader.load("sql/identity/read_foreign_keys_for_test.sql"), Map.of(),
                 (rs, row) -> rs.getString("conname") + ":" + rs.getString("target_schema"));
-        assertEquals(List.of("fk_staff_branch_account:identity"), keys);
+        assertTrue(keys.contains("fk_staff_branch_account:identity"));
+        assertFalse(keys.isEmpty());
+        assertTrue(keys.stream().allMatch(key -> key.endsWith(":identity")),
+                "Every identity foreign key must stay inside the identity schema.");
     }
 }

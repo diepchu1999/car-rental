@@ -79,6 +79,42 @@ Mức tăng cuối tuần/lễ dùng dạng thập phân, không âm; hạn báo
 Nguồn tham số hiện là cấu hình ứng dụng, đổi cần khởi động lại; lịch lễ nằm trong YAML,
 không tự suy ngày nghỉ liền kề. Trước khi chạy với khách thật phải có module config (ADR-0013).
 
+**Kho ảnh giấy tờ (BR-130):** thêm các biến `CAR_RENTAL_STORAGE_*` và cấu hình giới hạn/hạn URL `CAR_RENTAL_DOCUMENT_*`
+từ `.env.example` vào `.env`. Riêng `CAR_RENTAL_STORAGE_SECRET_KEY` phải tự sinh bằng
+`openssl rand -hex 32`; không dùng mật khẩu MinIO root, không dán secret vào chat hoặc commit.
+Backend dùng tài khoản riêng `car-rental-documents-app`, bucket riêng tư `car-rental-documents`.
+Giới hạn mặc định: 5.000.000 byte, 40 triệu pixel, URL upload 5 phút, URL xem 60 giây.
+Nạp các biến này vào cả môi trường chạy IntelliJ; backend không tự đọc `.env`.
+
+**Khoá số giấy tờ (BR-130):** đặt `CAR_RENTAL_DOCUMENT_KEY_VERSION=1` trong `.env`.
+Chạy `openssl rand -base64 32` **hai lần độc lập**, lưu lần lượt vào
+`CAR_RENTAL_DOCUMENT_ENCRYPTION_KEY` và `CAR_RENTAL_DOCUMENT_HASH_KEY`; không dùng lại khoá OTP hay MinIO.
+Hai khoá bắt buộc khác nhau, mỗi khoá giải mã Base64 được đúng 32 byte. Thiếu hoặc sai thì backend
+không khởi động. Nạp cả ba biến vào run configuration IntelliJ hoặc shell chạy backend.
+Giữ nguyên và sao lưu an toàn cặp khoá cùng phiên bản qua restart: mất/đổi khoá sẽ không đọc được
+bản mã cũ hoặc đối chiếu hash cũ. Chưa hỗ trợ xoay vòng khoá; không tự tăng phiên bản để thử.
+Không gửi khoá vào chat, log hay commit. Test dùng khoá giả riêng, không đọc khoá trong `.env`.
+
+**Bảng hạng GPLX (BR-128):** khai báo tại `car-rental.identity.license-classes` trong
+`car-rental-api/src/main/resources/application.yml`: `cutover-date` hiện là `2025-01-01`,
+`before-cutover` dành cho GPLX cấp trước mốc, `from-cutover` dành cho GPLX cấp đúng hoặc sau mốc.
+Mỗi hàng gồm `code` và danh sách `seats`; không gộp hạng trùng tên giữa hai bảng.
+Thiếu mốc/bảng, ngày không hợp lệ, hàng trùng hoặc số chỗ không dương làm backend không khởi động.
+Bảng hiện là nguồn local theo ADR-0013, chưa có lịch sử hiệu lực; đổi YAML trong JAR cần build và
+khởi động lại. Trước khi dùng với khách thật phải xác nhận bảng với người hiểu luật và chuyển nguồn
+sang module config. Cờ `automatic_only` thuộc từng GPLX, không suy ra chỉ từ tên hạng.
+
+**Cổng giấy tờ thuê tự lái (BR-106/106b/128/130):** module khác gọi
+`identity.api.RentalEligibilityDirectory.requireSelfDriveEligible(accountCode, seats, transmission, tripEnd)`
+với tài khoản và thuộc tính xe đã đọc từ nguồn tin cậy. Cổng xét bản VERIFIED đang dùng, kể cả khi bản mới
+đang chờ hoặc bị từ chối; kiểm xác minh/hạn CCCD trước, rồi xác minh/hạn GPLX và quyền lái theo hạng/hộp số.
+GPLX đang dùng thiếu ngày cấp trả `403 DRIVER_LICENSE_NOT_VERIFIED`, yêu cầu khách nộp lại.
+Ngày cấp của bản đang dùng chọn bảng hạng; B1 cấp từ mốc trả `422 DRIVER_LICENSE_CLASS_NOT_SUPPORTED`
+khi thuê ô tô. Ngày nộp, ngày kiểm và ngày trả xe không thay thế ngày cấp.
+Giấy tờ hết hạn ngày D còn dùng được hết ngày D theo múi giờ ứng dụng (Việt Nam);
+`tripEnd` là giờ trả thực tế, không cộng đệm.
+Cổng không giữ chỗ, tạo đơn hoặc thay việc xác thực/phân quyền của bên gọi; hiện chưa nối vào booking.
+
 ### 2. Khởi động hạ tầng
 
 **Build provider trước khi chạy Keycloak** (bytecode Java 21, dùng được JDK 25 ở trên):
@@ -110,6 +146,53 @@ docker compose ps
 PostgreSQL, Keycloak và MinIO phải cùng hiện trạng thái `(healthy)`.
 `config --quiet` kiểm cấu hình mà không in giá trị secret; thiếu biến sẽ báo đúng tên biến.
 
+Khởi tạo bucket giấy tờ riêng tư và quyền cho tài khoản ứng dụng (chạy lại được, không xoá dữ liệu):
+
+```bash
+docker compose exec -T minio sh < infra/minio/bootstrap-documents.sh
+```
+
+Kết quả: `Private document bucket and application account are ready.` Nếu vừa thêm/đổi biến storage
+trên máy đã chạy hạ tầng, chạy `docker compose up -d minio` trước lệnh trên để cập nhật môi trường
+container; chỉ restart không cập nhật biến. Không cần `down -v`.
+Xem [hướng dẫn MinIO](infra/minio/README.md) về quyền, endpoint và cách kiểm local.
+
+Khách xin URL tại `POST /api/v1/client/document-uploads`, PUT ảnh vào URL ký rồi nộp hai mã AN tại
+`POST /api/v1/client/documents`. Dùng collection `postman/task-08b-documents.postman_collection.json`,
+thư mục **Part 2 - Submit documents (BR-130)** với token CUSTOMER và Collection Runner.
+GPLX nộp mới bắt buộc `issuedOn` dạng `YYYY-MM-DD`, không sau ngày nộp theo giờ Việt Nam hoặc
+ngày hết hạn. GPLX lịch sử thiếu ngày cấp vẫn đọc được với `issuedOn: null`; không tự điền ngày đoán.
+Ảnh giả và cách đặt working directory Postman ở [hướng dẫn fixture](postman/fixtures/documents/README.md).
+Chỉ dùng dữ liệu thử; chi tiết body và mã lỗi ở [API tài khoản và giấy tờ](car-rental-docs/vi/api/identity.md).
+Khách xem trạng thái tại `GET /api/v1/client/documents` và `GET /api/v1/client/documents/{documentCode}`.
+Danh sách tách bản nộp mới nhất với bản VERIFIED được chọn; không trả số giấy tờ hoặc ảnh.
+Trong cùng collection, chạy các folder **Read document status**, **Reject cross-account document reads**
+và **Reject staff document status access** bằng token chủ hồ sơ, khách khác, rồi ADMIN tương ứng.
+
+Nhân viên `DOCUMENT_VERIFIER` hoặc `ADMIN` đọc hàng chờ tại
+`GET /api/v1/admin/documents?limit=20&offset=0`: chỉ metadata của hồ sơ PENDING, không có số/ảnh.
+Trang tối đa 100, vượt giới hạn trả 400; dùng `hasMore` để biết còn trang sau. Trong collection giấy tờ,
+chạy các folder **Pending queue** theo thứ tự DOCUMENT_VERIFIER, ADMIN, BRANCH_STAFF, CUSTOMER;
+chi tiết token và dữ liệu thử ở [danh mục API](car-rental-docs/vi/api/identity.md).
+
+Nhân viên có vai `DOCUMENT_VERIFIER` hoặc `ADMIN` mở hồ sơ kèm ảnh bằng
+`POST /api/v1/admin/documents/{documentCode}/view-sessions` (không body hoặc `{}`).
+Mỗi lượt mở ghi một audit đã commit trước khi cấp URL xem ảnh; URL có hạn 60 giây theo cấu hình,
+response không cache. Trong collection giấy tờ, chạy lần lượt các folder **View session owner setup
+(CUSTOMER)**, **Open view sessions (DOCUMENT_VERIFIER)**, **Open view sessions (ADMIN)** và
+**Reject view sessions (BRANCH_STAFF)**. Mỗi folder dùng token đúng vai; script tự tải hai ảnh ngay
+bằng URL ký, không gửi bearer tới MinIO và không lưu URL vào biến. Không chia sẻ response/history
+chứa giấy tờ; chỉ dùng ảnh và thông tin thử ở local.
+
+`DOCUMENT_VERIFIER` và `ADMIN` quyết định tại `POST /api/v1/admin/documents/{documentCode}/verify`
+(không body hoặc `{}`) và `/reject` (JSON gồm `rejectionCode`, `rejectionNote` tuỳ chọn).
+Chính chủ không được gọi `verify`, `reject` hoặc `view-sessions`, kể cả có vai xác minh hay ADMIN:
+trả `403 ACCESS_DENIED`; nhờ người xác minh khác xử lý. Lượt tự mở bị từ chối không ghi audit mở ảnh.
+Xác minh trả `VERIFIED`; từ chối trả `REJECTED` và giữ bản VERIFIED đang dùng. Hồ sơ đã xử lý hoặc
+đã bị thay trả `409 DOCUMENT_REVIEW_CONFLICT`. Trong collection giấy tờ, chạy các folder từ
+**Review setup (CUSTOMER)** đến **Read final review (CUSTOMER)** theo thứ tự và đúng vai;
+[hướng dẫn xác minh/từ chối](car-rental-docs/vi/api/identity.md) ghi đủ body, mã lỗi và các bước Runner.
+
 Compose chỉ mount provider lõi và JAR SMS local, không mount JAR `*-tests.jar`. Nếu chưa build,
 mount phải báo thiếu file, không tự tạo thư mục giả mang tên `.jar`. Không đổi image/platform.
 
@@ -118,6 +201,43 @@ của Keycloak tạo trong **database `keycloak`**, không thuộc Flyway/backen
 [bỏ qua realm đã tồn tại](https://www.keycloak.org/server/importExport#_importing_a_realm_during_startup):
 restart không xoá user, không đặt lại mật khẩu và không áp lại nội dung JSON lên realm cũ.
 Nếu local đã có realm `car-rental` từ cấu hình khác, dừng để đối chiếu trước; **không xoá realm hoặc volume**.
+
+**Phiên đăng nhập local và Postman.** Realm local dùng phiên tối đa **30 ngày** và thời gian
+không hoạt động tối đa **30 ngày**. Access token chỉ **5 phút**; Postman dùng refresh token để lấy
+access token mới, không phải token vô thời hạn. Phiên client kế thừa realm (`clientSessionIdleTimeout=0`,
+`clientSessionMaxLifespan=0`); giữ xoay refresh token (`revokeRefreshToken=true`, `refreshTokenMaxReuse=0`).
+Refresh không vượt hạn 30 ngày tính từ lúc bắt đầu phiên; logout/thu hồi phiên cũng có thể làm token mất hiệu lực.
+Đây là cấu hình tiện kiểm thử với dữ liệu giả, **không mang sang môi trường thật**.
+
+Realm đã tồn tại cần áp một lần bằng quản trị hạ tầng ở
+`http://localhost:8080/admin/master/console/` → chọn **car-rental**:
+
+1. **Realm settings → Sessions:** SSO Session Idle và SSO Session Max đều **30 Days**.
+   Client Session Idle và Client Session Max để **0** (kế thừa realm). Save rồi tải lại để kiểm.
+2. **Realm settings → Tokens:** Access Token Lifespan **5 Minutes**. Giữ Revoke Refresh Token **On**,
+   Refresh Token Max Reuse **0**. Không đổi Implicit Flow, offline session hoặc phiên Remember Me.
+3. **Clients → admin-web/customer-web → Advanced:** không đặt timeout riêng ngắn hơn realm.
+   Export được commit không đặt override cho hai client này. Nếu local có override thì đối chiếu trước.
+4. Không cần restart hay xoá volume. Token đã hết hạn không sống lại: đăng nhập mới **một lần cho mỗi
+   tài khoản thử** sau khi áp cấu hình. Không xuất hoặc chia sẻ token.
+
+Trong Postman desktop, tại Authorization của folder, dùng OAuth 2.0 / Authorization Code with PKCE:
+
+- Đặt Token Name dễ nhận ra, ví dụ `LOCAL-CUSTOMER-A`, `LOCAL-ADMIN`, `LOCAL-VERIFIER`, `LOCAL-STAFF`;
+  nếu có hai CUSTOMER thì mỗi người một tên. Đăng nhập đúng người rồi **Use Token**.
+- Bật **Auto-refresh Token** (hoặc Auto-refresh access token). Trong Manage Tokens phải có refresh token;
+  nếu không có, lấy lại bằng luồng PKCE. Giữ token trong kho token của Postman, không copy sang Bearer
+  tĩnh, environment, collection hoặc file JSON. Tắt Share Token cho token thử cá nhân.
+- Khi chuyển folder, chọn token đã lưu đúng người và đúng client trong Current Token/Available Tokens;
+  không cần Get new access token mỗi lần. Token `customer-web` không dùng thay cho `admin-web` và ngược lại.
+- Khi gửi tay, Postman tự refresh trước request. Trước khi chạy Runner, có thể bấm **Refresh** để lấy
+  token mới mà không nhập lại mật khẩu/OTP; không giả định mọi chế độ Runner/CLI đều tự refresh.
+  Scheduled runs, monitors, Postman CLI và Newman không hỗ trợ auto-refresh như gửi tay.
+- Refresh token chỉ dùng một lần: không sao chép cùng refresh token sang nhiều công cụ chạy song song.
+  Nếu phiên hết hạn/đã bị thu hồi hoặc báo `invalid_grant`, lấy token mới bằng đăng nhập đầy đủ.
+
+Nguồn: [Postman OAuth refresh](https://learning.postman.com/docs/use/send-requests/authorization/oauth-20/#refreshing-an-oauth-20-token),
+[Keycloak session timeouts](https://www.keycloak.org/docs/latest/server_admin/index.html#_timeouts).
 
 **Chống đoán mật khẩu nhân viên (BR-809).** Realm mới import bật khoá tạm: 5 lần sai → 15 phút,
 mỗi nhóm 5 lần sai tăng thêm 15 phút, trần 1 giờ; không khoá vĩnh viễn. OTP vẫn dùng giới hạn riêng
@@ -320,6 +440,10 @@ Caller giữ package/module, chỉ bỏ `com.carrental.`; tối đa 12 frame, d�
 Không có frame ứng dụng thì `caller: -`; loại proxy/CGLIB và tầng log. Hai service cùng tên
 được phân biệt bằng module. SQL giữ xuống dòng sau `--`; không dùng `sqlSingleLine`.
 Đây chỉ là hiển thị: JDBC vẫn bind tham số, không nối SQL nghiệp vụ. Giới hạn `api` không cắt SQL.
+
+SQL giấy tờ chạy trong phạm vi bảo vệ chỉ in `[REDACTED sensitive SQL]` thay nội dung SQL,
+kể cả với `sql-log`; vẫn có thời gian và caller. JDBC DEBUG/TRACE trong phạm vi này bị chặn.
+Lỗi JDBC giấy tờ chỉ giữ loại lỗi, SQLSTATE, tên constraint và vị trí stack, không giữ message/row gốc.
 
 **Đọc lỗi HTTP 500 và lỗi job**
 

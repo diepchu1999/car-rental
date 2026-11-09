@@ -252,10 +252,10 @@ class IdentitySecurityConfigurationTest {
         assertForbidden("/api/v1/admin/probe", sign(claims("CUSTOMER", "customer-web").build(), signingKey));
     }
 
-    /** Bảy vai nhân viên vào cửa admin bằng client MFA; quyền thao tác/chi nhánh được kiểm riêng. */
+    /** Tám vai nhân viên vào cửa admin bằng client MFA; quyền thao tác/chi nhánh được kiểm riêng. */
     @ParameterizedTest
     @EnumSource(value = AccountRole.class, names = {"BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF",
-            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN"})
+            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN", "DOCUMENT_VERIFIER"})
     void acceptsEmployeeNamespaceOnlyWithEmployeeClient(AccountRole role) throws Exception {
         String token = sign(claims(role.name(), "admin-web").build(), signingKey);
         mvc.perform(get("/api/v1/admin/probe").header("Authorization", "Bearer " + token))
@@ -388,7 +388,7 @@ class IdentitySecurityConfigurationTest {
     /** Mọi vai nhân viên đọc được chính mình trước khi gán chi nhánh, không bị buộc consent khách. */
     @ParameterizedTest
     @EnumSource(value = AccountRole.class, names = {"BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF",
-            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN"})
+            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN", "DOCUMENT_VERIFIER"})
     void readsUnassignedEmployeeAccountWithoutConsent(AccountRole role) throws Exception {
         stubStoredAccount(false);
         var employeeClaims = claims(role.name(), "admin-web").claim("terms_version", null).claim("consented_at", null);
@@ -490,7 +490,7 @@ class IdentitySecurityConfigurationTest {
     /** Các vai nhân viên khác qua được namespace nhưng bị use case từ chối trước tra cứu đích/ghi. */
     @ParameterizedTest
     @EnumSource(value = AccountRole.class, names = {"BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF",
-            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER"})
+            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "DOCUMENT_VERIFIER"})
     void nonAdminCannotAssignBranch(AccountRole role) throws Exception {
         String token = sign(claims(role.name(), "admin-web").build(), signingKey);
         mvc.perform(put("/api/v1/admin/accounts/TK-STAFF1/branch")
@@ -547,11 +547,12 @@ class IdentitySecurityConfigurationTest {
     }
 
     /** Vai cấp công ty không được ép vào chi nhánh chỉ vì người gọi là ADMIN. */
-    @Test
-    void rejectsAssignmentToNonBranchScopedRole() throws Exception {
+    @ParameterizedTest
+    @EnumSource(value = AccountRole.class, names = {"ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN", "DOCUMENT_VERIFIER"})
+    void rejectsAssignmentToNonBranchScopedRole(AccountRole role) throws Exception {
         stubAssignmentTarget(AccountRole.BRANCH_STAFF);
         when(accountRoles.findBySubject("target-staff-subject"))
-                .thenReturn(Optional.of(new AccountRoles(Set.of(AccountRole.ACCOUNTANT))));
+                .thenReturn(Optional.of(new AccountRoles(Set.of(role))));
         String token = sign(claims("ADMIN", "admin-web").build(), signingKey);
         mvc.perform(put("/api/v1/admin/accounts/TK-STAFF1/branch").header("Authorization", "Bearer " + token)
                         .contentType("application/json").content("{\"branchCode\":\"CN-LOCAL1\"}"))
@@ -594,10 +595,10 @@ class IdentitySecurityConfigurationTest {
         verifyNoMoreInteractions(branchCodes, branchWrites, branchReads);
     }
 
-    /** BR-810: sáu vai nhân viên khác qua namespace nhưng service chặn trước sinh mã/ghi/đọc. */
+    /** BR-810: các vai nhân viên khác qua namespace nhưng service chặn trước sinh mã/ghi/đọc. */
     @ParameterizedTest
     @EnumSource(value = AccountRole.class, names = {"BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF",
-            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER"})
+            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "DOCUMENT_VERIFIER"})
     void employeeCannotCreateBranchByForgingAdminInput(AccountRole role) throws Exception {
         doReturn(new CallerRef("TK-ABC123", Set.of(role.name()), role.isBranchScoped() ? 42L : null))
                 .when(callers).get(any());
@@ -674,7 +675,7 @@ class IdentitySecurityConfigurationTest {
 
     /** Các vai nhân viên khác qua được namespace nhưng không được quyền đọc chi nhánh quản trị. */
     @ParameterizedTest
-    @ValueSource(strings = {"DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER"})
+    @ValueSource(strings = {"DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "DOCUMENT_VERIFIER"})
     void otherEmployeesCannotReadAdminBranch(String role) throws Exception {
         doReturn(new CallerRef("TK-ABC123", Set.of(role), 1000L)).when(callers).get(any());
         String token = sign(claims(role, "admin-web").build(), signingKey);
@@ -776,7 +777,7 @@ class IdentitySecurityConfigurationTest {
 
     /** Các vai nhân viên còn lại không tự có quyền tạo xe khi qua được namespace admin. */
     @ParameterizedTest
-    @ValueSource(strings = {"DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER"})
+    @ValueSource(strings = {"DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "DOCUMENT_VERIFIER"})
     void otherEmployeesCannotCreateVehicle(String role) throws Exception {
         doReturn(new CallerRef("TK-ABC123", Set.of(role), 1000L)).when(callers).get(any());
         String token = sign(claims(role, "admin-web").build(), signingKey);
@@ -861,7 +862,7 @@ class IdentitySecurityConfigurationTest {
 
     /** Các vai nhân viên còn lại không được gửi duyệt dù qua được namespace quản trị. */
     @ParameterizedTest
-    @ValueSource(strings = {"DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER"})
+    @ValueSource(strings = {"DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "DOCUMENT_VERIFIER"})
     void otherEmployeesCannotSubmitVehicle(String role) throws Exception {
         doReturn(new CallerRef("TK-ABC123", Set.of(role), 1000L)).when(callers).get(any());
         String token = sign(claims(role, "admin-web").build(), signingKey);
@@ -945,7 +946,7 @@ class IdentitySecurityConfigurationTest {
 
     /** STAFF cùng chi nhánh và các vai nhân viên khác không được duyệt; giả vai không có tác dụng. */
     @ParameterizedTest
-    @ValueSource(strings = {"BRANCH_STAFF", "DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER"})
+    @ValueSource(strings = {"BRANCH_STAFF", "DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "DOCUMENT_VERIFIER"})
     void otherEmployeesCannotApproveVehicle(String role) throws Exception {
         doReturn(new CallerRef("TK-ABC123", Set.of(role), 1000L)).when(callers).get(any());
         String token = sign(claims(role, "admin-web").build(), signingKey);
@@ -1084,7 +1085,7 @@ class IdentitySecurityConfigurationTest {
 
     /** Vai nhân viên khác dù qua namespace admin vẫn không có quyền GET danh mục xe. */
     @ParameterizedTest
-    @ValueSource(strings = {"DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER"})
+    @ValueSource(strings = {"DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "DOCUMENT_VERIFIER"})
     void otherEmployeesCannotReadVehicle(String role) throws Exception {
         doReturn(new CallerRef("TK-ABC123", Set.of(role), 1000L)).when(callers).get(any());
         String token = sign(claims(role, "admin-web").build(), signingKey);
@@ -1158,7 +1159,7 @@ class IdentitySecurityConfigurationTest {
 
     /** STAFF cùng chi nhánh và các vai nhân viên khác đều nhận 403 trước tải/ghi xe. */
     @ParameterizedTest
-    @ValueSource(strings = {"BRANCH_STAFF", "DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER"})
+    @ValueSource(strings = {"BRANCH_STAFF", "DELIVERY_STAFF", "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "DOCUMENT_VERIFIER"})
     void otherEmployeesCannotChangeDailyRate(String role) throws Exception {
         doReturn(new CallerRef("TK-ABC123", Set.of(role), 1000L)).when(callers).get(any());
         String token = sign(claims(role, "admin-web").build(), signingKey);

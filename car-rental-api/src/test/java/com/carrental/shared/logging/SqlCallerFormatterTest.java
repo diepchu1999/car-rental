@@ -1,6 +1,7 @@
 package com.carrental.shared.logging;
 
 import org.junit.jupiter.api.Test;
+import com.carrental.shared.sql.SensitiveSql;
 
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -97,6 +98,18 @@ class SqlCallerFormatterTest {
         for (String sql : new String[] {null, "", " \n\t"}) {
             assertEquals("", formatter.formatMessage(1, "", 0, "statement", "", sql, ""));
         }
+    }
+
+    /** Không dùng cả prepared làm đường phụ lộ literal; vẫn giữ thời gian và caller. */
+    @Test
+    void redactsSensitiveSqlAndRestoresNormalFormatting() {
+        var formatter = new SqlCallerFormatter();
+        String message = SensitiveSql.execute(() -> formatter.formatMessage(1, "", 9, "statement",
+                "-- secret-comment\nSELECT 'secret-literal'", "secret-expanded", "secret-jdbc-url"));
+        assertEquals("SQL (9 ms):\ncaller: -\n[REDACTED sensitive SQL]", message);
+        assertFalse(message.contains("secret-"));
+        assertEquals("SQL (2 ms):\ncaller: -\nSELECT 7", formatter.formatMessage(1, "", 2,
+                "statement", "SELECT 7", "SELECT 7", ""));
     }
 
     /** Tạo metadata giả chỉ để kiểm định dạng, không giả kết quả stack của request integration. */

@@ -15,7 +15,7 @@ final class EmployeeLoginState {
     static final String MFA_VERIFIED = "car-rental.employee.mfa-verified";
     private static final List<String> EMPLOYEE_ROLES = List.of(
             "BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF", "DRIVER",
-            "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN");
+            "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN", "DOCUMENT_VERIFIER");
 
     /** Chỉ dùng các thao tác không giữ trạng thái giữa request. */
     private EmployeeLoginState() { }

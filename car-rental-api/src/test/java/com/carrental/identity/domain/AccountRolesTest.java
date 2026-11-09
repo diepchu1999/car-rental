@@ -13,6 +13,16 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Kiểm bất biến một vai nhân viên và việc không vô tình cấp thêm quyền, BR-809. */
 class AccountRolesTest {
 
+    /** BR-130/803: verifier là nhân viên cấp công ty, không tự thành ADMIN hoặc cần gán chi nhánh. */
+    @Test void documentVerifierIsCompanyScopedEmployee() {
+        assertTrue(AccountRole.DOCUMENT_VERIFIER.isEmployee());
+        assertFalse(AccountRole.DOCUMENT_VERIFIER.isBranchScoped());
+        var roles = new AccountRoles(Set.of(AccountRole.DOCUMENT_VERIFIER));
+        assertEquals(AccountRole.DOCUMENT_VERIFIER, roles.employeeRole().orElseThrow());
+        assertFalse(roles.has(AccountRole.ADMIN));
+        assertFalse(roles.has(AccountRole.CUSTOMER));
+    }
+
     /** Khách không cần vai nhân viên để có tập vai hợp lệ. */
     @Test
     void acceptsCustomerWithoutEmployeeRole() {
@@ -24,7 +34,7 @@ class AccountRolesTest {
     /** Mỗi vai nhân viên được đứng riêng hoặc đồng thời là khách, không bắt nhân viên đăng ký thuê. */
     @ParameterizedTest
     @EnumSource(value = AccountRole.class, names = {"BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF",
-            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN"})
+            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN", "DOCUMENT_VERIFIER"})
     void acceptsEmployeeAloneOrAlongsideCustomer(AccountRole employee) {
         AccountRoles staffOnly = new AccountRoles(Set.of(employee));
         assertEquals(employee, staffOnly.employeeRole().orElseThrow());
@@ -39,7 +49,7 @@ class AccountRolesTest {
     void rejectsEveryPairOfEmployeeRoles() {
         AccountRole[] employees = {AccountRole.BRANCH_STAFF, AccountRole.BRANCH_MANAGER,
                 AccountRole.DELIVERY_STAFF, AccountRole.DRIVER, AccountRole.ACCOUNTANT,
-                AccountRole.OPERATIONS_MANAGER, AccountRole.ADMIN};
+                AccountRole.OPERATIONS_MANAGER, AccountRole.ADMIN, AccountRole.DOCUMENT_VERIFIER};
         for (int first = 0; first < employees.length; first++) {
             for (int second = first + 1; second < employees.length; second++) {
                 Set<AccountRole> pair = Set.of(employees[first], employees[second]);

@@ -31,6 +31,8 @@ Keycloak không hỗ trợ sẵn — phải viết Authenticator SPI bằng Java
 - Lưu ở **Keychain (iOS) / Keystore (Android)**. Không lưu ở AsyncStorage hay SharedPreferences.
 - Refresh token có xoay vòng. Phát hiện dùng lại token cũ ⇒ thu hồi cả phiên.
 - Access token có hạn ngắn; giữ phiên bằng refresh token, không bằng access token dài hạn.
+- **Phiên 30 ngày trong `realm-export.json` chỉ dành cho local** (Tech Owner yêu cầu, Task 8b) và đang áp cả
+  cho nhân viên qua `admin-web`. **Trước khi chạy thật phải đặt lại**, tách thời hạn phiên khách và nhân viên.
 - Deep link redirect URI đăng ký chính xác, **không dùng ký tự đại diện**.
 
 ## 2. Phân quyền
@@ -90,6 +92,8 @@ Hệ thống lưu CCCD, GPLX, ảnh tình trạng xe, vị trí, và dữ liệu
 - **Không bao giờ bật ở môi trường có dữ liệu thật.** Giá trị tham số là số điện thoại, mã đơn, toạ độ,
   số CCCD đã mã hoá — log là nơi dữ liệu bị đọc bởi người không có quyền đọc bảng gốc. Khi dựng môi
   trường thật, kiểm rằng profile `sql-log` **không thể** được bật ở đó.
+- **Giấy tờ khách không vào log, kể cả ở profile `sql-log`.** Truy vấn chạm số CCCD/GPLX, khoá object ảnh
+  hay liên kết ký phải che giá trị tham số; lỗi JDBC, lỗi SDK và `toString()` cũng không được làm lộ (BR-130).
 - **Lỗi 500: chi tiết chỉ nằm ở log máy chủ.** Stack trace, tên class, số dòng, câu SQL không bao giờ
   vào response gửi khách — response chỉ có mã lỗi chung. Đã khoá bằng test
   `hidesInternalDetailsForUnexpectedFailure`.

@@ -38,7 +38,52 @@ management:
 
 car-rental:
   time-zone: ${CAR_RENTAL_TIME_ZONE:Asia/Ho_Chi_Minh}
+  storage:
+    endpoint: ${CAR_RENTAL_STORAGE_ENDPOINT}
+    bucket: ${CAR_RENTAL_STORAGE_BUCKET}
+    access-key: ${CAR_RENTAL_STORAGE_ACCESS_KEY}
+    secret-key: ${CAR_RENTAL_STORAGE_SECRET_KEY}
+    documents:
+      # BR-130: byte thập phân, pixel và hạn liên kết đã chốt; đổi cần restart.
+      max-bytes: ${CAR_RENTAL_DOCUMENT_MAX_BYTES:5000000}
+      max-pixels: ${CAR_RENTAL_DOCUMENT_MAX_PIXELS:40000000}
+      upload-lifetime: ${CAR_RENTAL_DOCUMENT_UPLOAD_LIFETIME:PT5M}
+      view-lifetime: ${CAR_RENTAL_DOCUMENT_VIEW_LIFETIME:PT60S}
   identity:
+    # BR-128: chọn cột theo ngày cấp GPLX, không hợp nhất hạng trùng tên giữa hai chế độ.
+    # Dữ liệu local cần xác nhận trước khi chạy khách thật; thay YAML cần build/restart (ADR-0013).
+    license-classes:
+      cutover-date: "2025-01-01"
+      before-cutover:
+        - code: B1
+          seats: [4, 5, 7]
+        - code: B2
+          seats: [4, 5, 7]
+        - code: C
+          seats: [4, 5, 7]
+        - code: D
+          seats: [4, 5, 7, 16]
+        - code: E
+          seats: [4, 5, 7, 16]
+      from-cutover:
+        - code: B
+          seats: [4, 5, 7]
+        - code: C1
+          seats: [4, 5, 7]
+        - code: C
+          seats: [4, 5, 7]
+        - code: D1
+          seats: [4, 5, 7, 16]
+        - code: D2
+          seats: [4, 5, 7, 16]
+        - code: D
+          seats: [4, 5, 7, 16]
+    documents:
+      crypto:
+        # BR-130: hai khoá độc lập, không có mặc định; giữ nguyên qua restart.
+        key-version: ${CAR_RENTAL_DOCUMENT_KEY_VERSION}
+        encryption-key: ${CAR_RENTAL_DOCUMENT_ENCRYPTION_KEY}
+        hash-key: ${CAR_RENTAL_DOCUMENT_HASH_KEY}
     jwt:
       # Phải khớp mapper backend-audience trong realm Keycloak (ADR-0006).
       audience: car-rental-api

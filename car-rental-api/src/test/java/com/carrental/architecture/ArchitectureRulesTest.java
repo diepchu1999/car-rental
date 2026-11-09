@@ -518,6 +518,23 @@ class ArchitectureRulesTest {
         );
     }
 
+    /** R8 bắt đủ bốn loại sửa/huỷ audit và UPDATE từ module khác, kể cả CTE/MERGE/upsert. */
+    @Test
+    void r8NegativeFixtureDetectsAuditMutations() {
+        var scan = SqlArchitectureScanner.scan(BACKEND_ROOT,
+                BACKEND_ROOT.resolve("src/test/resources/architecture-fixtures/r8audit/forbidden"));
+        assertFixtureViolations(R8, scan.r8Violations(), 9,
+                "UPDATE", "DELETE", "TRUNCATE", "DROP TABLE", "audit");
+    }
+
+    /** INSERT, SELECT FOR UPDATE và khai báo trigger không phải sửa dữ liệu audit. */
+    @Test
+    void r8AllowedFixturePermitsAuditAppendAndProtectionTriggers() {
+        var scan = SqlArchitectureScanner.scan(BACKEND_ROOT,
+                BACKEND_ROOT.resolve("src/test/resources/architecture-fixtures/r8audit/allowed"));
+        assertNoViolations(R8, scan.r8Violations());
+    }
+
     @Test
     void r9RealSourceSettlementRelatedModulesUseBookingSnapshots() {
         assertNoViolations(

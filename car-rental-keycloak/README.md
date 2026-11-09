@@ -108,6 +108,35 @@ dùng `security-admin-console` qua luồng nhân viên.
 
 ## Đăng nhập local bằng Postman
 
+### Nhân viên xác minh giấy tờ
+
+`DOCUMENT_VERIFIER` dùng mật khẩu + SMS như các nhân viên khác (BR-130/809). Vai cấp công ty,
+không gán chi nhánh; không có quyền quản lý xe hoặc chi nhánh. Realm mới import đã có vai và scope
+cho `admin-web`. Realm đang tồn tại **không được cập nhật bởi import khi restart**.
+
+Để áp lên realm local đang có mà không xoá volume:
+
+1. Build provider bằng `./mvnw verify` trong `car-rental-keycloak/`, rồi từ gốc repo chạy
+   `docker compose up -d --force-recreate keycloak` để nạp JAR mới.
+2. Mở Admin Console ở `http://localhost:8080/admin/`, đăng nhập bằng quản trị hạ tầng của realm
+   `master`, chọn realm `car-rental`. Trong **Realm roles**, tạo `DOCUMENT_VERIFIER` nếu chưa có;
+   đây là vai thường, không ghép thêm quyền của `ADMIN`.
+3. Vào **Clients → admin-web → Client scopes → admin-web-dedicated → Scope**. Giữ **Full scope
+   allowed** tắt; **Assign role**, lọc realm roles rồi thêm `DOCUMENT_VERIFIER`. Giữ nguyên các vai
+   hiện có. Không thêm vai này vào scope của `customer-web` hoặc `mobile`.
+4. Tạo người dùng thử với username là số di động Việt Nam dạng `+84`, enabled. Trong **Role mapping**,
+   gán `DOCUMENT_VERIFIER`, không gán thêm vai nhân viên khác. Trong **Credentials**, đặt mật khẩu
+   tạm ít nhất 12 ký tự, bật **Temporary**. Không lưu mật khẩu vào collection hoặc repo.
+5. Lấy token mới qua `admin-web`: mật khẩu → OTP SMS local → đổi mật khẩu tạm. Gọi
+   `GET /api/v1/admin/accounts/me`: vai `DOCUMENT_VERIFIER`, `branchCode: null`.
+
+Collection [giấy tờ](../postman/task-08b-documents.postman_collection.json) có hai thư mục kiểm:
+`Part 3 - Verifier access fixtures (ADMIN)` tạo tài nguyên giả bằng ADMIN, rồi
+`Part 3 - Verifier role boundaries (BR-130)` dùng token người xác minh. Mỗi thư mục có OAuth riêng;
+chọn đúng token trước khi chạy Runner. Các request kiểm từ chối phải trả `403 ACCESS_DENIED`.
+
+### Khách và nhân viên
+
 Import [collection Identity](../postman/task-08a-identity.postman_collection.json), dùng thư mục
 `Part 2 - Keycloak login`. Biến collection `keycloakBaseUrl` mặc định `http://localhost:8080`;
 không đổi `baseUrl` của backend trong environment chung.

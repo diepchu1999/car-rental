@@ -52,10 +52,10 @@ class AccountQueryServiceTest {
         verifyNoInteractions(branches);
     }
 
-    /** Cả bảy vai nhân viên được đọc chính mình khi chưa có consent hoặc chưa gán chi nhánh. */
+    /** Cả tám vai nhân viên được đọc chính mình khi chưa có consent hoặc chưa gán chi nhánh. */
     @ParameterizedTest
     @EnumSource(value = AccountRole.class, names = {"BRANCH_STAFF", "BRANCH_MANAGER", "DELIVERY_STAFF",
-            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN"})
+            "DRIVER", "ACCOUNTANT", "OPERATIONS_MANAGER", "ADMIN", "DOCUMENT_VERIFIER"})
     void permitsEmployeeWithoutConsentOrBranch(AccountRole role) {
         when(callers.current()).thenReturn(caller(Set.of(role.name()), null));
         when(accounts.findByCode(CODE)).thenReturn(Optional.of(account(CODE, false)));
