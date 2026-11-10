@@ -1,4 +1,4 @@
--- Chạy toàn bộ file trong IntelliJ SQL Console riêng, user car_rental_app, sau V009.
+-- Chạy toàn bộ file trong IntelliJ SQL Console riêng, user car_rental_app, sau V015.
 -- BR-122/234/236, ADR-0008/0014: thử phá từng CHECK và UPDATE snapshot, rồi ROLLBACK.
 -- Phí 100000 chỉ là dữ liệu thử. Không chạy trong transaction có công việc chưa lưu.
 -- Nếu có lỗi ngoài dự kiến, chạy riêng ROLLBACK trước khi thử lại.
@@ -27,12 +27,12 @@ BEGIN
         RAISE EXCEPTION 'Run the vehicle Postman setup to create one ACTIVE vehicle before this verification.';
     END IF;
     INSERT INTO pricing.quote (
-        code, vehicle_code, start_at, end_at, rental_type, drive_mode, pickup_method,
+        code, customer_account_code, vehicle_code, start_at, end_at, rental_type, drive_mode, pickup_method,
         daily_rate, weekend_days, weekend_uplift, holiday_uplift,
         insurance_calculation, insurance_value, insurance_billing_days, quote_validity_seconds,
         rental_amount, insurance_fee, total_amount, created_at, expires_at, expires_at_submicro_nanos
     ) VALUES (
-        base_code, chosen_vehicle, '2026-11-10 03:00:00+00', '2026-11-11 03:00:00+00',
+        base_code, 'TK-SQL001', chosen_vehicle, '2026-11-10 03:00:00+00', '2026-11-11 03:00:00+00',
         'DAILY', 'SELF_DRIVE', 'BRANCH', chosen_rate, ARRAY['SATURDAY', 'SUNDAY'], 0.2, 0.5,
         'PER_BILLING_DAY', 100000, 1, 900, chosen_rate, 100000, chosen_rate + 100000,
         created, created + INTERVAL '15 minutes', 0
@@ -65,12 +65,12 @@ BEGIN
                 || jsonb_build_object(test_case.field_name, test_case.new_value)) transformed
             WHERE q.code = base_code;
             INSERT INTO pricing.quote (
-                code, vehicle_code, start_at, end_at, rental_type, drive_mode, pickup_method,
+                code, customer_account_code, vehicle_code, start_at, end_at, rental_type, drive_mode, pickup_method,
                 daily_rate, weekend_days, weekend_uplift, holiday_uplift,
                 insurance_calculation, insurance_value, insurance_billing_days, quote_validity_seconds,
                 rental_amount, insurance_fee, total_amount, created_at, expires_at, expires_at_submicro_nanos
             ) VALUES (
-                candidate.code, candidate.vehicle_code, candidate.start_at, candidate.end_at,
+                candidate.code, candidate.customer_account_code, candidate.vehicle_code, candidate.start_at, candidate.end_at,
                 candidate.rental_type, candidate.drive_mode, candidate.pickup_method,
                 candidate.daily_rate, candidate.weekend_days, candidate.weekend_uplift, candidate.holiday_uplift,
                 candidate.insurance_calculation, candidate.insurance_value, candidate.insurance_billing_days,

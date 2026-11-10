@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 /**
  * Báo giá bất biến theo BR-122; không thu tiền, không giữ chỗ và không đọc lại cấu hình.
  * @param code mã BG-yymm-6 do application sinh
+ * @param customerAccountCode mã khách đã xác thực tạo báo giá, không nhận từ request body
  * @param vehicleCode mã xe bất biến dùng đối chiếu/hiển thị theo ADR-0008
  * @param startAt giờ nhận thực tế
  * @param endAt giờ trả thực tế
@@ -21,7 +22,7 @@ import java.util.regex.Pattern;
  * @param createdAt mốc tạo chụp một lần từ Clock của application
  * @param expiresAt hạn tính từ mốc tạo và giá trị trong snapshot
  */
-public record Quote(String code, String vehicleCode, Instant startAt, Instant endAt,
+public record Quote(String code, String customerAccountCode, String vehicleCode, Instant startAt, Instant endAt,
         RentalType rentalType, DriveMode driveMode, PickupMethod pickupMethod,
         QuoteSnapshot snapshot, CalculatedPrice price, Instant createdAt, Instant expiresAt) {
     private static final Pattern CODE = Pattern.compile("BG-[0-9]{2}(0[1-9]|1[0-2])-[A-Z0-9]{6}");
@@ -30,6 +31,7 @@ public record Quote(String code, String vehicleCode, Instant startAt, Instant en
     /** Không cho một báo giá mang tổng/giá/hạn khác với dữ liệu đã tính ở lúc tạo. */
     public Quote {
         Objects.requireNonNull(code, "code");
+        Objects.requireNonNull(customerAccountCode, "customerAccountCode");
         Objects.requireNonNull(vehicleCode, "vehicleCode");
         Objects.requireNonNull(startAt, "startAt");
         Objects.requireNonNull(endAt, "endAt");
@@ -40,7 +42,8 @@ public record Quote(String code, String vehicleCode, Instant startAt, Instant en
         Objects.requireNonNull(price, "price");
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(expiresAt, "expiresAt");
-        if (!CODE.matcher(code).matches() || !VEHICLE_CODE.matcher(vehicleCode).matches()
+        if (!CODE.matcher(code).matches() || !customerAccountCode.matches("TK-[A-Z0-9]{6}")
+                || !VEHICLE_CODE.matcher(vehicleCode).matches()
                 || !endAt.isAfter(startAt) || createdAt.getNano() % 1_000 != 0
                 || startAt.getNano() % 1_000 != 0 || endAt.getNano() % 1_000 != 0
                 || !expiresAt.equals(createdAt.plus(snapshot.quoteValidity()))
@@ -50,10 +53,10 @@ public record Quote(String code, String vehicleCode, Instant startAt, Instant en
     }
 
     /** Đóng băng hạn tại lúc tạo; mọi lượt thử mã giữ nguyên các giá trị còn lại (BR-122). */
-    public static Quote create(String code, String vehicleCode, Instant startAt, Instant endAt,
+    public static Quote create(String code, String customerAccountCode, String vehicleCode, Instant startAt, Instant endAt,
             RentalType rentalType, DriveMode driveMode, PickupMethod pickupMethod,
             QuoteSnapshot snapshot, CalculatedPrice price, Instant createdAt) {
-        return new Quote(code, vehicleCode, startAt, endAt, rentalType, driveMode, pickupMethod,
+        return new Quote(code, customerAccountCode, vehicleCode, startAt, endAt, rentalType, driveMode, pickupMethod,
                 snapshot, price, createdAt, createdAt.plus(snapshot.quoteValidity()));
     }
 }

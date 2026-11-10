@@ -35,6 +35,7 @@ class QuoteWriteAdapter implements WriteQuotePort {
         String days = snapshot.weekendDays().stream().sorted().map(Enum::name).collect(Collectors.joining(",", "{", "}"));
         var validity = snapshot.quoteValidity();
         var parameters = new MapSqlParameterSource()
+                .addValue("customerAccountCode", quote.customerAccountCode(), Types.VARCHAR)
                 .addValue("code", quote.code(), Types.VARCHAR).addValue("vehicleCode", quote.vehicleCode(), Types.VARCHAR)
                 .addValue("startAt", timestamp(quote.startAt()), Types.TIMESTAMP_WITH_TIMEZONE)
                 .addValue("endAt", timestamp(quote.endAt()), Types.TIMESTAMP_WITH_TIMEZONE)

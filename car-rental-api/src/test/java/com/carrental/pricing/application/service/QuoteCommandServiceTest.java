@@ -1,5 +1,8 @@
 package com.carrental.pricing.application.service;
 
+import com.carrental.identity.api.CallerDirectory;
+import com.carrental.identity.api.CallerRef;
+import java.util.Set;
 import com.carrental.rental.api.RentalTermsDirectory;
 import com.carrental.pricing.application.command.CreateQuoteCommand;
 import com.carrental.pricing.application.port.out.*;
@@ -33,10 +36,13 @@ class QuoteCommandServiceTest {
     private ReadQuotePort reads;
     private BusinessCodeGenerator codes;
     private QuoteCommandService service;
+    private CallerDirectory callers;
 
     /** Tạo mock mới; các số bảo hiểm chỉ là fixture test. */
     @BeforeEach
     void setUp() {
+        callers = mock(CallerDirectory.class);
+        when(callers.current()).thenReturn(new CallerRef(OWNER, Set.of("CUSTOMER"), null));
         terms = mock(RentalTermsDirectory.class); settings = mock(ReadPricingPolicyPort.class);
         vehicles = mock(VehiclePricingDirectory.class); writes = mock(WriteQuotePort.class);
         reads = mock(ReadQuotePort.class); codes = mock(BusinessCodeGenerator.class);
@@ -44,7 +50,7 @@ class QuoteCommandServiceTest {
         when(vehicles.findActiveByCode("XE-TEST01")).thenReturn(Optional.of(new VehiclePricingRef("XE-TEST01", 1_000_000)));
         when(codes.generate("BG")).thenReturn("BG-AAAAAA", "BG-BBBBBB", "BG-CCCCCC", "BG-DDDDDD", "BG-EEEEEE");
         service = new QuoteCommandService(new RentalPricingPolicyResolver(), terms, settings, vehicles,
-                writes, reads, codes, Clock.fixed(CREATED_AT, ZONE));
+                writes, reads, codes, Clock.fixed(CREATED_AT, ZONE), callers);
     }
 
     /** Trùng mã chỉ thử mã mới, đọc policy/xe một lần và giữ nguyên hạn/giá qua mọi lượt. */
@@ -59,6 +65,7 @@ class QuoteCommandServiceTest {
         assertTrue(result.code().startsWith("BG-2611-")); // UTC còn tháng 10, Việt Nam đã tháng 11.
         assertEquals(2_200_000, result.price().rentalAmount());
         for (var quote : saved) {
+            assertEquals(OWNER, quote.customerAccountCode());
             assertEquals(saved.getFirst().snapshot(), quote.snapshot());
             assertEquals(saved.getFirst().price(), quote.price());
             assertEquals(saved.getFirst().expiresAt(), quote.expiresAt());
@@ -138,6 +145,25 @@ class QuoteCommandServiceTest {
         when(writes.insert(any())).thenReturn(true);
         assertThrows(IllegalStateException.class, () -> service.create(command()));
         verify(writes).insert(any()); verify(reads).findByCode("BG-2611-AAAAAA");
+    }
+
+
+    /** Quyền CUSTOMER được kiểm tại use case; ADMIN thuần không tạo báo giá cho khách. */
+    @Test
+    void deniesNonCustomerBeforeReadingPrices() {
+        when(callers.current()).thenReturn(new CallerRef("TK-ADMIN1", Set.of("ADMIN"), null));
+        var failure = assertThrows(DomainException.class, () -> service.create(command()));
+        assertEquals(ErrorCode.ACCESS_DENIED, failure.errorCode());
+        verifyNoInteractions(terms, settings, vehicles, writes, reads, codes);
+    }
+
+    /** Ngoài HTTP không dựng chủ mặc định và không ghi báo giá. */
+    @Test
+    void preservesMissingCallerFailure() {
+        var failure = new IllegalStateException("CallerDirectory requires an active HTTP request.");
+        when(callers.current()).thenThrow(failure);
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> service.create(command())));
+        verifyNoInteractions(terms, settings, vehicles, writes, reads, codes);
     }
 
     /** Khoảng ví dụ a, không dùng availability hoặc tự kiểm xe còn trống. */

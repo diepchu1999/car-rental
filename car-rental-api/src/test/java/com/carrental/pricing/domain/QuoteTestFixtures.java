@@ -11,6 +11,7 @@ import static com.carrental.pricing.domain.PricingTestFixtures.*;
 
 /** Báo giá thử độc lập với CSDL local, không phải cấu hình mặc định ứng dụng. */
 public final class QuoteTestFixtures {
+    public static final String OWNER = "TK-OWNER1";
     public static final Instant CREATED_AT = Instant.parse("2026-10-31T18:00:00Z");
     /** Tiện ích không có instance. */
     private QuoteTestFixtures() { }
@@ -23,14 +24,14 @@ public final class QuoteTestFixtures {
         var start = at("2026-11-13T10:00");
         var end = at("2026-11-15T10:00");
         var schedule = new DailyRentalPricingPolicy().prepare(start, end, settings, ZONE);
-        return Quote.create(code, "XE-TEST01", start, end, RentalType.DAILY, DriveMode.SELF_DRIVE,
+        return Quote.create(code, OWNER, "XE-TEST01", start, end, RentalType.DAILY, DriveMode.SELF_DRIVE,
                 PickupMethod.BRANCH, QuoteSnapshot.from(1_000_000, settings, schedule.insuranceBillingDays()),
                 schedule.calculate(1_000_000, settings.insurance()), CREATED_AT);
     }
 
     /** Biểu diễn dữ liệu đã reload trong các unit test service, không sửa aggregate production. */
     public static QuoteDetail detail(Quote quote) {
-        return new QuoteDetail(quote.code(), quote.vehicleCode(), quote.startAt(), quote.endAt(),
+        return new QuoteDetail(quote.code(), quote.customerAccountCode(), quote.vehicleCode(), quote.startAt(), quote.endAt(),
                 quote.rentalType(), quote.driveMode(), quote.pickupMethod(), quote.snapshot(), quote.price(),
                 quote.createdAt(), quote.expiresAt());
     }

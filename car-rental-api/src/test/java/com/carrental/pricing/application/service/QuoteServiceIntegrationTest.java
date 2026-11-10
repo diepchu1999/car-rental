@@ -1,6 +1,10 @@
 package com.carrental.pricing.application.service;
 
 import com.carrental.PostgresTestConfiguration;
+import com.carrental.identity.adapter.in.internal.ServiceCallerTestScope;
+import com.carrental.identity.api.CallerRef;
+import org.junit.jupiter.api.AfterEach;
+import java.util.Set;
 import com.carrental.pricing.application.command.CreateQuoteCommand;
 import com.carrental.pricing.application.port.in.CreateQuoteUseCase;
 import com.carrental.pricing.application.port.in.GetQuoteUseCase;
@@ -53,10 +57,65 @@ class QuoteServiceIntegrationTest {
     @Autowired private PlatformTransactionManager transactionManager;
     @Autowired private NamedParameterJdbcTemplate jdbc;
     @Autowired private SqlLoader loader;
+    @Autowired private com.carrental.pricing.api.QuoteDirectory quotes;
+
+    /** Cổng thật nối adapter/use case/SQL: giữ mọi dòng, tham số bảo hiểm và độ chính xác hạn. */
+    @Test
+    void bookingDirectoryReturnsStoredOwnedSnapshot() {
+        var original = create.create(command(activeVehicle()));
+        var result = quotes.getForBooking(original.code(), OWNER, original.expiresAt().minusNanos(1));
+        assertEquals(original.code(), result.code());
+        assertEquals(OWNER, result.customerAccountCode());
+        assertEquals(original.vehicleCode(), result.vehicleCode());
+        assertEquals(original.startAt(), result.startAt()); assertEquals(original.endAt(), result.endAt());
+        assertEquals(original.rentalType(), result.rentalType()); assertEquals(original.driveMode(), result.driveMode());
+        assertEquals(original.pickupMethod(), result.pickupMethod());
+        assertEquals(original.snapshot().dailyRate(), result.dailyRate());
+        assertEquals(original.snapshot().insurance().calculation().name(), result.insuranceCalculation());
+        assertEquals(0, original.snapshot().insurance().value().compareTo(result.insuranceValue()));
+        assertEquals(original.snapshot().insuranceBillingDays(), result.insuranceBillingDays());
+        assertEquals(original.price().rentalAmount(), result.rentalAmount());
+        assertEquals(original.price().insuranceFee(), result.insuranceFee());
+        assertEquals(original.price().totalAmount(), result.totalAmount());
+        assertEquals(original.createdAt(), result.createdAt()); assertEquals(original.expiresAt(), result.expiresAt());
+        assertEquals(original.price().lines().size(), result.lines().size());
+        for (int i = 0; i < result.lines().size(); i++) {
+            var expected = original.price().lines().get(i);
+            var actual = result.lines().get(i);
+            assertEquals(expected.type().name(), actual.type()); assertEquals(expected.dayType().name(), actual.dayType());
+            assertEquals(expected.startAt(), actual.startAt()); assertEquals(expected.hours(), actual.hours());
+            assertEquals(expected.dailyRate(), actual.dailyRate()); assertEquals(0, expected.uplift().compareTo(actual.uplift()));
+            assertEquals(expected.amount(), actual.amount());
+        }
+        assertThrows(UnsupportedOperationException.class, () -> result.lines().clear());
+    }
+
+    /** Chủ đọc GET được sau hạn nhưng không dùng để đặt xe; người khác không biết báo giá đã hết hạn. */
+    @Test
+    void bookingChecksOwnerBeforeExactExpiryOnStoredQuote() {
+        var original = create.create(command(activeVehicle()));
+        var expired = assertThrows(com.carrental.shared.error.DomainException.class,
+                () -> quotes.getForBooking(original.code(), OWNER, original.expiresAt()));
+        assertEquals(com.carrental.shared.error.ErrorCode.QUOTE_EXPIRED, expired.errorCode());
+        var hidden = assertThrows(com.carrental.shared.error.DomainException.class,
+                () -> quotes.getForBooking(original.code(), "TK-OTHER1", original.expiresAt()));
+        assertEquals(com.carrental.shared.error.ErrorCode.QUOTE_NOT_FOUND, hidden.errorCode());
+        clock.at = original.expiresAt().plusSeconds(1);
+        assertEquals(original, get.get(GetQuoteQuery.from(original.code())));
+    }
+
+    private ServiceCallerTestScope callerScope;
 
     /** Tách trạng thái nguồn cấu hình/đồng hồ và probe giữa các phép kiểm. */
     @BeforeEach
-    void reset() { policy.value = parameters(); clock.at = CREATED_AT; probe.fail = false; probe.last = null; }
+    void reset() {
+        callerScope = ServiceCallerTestScope.open(new CallerRef(OWNER, Set.of("CUSTOMER"), null));
+        policy.value = parameters(); clock.at = CREATED_AT; probe.fail = false; probe.last = null;
+    }
+
+    /** Thu hồi request giả sau mỗi test, không thay bean xác thực production. */
+    @AfterEach
+    void closeCallerScope() { callerScope.close(); }
 
     /** Báo giá cũ giữ nguyên sau đổi giá, tham số bảo hiểm/mức tăng/hạn; báo giá mới dùng bộ mới. */
     @Test
@@ -112,7 +171,7 @@ class QuoteServiceIntegrationTest {
         var second = lines.get(1);
         lines.set(1, new QuoteLine(second.type(), second.dayType(), second.startAt(), 25,
                 second.dailyRate(), second.uplift(), second.amount()));
-        var bad = new Quote(original.code(), original.vehicleCode(), original.startAt(), original.endAt(),
+        var bad = new Quote(original.code(), original.customerAccountCode(), original.vehicleCode(), original.startAt(), original.endAt(),
                 original.rentalType(), original.driveMode(), original.pickupMethod(), original.snapshot(),
                 new CalculatedPrice(lines, original.price().rentalAmount(), original.price().insuranceFee(),
                         original.price().totalAmount()), original.createdAt(), original.expiresAt());

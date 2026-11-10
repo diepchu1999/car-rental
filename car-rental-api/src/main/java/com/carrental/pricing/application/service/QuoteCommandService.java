@@ -1,6 +1,7 @@
 package com.carrental.pricing.application.service;
 
 import com.carrental.rental.api.RentalTermsDirectory;
+import com.carrental.identity.api.CallerDirectory;
 import com.carrental.pricing.application.command.CreateQuoteCommand;
 import com.carrental.pricing.application.port.in.CreateQuoteUseCase;
 import com.carrental.pricing.application.port.out.ReadPricingPolicyPort;
@@ -35,19 +36,24 @@ class QuoteCommandService implements CreateQuoteUseCase {
     private final ReadQuotePort reads;
     private final BusinessCodeGenerator codes;
     private final Clock clock;
+    private final CallerDirectory callers;
 
     /** Chỉ phụ thuộc các port và API module, không biết SQL hoặc adapter cấu hình. */
     QuoteCommandService(RentalPricingPolicyResolver resolver, RentalTermsDirectory terms,
             ReadPricingPolicyPort parameters, VehiclePricingDirectory vehicles,
-            WriteQuotePort writes, ReadQuotePort reads, BusinessCodeGenerator codes, Clock clock) {
+            WriteQuotePort writes, ReadQuotePort reads, BusinessCodeGenerator codes, Clock clock,
+            CallerDirectory callers) {
         this.resolver = resolver; this.terms = terms; this.parameters = parameters; this.vehicles = vehicles;
         this.writes = writes; this.reads = reads; this.codes = codes; this.clock = clock;
+        this.callers = callers;
     }
 
     /** Thứ tự: hỗ trợ, điều kiện thuê, lịch lễ, xe ACTIVE, tính giá, ghi rồi reload; lỗi sau ghi rollback. */
     @Override
     @Transactional
     public QuoteDetail create(CreateQuoteCommand command) {
+        var caller = callers.current();
+        if (!caller.hasRole("CUSTOMER")) throw DomainException.forbidden(ErrorCode.ACCESS_DENIED);
         Validations.required(command, "command");
         var policy = resolver.resolve(command.rentalType(), command.driveMode(), command.pickupMethod());
         terms.getTerms(command.rentalType(), command.pickupMethod(), command.startAt(), command.endAt());
@@ -61,7 +67,7 @@ class QuoteCommandService implements CreateQuoteUseCase {
         var snapshot = QuoteSnapshot.from(vehicle.dailyRate(), settings, schedule.insuranceBillingDays());
         for (int attempt = 0; attempt < MAX_CODE_ATTEMPTS; attempt++) {
             String code = "BG-" + MONTH.format(at.atZone(clock.getZone())) + "-" + codes.generate("BG").substring(3);
-            var quote = Quote.create(code, vehicle.code(), command.startAt(), command.endAt(),
+            var quote = Quote.create(code, caller.accountCode(), vehicle.code(), command.startAt(), command.endAt(),
                     command.rentalType(), command.driveMode(), command.pickupMethod(), snapshot, price, at);
             if (writes.insert(quote)) {
                 return reads.findByCode(code).orElseThrow(() ->

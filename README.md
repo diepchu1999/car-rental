@@ -298,7 +298,11 @@ chưa gán chi nhánh nhận `403 STAFF_BRANCH_REQUIRED`, đọc chéo hoặc sa
 Đổi giá ngày chỉ cho ADMIN hoặc MANAGER của chi nhánh có xe; STAFF không được đổi giá.
 Giá phải dương, nguyên VND và chia hết cho 1.000; cập nhật không đổi trạng thái hay báo giá cũ.
 Chỉ dùng dữ liệu giả ở local, không dùng bản này với dữ liệu thật.
-Báo giá hiện chưa gắn chủ sở hữu.
+Báo giá chỉ cho CUSTOMER đã tạo nó đọc và dùng để đặt xe (BR-122); mã của người khác trả
+`404 QUOTE_NOT_FOUND`. Báo giá cũ chưa có chủ cũng bị từ chối — xin báo giá mới, không gán chủ cho lịch sử.
+Kiểm quyền bằng folder **Part 2 - Quote ownership (BR-122)** trong
+[collection booking](postman/task-09-booking.postman_collection.json): chạy riêng A → B → C → D;
+A dùng ADMIN, B/D cùng khách A, C khách B khác A. Chọn token tại từng folder; mã tài nguyên được truyền tự động.
 Kiểm bằng thư mục `Part 3 - Backend namespace security` trong
 [collection identity](postman/task-08a-identity.postman_collection.json), environment `Car Rental - Local`.
 Các request OAuth2 dùng **Get New Access Token → Use Token**, không copy token vào file hay bật đồng bộ token.

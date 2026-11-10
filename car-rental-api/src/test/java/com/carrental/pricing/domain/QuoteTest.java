@@ -31,11 +31,21 @@ class QuoteTest {
         assertThrows(IllegalArgumentException.class, () -> quote(code, Duration.ofMinutes(15)));
     }
 
+    /** BR-122: báo giá mới phải có mã chủ thật đúng hình dạng, không nhận chuỗi rỗng hoặc mã xe. */
+    @ParameterizedTest
+    @ValueSource(strings = {"", " ", "XE-TEST01", "TK-owner1", "TK-OWNER12"})
+    void rejectsInvalidOwner(String owner) {
+        var base = quote("BG-2611-TEST01", Duration.ofMinutes(15));
+        assertThrows(IllegalArgumentException.class, () -> Quote.create(base.code(), owner, base.vehicleCode(),
+                base.startAt(), base.endAt(), base.rentalType(), base.driveMode(), base.pickupMethod(),
+                base.snapshot(), base.price(), base.createdAt()));
+    }
+
     /** Constructor không cho gán hạn khác snapshot để làm thay đổi dữ liệu đã chốt. */
     @Test
     void rejectsExpiryNotMatchingFrozenValidity() {
         var quote = quote("BG-2611-TEST01", Duration.ofMinutes(15));
-        assertThrows(IllegalArgumentException.class, () -> new Quote(quote.code(), quote.vehicleCode(),
+        assertThrows(IllegalArgumentException.class, () -> new Quote(quote.code(), quote.customerAccountCode(), quote.vehicleCode(),
                 quote.startAt(), quote.endAt(), quote.rentalType(), quote.driveMode(), quote.pickupMethod(),
                 quote.snapshot(), quote.price(), quote.createdAt(), quote.expiresAt().plusSeconds(1)));
     }

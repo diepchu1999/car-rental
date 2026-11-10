@@ -90,6 +90,9 @@ public enum ErrorCode {
     /** Báo giá không tồn tại khi đọc theo BR-122. */
     QUOTE_NOT_FOUND("The requested quote was not found."),
 
+    /** BR-122: báo giá đúng chủ nhưng đã hết hạn dùng để đặt xe; trả 422. */
+    QUOTE_EXPIRED("The quote has expired. Please request a new quote."),
+
     /** BR-125: lát cắt báo giá chưa hỗ trợ có tài xế. */
     QUOTE_DRIVE_MODE_NOT_SUPPORTED("Quotes with a driver are not supported yet."),
 
