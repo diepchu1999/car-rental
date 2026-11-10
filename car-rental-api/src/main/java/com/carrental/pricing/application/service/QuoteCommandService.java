@@ -1,6 +1,6 @@
 package com.carrental.pricing.application.service;
 
-import com.carrental.booking.api.RentalTermsDirectory;
+import com.carrental.rental.api.RentalTermsDirectory;
 import com.carrental.pricing.application.command.CreateQuoteCommand;
 import com.carrental.pricing.application.port.in.CreateQuoteUseCase;
 import com.carrental.pricing.application.port.out.ReadPricingPolicyPort;

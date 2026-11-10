@@ -135,7 +135,7 @@ class QuoteServiceIntegrationTest {
         return code;
     }
 
-    /** Khoảng hai khối theo ví dụ a, dùng chung validation thật của booking. */
+    /** Khoảng hai khối theo ví dụ a, dùng chung validation thật của rental. */
     private static CreateQuoteCommand command(String code) {
         return new CreateQuoteCommand(code, at("2026-11-13T10:00"), at("2026-11-15T10:00"),
                 RentalType.DAILY, DriveMode.SELF_DRIVE, PickupMethod.BRANCH);
@@ -147,7 +147,7 @@ class QuoteServiceIntegrationTest {
     /** Nguồn điều khiển chỉ ở context test riêng, không thêm cờ vào code production. */
     @TestConfiguration(proxyBeanMethods = false)
     static class ProbeConfiguration {
-        /** Dùng cùng Clock cho booking và pricing để điều kiện thuê tái lập được. */
+        /** Dùng cùng Clock cho rental và pricing để điều kiện thuê tái lập được. */
         @Bean @Primary MutableClock quoteTestClock() { return new MutableClock(); }
         /** Thay nguồn cấu hình qua đúng port, mô phỏng một phiên bản mới mà không sửa báo giá cũ. */
         @Bean @Primary MutablePolicy quoteTestPolicy() { return new MutablePolicy(); }

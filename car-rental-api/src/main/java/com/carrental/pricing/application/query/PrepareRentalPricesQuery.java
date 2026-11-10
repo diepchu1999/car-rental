@@ -7,7 +7,7 @@ import java.time.Instant;
 
 /** Khoảng dùng tính theo lô BR-126; không chứa mã xe hoặc tham số do client tự đặt. */
 public record PrepareRentalPricesQuery(RentalType rentalType, Instant startAt, Instant endAt) {
-    /** Kiểm hình dạng, còn điều kiện đặt thuộc booking và lịch lễ thuộc policy pricing. */
+    /** Kiểm hình dạng, còn điều kiện thuê thuộc rental và lịch lễ thuộc policy pricing. */
     public PrepareRentalPricesQuery {
         rentalType = Validations.required(rentalType, "rentalType");
         startAt = Validations.required(startAt, "startAt");

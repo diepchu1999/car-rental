@@ -10,7 +10,7 @@ import java.time.Instant;
 /** Đầu vào tạo báo giá BR-122/125, không nhận giá, tổng tiền hoặc hạn do client quyết định. */
 public record CreateQuoteCommand(String vehicleCode, Instant startAt, Instant endAt,
         RentalType rentalType, DriveMode driveMode, PickupMethod pickupMethod) {
-    /** Kiểm cấu trúc trước mọi truy vấn; điều kiện thuê cụ thể thuộc booking.api. */
+    /** Kiểm cấu trúc trước mọi truy vấn; điều kiện thuê cụ thể thuộc rental.api. */
     public CreateQuoteCommand {
         vehicleCode = Validations.requiredText(vehicleCode, "vehicleCode");
         startAt = Validations.required(startAt, "startAt");

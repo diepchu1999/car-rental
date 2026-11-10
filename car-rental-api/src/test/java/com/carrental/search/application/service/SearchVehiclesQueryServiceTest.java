@@ -2,8 +2,8 @@ package com.carrental.search.application.service;
 
 import com.carrental.availability.api.AvailabilityDirectory;
 import com.carrental.availability.api.Period;
-import com.carrental.booking.api.RentalTerms;
-import com.carrental.booking.api.RentalTermsDirectory;
+import com.carrental.rental.api.RentalTerms;
+import com.carrental.rental.api.RentalTermsDirectory;
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchSearchView;
 import com.carrental.pricing.api.RentalPricingDirectory;
@@ -102,7 +102,7 @@ class SearchVehiclesQueryServiceTest {
         verifyNoMoreInteractions(terms, pricing, branches, vehicles, availability, pricePlan);
     }
 
-    /** Từng gói nhận đệm từ booking và truyền riêng; search không tự cộng hay viết cứng đệm. */
+    /** Từng gói nhận đệm từ rental và truyền riêng; search không tự cộng hay viết cứng đệm. */
     @ParameterizedTest
     @CsvSource({"HOURLY,1", "DAILY,2"})
     void passesUnbufferedPeriodAndResolvedBuffer(RentalType type, int hours) {
@@ -347,7 +347,7 @@ class SearchVehiclesQueryServiceTest {
         when(availability.findBusyVehicleIds(any(), any(), anyCollection())).thenReturn(Set.of(1L, 4L));
     }
 
-    /** Điều kiện mẫu chỉ dành cho kiểm điều phối, không thay test policy thật của booking. */
+    /** Điều kiện mẫu chỉ dành cho kiểm điều phối, không thay test policy thật của rental. */
     private RentalTerms rentalTerms(int bufferHours) {
         return new RentalTerms(Duration.ofHours(bufferHours), Optional.empty(), LocalTime.of(6, 0),
                 LocalTime.of(23, 0), Duration.ofHours(1), java.time.Period.ofMonths(6));

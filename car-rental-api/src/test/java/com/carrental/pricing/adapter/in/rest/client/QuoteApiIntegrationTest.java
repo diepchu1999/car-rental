@@ -23,7 +23,7 @@ import java.util.*;
 import static com.carrental.pricing.domain.PricingTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** HTTP thật đi qua controller, booking/vehicle API, pricing và PostgreSQL; không dùng transaction bao ngoài test. */
+/** HTTP thật đi qua controller, rental/vehicle API, pricing và PostgreSQL; không dùng transaction bao ngoài test. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import({PostgresTestConfiguration.class, HttpIdentityTestConfiguration.class,
         QuoteApiIntegrationTest.ApiConfiguration.class})
@@ -163,7 +163,7 @@ class QuoteApiIntegrationTest {
         error(post(PATH, body), 422, code);
     }
 
-    /** Dùng đúng điều kiện booking: tối thiểu, giờ chi nhánh và cửa sổ nhận xe. */
+    /** Dùng đúng điều kiện rental: tối thiểu, giờ chi nhánh và cửa sổ nhận xe. */
     @ParameterizedTest
     @CsvSource({"HOURLY,2026-11-10T08:00,2026-11-10T11:00,RENTAL_DURATION_TOO_SHORT",
             "DAILY,2026-11-10T23:30,2026-11-11T10:00,OUTSIDE_BRANCH_HOURS",

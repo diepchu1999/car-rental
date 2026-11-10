@@ -5,7 +5,7 @@
 - BR-122: báo giá bất biến, có hạn dùng; đổi giá xe/cấu hình không đổi báo giá đã tạo.
 - BR-114/218/235–237: giá gói giờ/ngày, loại ngày, giờ lẻ và làm tròn riêng từng dòng.
 - BR-231: bảo hiểm là khoản riêng, không nằm trong `rentalAmount`.
-- BR-113/119/121/125: dùng cùng điều kiện thuê của `booking.api.RentalTermsDirectory`.
+- BR-113/119/121/125: dùng cùng điều kiện thuê của `rental.api.RentalTermsDirectory`.
 - Không thu tiền, giữ chỗ hoặc kiểm lịch xe. Báo giá không cam kết xe còn trống (ADR-0005).
 - Namespace `/client` cần access token hợp lệ có vai `CUSTOMER` (BR-120/801).
   Gửi `Authorization: Bearer <access-token>`; thiếu/token sai trả `401 UNAUTHENTICATED`,
