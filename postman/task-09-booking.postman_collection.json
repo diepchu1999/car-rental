@@ -1,0 +1,1232 @@
+{
+  "info": {
+    "name": "Car Rental - Task 09 - Booking",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "BR-122: Phần 2 kiểm chủ báo giá. Chạy riêng từng folder A → B → C → D, mỗi folder một lượt Runner. Chọn ADMIN cho A, cùng CUSTOMER A cho B/D, CUSTOMER B khác tài khoản cho C. Dùng token sẵn có tại Authorization của folder; không lưu token vào collection/environment và không Share/Sync token. Dữ liệu thử local, mỗi vòng tạo xe/chi nhánh mới."
+  },
+  "variable": [
+    {
+      "key": "keycloakBaseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "realm",
+      "value": "car-rental",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Part 2 - Quote ownership (BR-122)",
+      "description": "Chạy A → B → C → D, mỗi folder một lượt Runner 1 iteration; dùng ba token có sẵn. API/collection không nhận token trong biến. Không cần giấy tờ khách để xin báo giá. Hạn đặt xe qua cổng nội bộ được kiểm bằng Maven.",
+      "item": [
+        {
+          "name": "A - ADMIN vehicle fixture",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "admin-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 admin-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "description": "BR-810/122: chọn token ADMIN, chạy cả folder. Sinh dữ liệu giả và khoảng thuê mới mỗi lượt, không cần xoá dữ liệu cũ.",
+          "item": [
+            {
+              "name": "01 - Check ADMIN identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+                "description": "BR-120/122/803: kiểm đúng tài khoản và vai trước khi chạy cả folder."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9IdentityChecked');",
+                      "['t9Branch','t9Vehicle','t9OwnerA','t9OwnerB','t9QuoteA','t9QuoteB','t9QuoteASnapshot'].forEach(k => pm.collectionVariables.unset(k));",
+                      "pm.collectionVariables.set('t9Model','T09-'+pm.variables.replaceIn('{{$guid}}'));",
+                      "const vn = new Date(Date.now()+7*60*60*1000); vn.setUTCDate(vn.getUTCDate()+2); vn.setUTCHours(10,0,0,0);",
+                      "const start = new Date(vn.getTime()-7*60*60*1000);",
+                      "pm.collectionVariables.set('t9Start',start.toISOString()); pm.collectionVariables.set('t9End',new Date(start.getTime()+24*60*60*1000).toISOString());",
+                      "const expiry = new Date(start); expiry.setUTCFullYear(expiry.getUTCFullYear()+3); pm.collectionVariables.set('t9DocumentExpiry',expiry.toISOString().slice(0,10));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "const correct = Boolean(b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('ADMIN'));",
+                      "pm.test('Expected account and role', () => pm.expect(correct).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Select the correct account token and restart this folder.'); }",
+                      "pm.variables.set('t9IdentityChecked',true);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Create fixture branch",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/branches",
+                "description": "BR-807/808: tạo chi nhánh thử.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"latitude\": 10.76,\n  \"longitude\": 106.66,\n  \"name\": \"{{t9Model}}\",\n  \"address\": \"Local test address\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "pm.test('Branch code', () => pm.expect(b.data.code).to.match(/^CN-[A-Z0-9]{6}$/));",
+                      "pm.collectionVariables.set('t9Branch',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Create priced vehicle",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/vehicles",
+                "description": "BR-001/018/234: xe công ty có giá thử 1000000 VND.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"plateNumber\": \"T09-{{$guid}}\",\n  \"fuelType\": \"PETROL\",\n  \"branchCode\": \"{{t9Branch}}\",\n  \"inspectionExpiresOn\": \"{{t9DocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{t9DocumentExpiry}}\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"{{t9Model}}\",\n  \"dailyRate\": 1000000\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                      "for (const key of [\"t9Branch\"]) { if (!pm.collectionVariables.get(key)) throw new Error('Missing ' + key + '; run the preceding folder first.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "pm.test('Draft vehicle', () => { pm.expect(b.data.code).to.match(/^XE-[A-Z0-9]{6}$/); pm.expect(b.data.status).to.equal('DRAFT'); });",
+                      "pm.collectionVariables.set('t9Vehicle',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 - Submit vehicle",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/vehicles/{{t9Vehicle}}/submit-for-approval",
+                "description": "BR-010: gửi duyệt xe thử."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                      "for (const key of [\"t9Vehicle\"]) { if (!pm.collectionVariables.get(key)) throw new Error('Missing ' + key + '; run the preceding folder first.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "pm.test('Pending approval', () => pm.expect(b.data.status).to.equal('PENDING_APPROVAL'));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "05 - Approve vehicle",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/vehicles/{{t9Vehicle}}/approve",
+                "description": "BR-005/010: xe ACTIVE có giấy tờ còn hạn và giá để xin báo giá."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "pm.test('Active vehicle', () => pm.expect(b.data.status).to.equal('ACTIVE'));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "B - CUSTOMER A owns quote",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "description": "BR-122: CUSTOMER A đã consent; giữ token này cho D. Chạy cả folder, không đổi token giữa request.",
+          "item": [
+            {
+              "name": "01 - Check CUSTOMER A identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120/122/803: kiểm đúng tài khoản và vai trước khi chạy cả folder."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9IdentityChecked');",
+                      "for (const key of [\"t9Vehicle\"]) { if (!pm.collectionVariables.get(key)) throw new Error('Missing ' + key + '; run the preceding folder first.'); }",
+                      "['t9QuoteA','t9QuoteB','t9QuoteASnapshot','t9OwnerB'].forEach(k=>pm.collectionVariables.unset(k));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "const correct = Boolean(b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('CUSTOMER') && b.data.termsVersion);",
+                      "pm.test('Expected account and role', () => pm.expect(correct).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Select the correct account token and restart this folder.'); }",
+                      "pm.variables.set('t9IdentityChecked',true);",
+                      "pm.collectionVariables.set('t9OwnerA',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Create owned quote",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes",
+                "description": "BR-122: chủ lấy từ token, không do request chọn.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"vehicleCode\": \"{{t9Vehicle}}\",\n  \"startAt\": \"{{t9Start}}\",\n  \"endAt\": \"{{t9End}}\",\n  \"rentalType\": \"DAILY\",\n  \"driveMode\": \"SELF_DRIVE\",\n  \"pickupMethod\": \"BRANCH\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                      "for (const key of [\"t9Vehicle\",\"t9Start\",\"t9End\"]) { if (!pm.collectionVariables.get(key)) throw new Error('Missing ' + key + '; run the preceding folder first.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "pm.test('Quote snapshot', () => { pm.expect(b.data.code).to.match(/^BG-[0-9]{4}-[A-Z0-9]{6}$/); pm.expect(b.data.vehicleCode).to.equal(pm.collectionVariables.get('t9Vehicle')); pm.expect(b.data.totalAmount).to.equal(b.data.rentalAmount+b.data.insuranceFee); pm.expect(b.data.lines).to.be.an('array').and.not.empty; pm.expect(b.data).not.to.have.property('customerAccountCode'); pm.expect(Date.parse(b.data.expiresAt)).to.be.above(Date.parse(b.data.createdAt)); });",
+                      "pm.test('Location', () => pm.expect(pm.response.headers.get('Location')).to.equal('/api/v1/client/quotes/'+b.data.code));",
+                      "pm.collectionVariables.set('t9QuoteA',b.data.code); pm.collectionVariables.set('t9QuoteASnapshot',JSON.stringify(b.data));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Read owned quote",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes/{{t9QuoteA}}",
+                "description": "BR-122: chủ đọc lại đúng snapshot đã tạo."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                      "for (const key of [\"t9QuoteA\"]) { if (!pm.collectionVariables.get(key)) throw new Error('Missing ' + key + '; run the preceding folder first.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "pm.test('Stored snapshot is unchanged', () => pm.expect(b.data).to.deep.equal(JSON.parse(pm.collectionVariables.get('t9QuoteASnapshot'))));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "C - CUSTOMER B cannot read A quote",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "description": "BR-122: chọn CUSTOMER B khác A, đã consent. Kiểm 404 cả mã của A và mã không tồn tại; tạo báo giá dù body cố gán chủ A.",
+          "item": [
+            {
+              "name": "01 - Check different CUSTOMER B identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120/122/803: kiểm đúng tài khoản và vai trước khi chạy cả folder."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9IdentityChecked');",
+                      "for (const key of [\"t9OwnerA\",\"t9QuoteA\"]) { if (!pm.collectionVariables.get(key)) throw new Error('Missing ' + key + '; run the preceding folder first.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "const correct = Boolean(b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('CUSTOMER') && b.data.termsVersion && b.data.code !== pm.collectionVariables.get('t9OwnerA'));",
+                      "pm.test('Expected account and role', () => pm.expect(correct).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Select the correct account token and restart this folder.'); }",
+                      "pm.variables.set('t9IdentityChecked',true);",
+                      "pm.collectionVariables.set('t9OwnerB',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Reject another customer quote",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes/{{t9QuoteA}}",
+                "description": "BR-122: khách khác không thấy báo giá, kể cả hết hạn."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                      "for (const key of [\"t9QuoteA\"]) { if (!pm.collectionVariables.get(key)) throw new Error('Missing ' + key + '; run the preceding folder first.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 404) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(false); });",
+                      "pm.test('Expected error', () => { pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('QUOTE_NOT_FOUND'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Reject missing quote",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes/BG-0001-MISS00",
+                "description": "BR-122: mã không tồn tại và sai chủ có cùng lỗi."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 404) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(false); });",
+                      "pm.test('Expected error', () => { pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('QUOTE_NOT_FOUND'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 - Ignore forged owner in quote body",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes",
+                "description": "BR-122: trường ngoài hợp đồng không thể gán báo giá cho khách A.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"vehicleCode\": \"{{t9Vehicle}}\",\n  \"startAt\": \"{{t9Start}}\",\n  \"endAt\": \"{{t9End}}\",\n  \"rentalType\": \"DAILY\",\n  \"driveMode\": \"SELF_DRIVE\",\n  \"pickupMethod\": \"BRANCH\",\n  \"customerAccountCode\": \"{{t9OwnerA}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                      "for (const key of [\"t9Vehicle\",\"t9OwnerA\"]) { if (!pm.collectionVariables.get(key)) throw new Error('Missing ' + key + '; run the preceding folder first.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "pm.test('Quote snapshot', () => { pm.expect(b.data.code).to.match(/^BG-[0-9]{4}-[A-Z0-9]{6}$/); pm.expect(b.data.vehicleCode).to.equal(pm.collectionVariables.get('t9Vehicle')); pm.expect(b.data.totalAmount).to.equal(b.data.rentalAmount+b.data.insuranceFee); pm.expect(b.data.lines).to.be.an('array').and.not.empty; pm.expect(b.data).not.to.have.property('customerAccountCode'); pm.expect(Date.parse(b.data.expiresAt)).to.be.above(Date.parse(b.data.createdAt)); });",
+                      "pm.collectionVariables.set('t9QuoteB',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "05 - B reads own quote",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes/{{t9QuoteB}}",
+                "description": "BR-122: báo giá vừa tạo vẫn thuộc B."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');",
+                      "for (const key of [\"t9QuoteB\"]) { if (!pm.collectionVariables.get(key)) throw new Error('Missing ' + key + '; run the preceding folder first.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "pm.test('B owns created quote', () => pm.expect(b.data.code).to.equal(pm.collectionVariables.get('t9QuoteB')));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "D - CUSTOMER A rechecks isolation",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "description": "BR-122: chọn lại đúng CUSTOMER A như B; không dùng CUSTOMER B. Chủ đọc được cả báo giá quá hạn.",
+          "item": [
+            {
+              "name": "01 - Check original CUSTOMER A identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120/122/803: kiểm đúng tài khoản và vai trước khi chạy cả folder."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9IdentityChecked');",
+                      "for (const key of [\"t9OwnerA\",\"t9QuoteA\",\"t9QuoteB\"]) { if (!pm.collectionVariables.get(key)) throw new Error('Missing ' + key + '; run the preceding folder first.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "const correct = Boolean(b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('CUSTOMER') && b.data.termsVersion && b.data.code === pm.collectionVariables.get('t9OwnerA'));",
+                      "pm.test('Expected account and role', () => pm.expect(correct).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Select the correct account token and restart this folder.'); }",
+                      "pm.variables.set('t9IdentityChecked',true);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - A cannot read B quote",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes/{{t9QuoteB}}",
+                "description": "BR-122: B gửi owner A trong body vẫn không chuyển quyền cho A."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 404) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(false); });",
+                      "pm.test('Expected error', () => { pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('QUOTE_NOT_FOUND'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - A still reads original snapshot",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes/{{t9QuoteA}}",
+                "description": "BR-122: báo giá của A vẫn đọc đúng snapshot, kể cả đã hết 15 phút."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9IdentityChecked')) throw new Error('Run this entire folder from request 01 with the same token.');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; fix this request before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => { pm.expect(b).to.have.all.keys('success','data','error'); pm.expect(b.success).to.equal(true); });",
+                      "pm.test('No error', () => pm.expect(b.error).to.equal(null));",
+                      "pm.test('Stored snapshot is unchanged', () => pm.expect(b.data).to.deep.equal(JSON.parse(pm.collectionVariables.get('t9QuoteASnapshot'))));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
