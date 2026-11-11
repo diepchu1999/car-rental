@@ -23,6 +23,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.Optional;
+import com.carrental.availability.domain.ReservationPeriod;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -59,6 +61,9 @@ class ReservationCommandServiceTest {
         when(clock.instant()).thenReturn(NOW).thenReturn(NOW.plusSeconds(600));
         when(policies.holdDuration(NOW)).thenReturn(Duration.ofMinutes(90));
         when(codes.generate("KL")).thenReturn(CODES.get(0), CODES.get(1), CODES.get(2), CODES.get(3), CODES.get(4));
+        when(reads.loadAggregate(anyString())).thenAnswer(invocation -> Optional.of(Reservation.createHeld(
+                invocation.getArgument(0), 42L, ReservationPeriod.finite(START, END.plusSeconds(7200)),
+                "booking-code", Duration.ofMinutes(90), NOW)));
         service = new ReservationCommandService(writes, reads, policies, codes, clock);
     }
 
@@ -71,9 +76,10 @@ class ReservationCommandServiceTest {
     @ValueSource(longs = {0, 1, 2})
     void createsHeldWithFrozenPolicyAndBuffer(long bufferHours) {
         when(writes.insert(any(Reservation.class))).thenReturn(OptionalLong.of(91L));
-        assertEquals(new ReservationRef(91L, CODES.getFirst()), service.hold(command(bufferHours)));
+        assertEquals(new ReservationRef(91L, CODES.getFirst(), NOW.plusSeconds(5400)), service.hold(command(bufferHours)));
         Reservation saved = capturedWrites(1).getFirst();
-        verifyNoInteractions(reads);
+        verify(reads).loadAggregate(CODES.getFirst());
+        verifyNoMoreInteractions(reads);
         assertEquals(42L, saved.vehicleId());
         assertEquals("booking-code", saved.bookingCode());
         assertEquals(ReservationKind.RENTAL, saved.kind());
@@ -101,7 +107,9 @@ class ReservationCommandServiceTest {
         int[] calls = {0};
         when(writes.insert(any(Reservation.class))).thenAnswer(invocation ->
                 calls[0]++ < collisions ? OptionalLong.empty() : OptionalLong.of(91L));
-        assertEquals(new ReservationRef(91L, CODES.get(collisions)), service.hold(command(2)));
+        assertEquals(new ReservationRef(91L, CODES.get(collisions), NOW.plusSeconds(5400)), service.hold(command(2)));
+        verify(reads).loadAggregate(CODES.get(collisions));
+        verifyNoMoreInteractions(reads);
         List<Reservation> attempts = capturedWrites(collisions + 1);
         for (int index = 0; index < attempts.size(); index++) {
             Reservation saved = attempts.get(index);
@@ -128,6 +136,7 @@ class ReservationCommandServiceTest {
         when(writes.insert(any(Reservation.class))).thenReturn(OptionalLong.empty());
         assertThrows(IllegalStateException.class, () -> service.hold(command(0)));
         capturedWrites(5);
+        verifyNoInteractions(reads);
         verify(codes, times(5)).generate("KL");
         verify(clock).instant();
         verify(policies).holdDuration(NOW);
@@ -153,6 +162,7 @@ class ReservationCommandServiceTest {
         assertEquals(ErrorCode.VEHICLE_NOT_AVAILABLE, failure.errorCode());
         assertEquals(DomainException.Category.CONFLICT, failure.category());
         capturedWrites(initialCollisions + 1);
+        verifyNoInteractions(reads);
         verify(codes, times(initialCollisions + 1)).generate("KL");
         verify(clock).instant();
         verify(policies).holdDuration(NOW);
@@ -184,6 +194,47 @@ class ReservationCommandServiceTest {
                 Instant.MAX, Duration.ofSeconds(1), "booking-code");
         assertThrows(DomainException.class, () -> service.hold(command));
         verifyNoInteractions(writes, policies, codes, clock);
+    }
+
+    /** Hạn công bố lấy từ bản đã lưu; không lấy aggregate trước INSERT hoặc tính lại TTL. */
+    @Test
+    void returnsReloadedExpiryAfterSuccessfulInsert() {
+        when(writes.insert(any(Reservation.class))).thenReturn(OptionalLong.of(91L));
+        var stored = Reservation.createHeld(CODES.getFirst(), 42L, ReservationPeriod.finite(START, END),
+                "booking-code", Duration.ofMinutes(90).plusNanos(1_000), NOW);
+        when(reads.loadAggregate(CODES.getFirst())).thenReturn(Optional.of(stored));
+        var ref = service.hold(command(0));
+        assertEquals(stored.holdExpiresAt(), ref.holdExpiresAt());
+        var order = inOrder(writes, reads);
+        order.verify(writes).insert(any(Reservation.class));
+        order.verify(reads).loadAggregate(CODES.getFirst());
+        order.verifyNoMoreInteractions();
+        verify(clock).instant();
+        verify(policies).holdDuration(NOW);
+        verify(codes).generate("KL");
+    }
+
+    /** INSERT thành công nhưng reload rỗng là lỗi nội bộ để transaction ngoài rollback. */
+    @Test
+    void missingReloadDoesNotReturnIncompleteReference() {
+        when(writes.insert(any(Reservation.class))).thenReturn(OptionalLong.of(91L));
+        when(reads.loadAggregate(CODES.getFirst())).thenReturn(Optional.empty());
+        assertThrows(IllegalStateException.class, () -> service.hold(command(0)));
+        verify(writes).insert(any(Reservation.class));
+        verify(codes).generate("KL");
+        verifyNoMoreInteractions(writes, codes);
+    }
+
+    /** Lỗi đọc lại không được coi là trùng mã hoặc xung đột lịch. */
+    @Test
+    void reloadFailureIsNotRetriedOrTranslated() {
+        when(writes.insert(any(Reservation.class))).thenReturn(OptionalLong.of(91L));
+        var failure = new IllegalStateException("Storage unavailable during reload.");
+        when(reads.loadAggregate(CODES.getFirst())).thenThrow(failure);
+        assertSame(failure, assertThrows(IllegalStateException.class, () -> service.hold(command(0))));
+        verify(writes).insert(any(Reservation.class));
+        verify(codes).generate("KL");
+        verifyNoMoreInteractions(writes, codes);
     }
 
     /** Tạo đầu vào hợp lệ với khoảng chưa cộng đệm. */

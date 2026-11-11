@@ -106,9 +106,11 @@ class ReservationCommandService implements HoldReservationUseCase, BlockReservat
      * lại Clock, đọc lại chính sách, cộng lại đệm hoặc kéo dài hạn.
      * Trùng lịch báo VEHICLE_NOT_AVAILABLE ngay, không thử mã khác.
      * Các lỗi lưu trữ khác được truyền nguyên để transaction rollback.
+     * Đọc lại sau INSERT để công bố đúng hạn ở độ chính xác PostgreSQL;
+     * đây không phải truy vấn kiểm xe trống trước khi ghi (ADR-0005).
      *
      * @param command yêu cầu giữ chỗ đã kiểm tra
-     * @return định danh từ ID do INSERT RETURNING trả và mã vừa ghi
+     * @return định danh từ INSERT và hạn đọc lại từ CSDL để bên tạo đơn dùng đúng cùng mốc
      * @throws DomainException nếu đầu vào sai hoặc xe đã bận
      * @throws IllegalStateException nếu hết năm lần thử mã
      */
@@ -123,7 +125,13 @@ class ReservationCommandService implements HoldReservationUseCase, BlockReservat
                 codeGenerator.generate(CODE_PREFIX), checked.vehicleId(), period,
                 checked.bookingCode(), duration, createdAt
         );
-        return insertWithCodeRetries(reservation);
+        ReservationRef inserted = insertWithCodeRetries(reservation);
+        Reservation stored = readPort.loadAggregate(inserted.code()).orElseThrow(() ->
+                new IllegalStateException("Inserted reservation could not be reloaded."));
+        if (stored.holdExpiresAt() == null) {
+            throw new IllegalStateException("Inserted hold is missing its stored expiry.");
+        }
+        return new ReservationRef(inserted.id(), inserted.code(), stored.holdExpiresAt());
     }
 
     /**
@@ -170,7 +178,7 @@ class ReservationCommandService implements HoldReservationUseCase, BlockReservat
             }
 
             if (id.isPresent()) {
-                return new ReservationRef(id.getAsLong(), reservation.code());
+                return new ReservationRef(id.getAsLong(), reservation.code(), null);
             }
 
             if (attempt + 1 < MAX_CODE_GENERATION_ATTEMPTS) {

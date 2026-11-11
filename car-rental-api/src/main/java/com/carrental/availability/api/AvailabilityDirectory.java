@@ -42,7 +42,7 @@ public interface AvailabilityDirectory {
      * @param rentalPeriod khoảng thuê hữu hạn, bắt buộc
      * @param buffer độ dài đệm đã được bên gọi phân giải, không âm
      * @param bookingCode mã đơn thuê có nội dung
-     * @return định danh khóa RENTAL/HELD vừa được ghi
+     * @return định danh khóa RENTAL/HELD và holdExpiresAt đọc lại từ CSDL; bên gọi chép nguyên hạn này vào đơn
      * @throws DomainException nếu đầu vào không hợp lệ
      *                         hoặc xe không còn trống trong khoảng yêu cầu
      */

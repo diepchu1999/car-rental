@@ -79,7 +79,7 @@ class AvailabilityDirectoryAdapterTest {
     @Test
     void mapsHoldWithoutApplyingBufferOrCheckingAvailability() {
         var command = HoldReservationCommand.from(41L, START, END, Duration.ofHours(2), " booking-code ");
-        var ref = new ReservationRef(91L, "KL-ABC123");
+        var ref = new ReservationRef(91L, "KL-ABC123", START.plusSeconds(3600));
         when(holds.hold(command)).thenReturn(ref);
         assertSame(ref, directory.hold(41L, PERIOD, Duration.ofHours(2), " booking-code "));
         verify(holds).hold(command);
@@ -93,7 +93,7 @@ class AvailabilityDirectoryAdapterTest {
         var period = kind == BlockKind.COMPLIANCE_HOLD ? new Period(START, null) : PERIOD;
         var command = BlockReservationCommand.from(41L, START, period.endExclusive(),
                 ReservationKind.valueOf(kind.name()), " Scheduled work ");
-        var ref = new ReservationRef(92L, "KL-DEF456");
+        var ref = new ReservationRef(92L, "KL-DEF456", null);
         when(blocks.block(command)).thenReturn(ref);
         assertSame(ref, directory.block(41L, period, kind, " Scheduled work "));
         verify(blocks).block(command);

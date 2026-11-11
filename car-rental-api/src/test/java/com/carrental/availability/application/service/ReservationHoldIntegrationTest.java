@@ -85,6 +85,7 @@ class ReservationHoldIntegrationTest {
             assertEquals(created, rs.getObject("status_changed_at", OffsetDateTime.class).toInstant());
             assertEquals(created.plus(Duration.ofMinutes(90)),
                     rs.getObject("hold_expires_at", OffsetDateTime.class).toInstant());
+            assertEquals(rs.getObject("hold_expires_at", OffsetDateTime.class).toInstant(), ref.holdExpiresAt());
             assertTrue(rs.getBoolean("start_inclusive"));
             assertFalse(rs.getBoolean("end_inclusive"));
             return rs.getLong("id");

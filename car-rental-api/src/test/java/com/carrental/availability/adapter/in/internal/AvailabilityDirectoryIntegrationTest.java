@@ -95,6 +95,7 @@ class AvailabilityDirectoryIntegrationTest {
         assertTrue(ref.code().matches("KL-[A-Z0-9]{6}"));
         var original = reads.loadAggregate(ref.code()).orElseThrow();
         assertEquals(ReservationStatus.HELD, original.status());
+        assertEquals(original.holdExpiresAt(), ref.holdExpiresAt());
         assertEquals(NOW.plus(Duration.ofMinutes(79)), original.holdExpiresAt());
         assertEquals(END.plusSeconds(7200), original.period().endExclusive());
         directory.confirm(ref.code());
@@ -131,6 +132,7 @@ class AvailabilityDirectoryIntegrationTest {
     void storesAndCompletesFiniteBlockKinds(BlockKind kind) {
         var ref = directory.block(VEHICLE_ID, PERIOD, kind, " Scheduled work ");
         var stored = reads.loadAggregate(ref.code()).orElseThrow();
+        assertNull(ref.holdExpiresAt());
         assertEquals(ReservationKind.valueOf(kind.name()), stored.kind());
         assertEquals(ReservationStatus.BLOCKED, stored.status());
         assertEquals(" Scheduled work ", stored.reason());

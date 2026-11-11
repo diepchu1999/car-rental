@@ -60,7 +60,7 @@ class ReservationBlockServiceTest {
     void createsBlockedWithoutHoldPolicyOrBuffer(ReservationKind kind) {
         BlockReservationCommand command = command(kind, kind == ReservationKind.COMPLIANCE_HOLD ? null : END);
         when(writes.insert(any(Reservation.class))).thenReturn(OptionalLong.of(91L));
-        assertEquals(new ReservationRef(91L, CODES.getFirst()), service.block(command));
+        assertEquals(new ReservationRef(91L, CODES.getFirst(), null), service.block(command));
         assertStoredFields(command, capturedWrites(1).getFirst(), CODES.getFirst());
         verify(clock).instant();
         verify(codes).generate("KL");
@@ -86,7 +86,7 @@ class ReservationBlockServiceTest {
         when(writes.insert(any(Reservation.class))).thenAnswer(invocation ->
                 count[0]++ < collisions ? OptionalLong.empty() : OptionalLong.of(91L));
         BlockReservationCommand command = command(ReservationKind.COMPLIANCE_HOLD, null);
-        assertEquals(new ReservationRef(91L, CODES.get(collisions)), service.block(command));
+        assertEquals(new ReservationRef(91L, CODES.get(collisions), null), service.block(command));
         List<Reservation> attempts = capturedWrites(collisions + 1);
         for (int index = 0; index < attempts.size(); index++) {
             assertStoredFields(command, attempts.get(index), CODES.get(index));
