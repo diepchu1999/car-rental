@@ -87,6 +87,12 @@ public enum ErrorCode {
     /** BR-120: khách thiếu bằng chứng đồng ý điều khoản hợp lệ. */
     CONSENT_REQUIRED("Valid consent to the terms is required."),
 
+    /** BR-131: CSDL từ chối đơn chờ thứ hai của cùng khách; trả 409. */
+    BOOKING_PENDING_PAYMENT_EXISTS("The customer already has a booking awaiting deposit payment."),
+
+    /** api-guideline §5: key còn hạn đã được dùng với nội dung khác; trả 409. */
+    IDEMPOTENCY_KEY_REUSED("The idempotency key was already used with a different request."),
+
     /** Báo giá không tồn tại khi đọc theo BR-122. */
     QUOTE_NOT_FOUND("The requested quote was not found."),
 
