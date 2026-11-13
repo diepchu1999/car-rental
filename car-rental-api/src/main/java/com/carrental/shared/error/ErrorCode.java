@@ -87,6 +87,9 @@ public enum ErrorCode {
     /** BR-120: khách thiếu bằng chứng đồng ý điều khoản hợp lệ. */
     CONSENT_REQUIRED("Valid consent to the terms is required."),
 
+    /** Đơn không tồn tại hoặc không thuộc khách đang gọi; trả 404 theo security-guideline §2. */
+    BOOKING_NOT_FOUND("The booking was not found."),
+
     /** BR-131: CSDL từ chối đơn chờ thứ hai của cùng khách; trả 409. */
     BOOKING_PENDING_PAYMENT_EXISTS("The customer already has a booking awaiting deposit payment."),
 

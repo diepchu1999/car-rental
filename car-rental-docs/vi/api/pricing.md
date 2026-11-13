@@ -151,6 +151,10 @@ Cổng nội bộ `pricing.api.QuoteDirectory.getForBooking(code, customerAccoun
 `QUOTE_NOT_FOUND`; đúng chủ nhưng `at >= expiresAt` → `422 QUOTE_EXPIRED`. Trả snapshot đã lưu,
 không đọc lại cấu hình, không tính lại giá và không tự giữ chỗ. Cổng này không phải endpoint REST mới.
 
+Để đặt xe bằng báo giá, dùng [`POST /api/v1/client/bookings`](booking.md) với body `quoteCode`
+và header `Idempotency-Key`. Booking mới kiểm lại chủ/hạn, giấy tờ, điều kiện thuê và giữ chỗ;
+không dùng GET báo giá như một cam kết xe còn trống. Cọc và phần còn lại xuất hiện trên response đơn.
+
 Snapshot lưu giá ngày, tập cuối tuần, hai mức tăng, cách tính/giá trị/số ngày bảo hiểm và hạn dùng;
 từng dòng lưu loại ngày/mức tăng đã áp. Không lưu toàn bộ lịch lễ vào mỗi báo giá; lịch sử lễ thuộc ADR-0013.
 Không có endpoint cập nhật báo giá. V009 cũng chặn UPDATE header/dòng đã lưu tại CSDL.

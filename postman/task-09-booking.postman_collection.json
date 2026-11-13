@@ -1227,6 +1227,1857 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Part 3.5 - Create and read booking",
+      "description": "BR-102/104/106/122/131/201. Chạy riêng A → B → C → D bằng Runner, một iteration, chọn đúng token từng folder. A/D: ADMIN thuần; B: CUSTOMER A đã có CCCD/GPLX VERIFIED còn hạn tới cuối chuyến, chưa có đơn PENDING_PAYMENT trước lần chạy đầu; C: CUSTOMER B khác A. B lưu key/báo giá/kết quả theo mã tài khoản, chạy lại dùng key cũ trong 24 giờ; bật Keep variable values trong Runner. Không xoá biến state sau khi đã tạo đơn. Sau 24 giờ dùng khách thử đủ điều kiện khác cho tới khi có luồng huỷ/hết hạn đơn ở Phần 4. Nếu lần đầu dừng sau tạo báo giá quá 15 phút, xem QUOTE_EXPIRED rồi xử lý báo giá hết hạn trước khi chạy tiếp. Không sửa hoặc xoá row CSDL để né BR-131. Không Share/Sync token.",
+      "item": [
+        {
+          "name": "A - ADMIN booking vehicle fixtures",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "admin-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 admin-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Check ADMIN identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+                "description": "BR-120/801: xác nhận tài khoản và vai trước khi chạy các request kế thừa cùng token."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9bIdentityChecked');",
+                      "const guid = pm.variables.replaceIn('{{$guid}}'); pm.collectionVariables.set('t9bRun', guid);",
+                      "const vn = new Date(Date.now()+7*3600000); vn.setUTCDate(vn.getUTCDate()+2); vn.setUTCHours(10,0,0,0); const start = new Date(vn.getTime()-7*3600000);",
+                      "pm.collectionVariables.set('t9bStart', start.toISOString()); pm.collectionVariables.set('t9bEnd', new Date(start.getTime()+86400000).toISOString());",
+                      "const expiry = new Date(start); expiry.setUTCFullYear(expiry.getUTCFullYear()+3); pm.collectionVariables.set('t9bDocumentExpiry',expiry.toISOString().slice(0,10));"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "const correct = b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('ADMIN');",
+                      "pm.test('Expected identity and role', () => pm.expect(Boolean(correct)).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Select the expected account token and restart this folder.'); }",
+                      "pm.variables.set('t9bIdentityChecked',true);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Create branch",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/branches",
+                "description": "BR-807/808: chi nhánh fixture không cần gán quản lý.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"latitude\": 10.76,\n  \"longitude\": 106.66,\n  \"name\": \"T09-Booking-{{t9bRun}}\",\n  \"address\": \"Local test address\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Branch business code', () => pm.expect(b.data.code).to.match(/^CN-[A-Z0-9]{6}$/)); pm.collectionVariables.set('t9bBranch',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Create vehicle 1",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/vehicles",
+                "description": "BR-001/005/018: tạo xe công ty, đủ giá và giấy tờ fixture.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"plateNumber\": \"T09-B1-{{t9bRun}}\",\n  \"branchCode\": \"{{t9bBranch}}\",\n  \"fuelType\": \"PETROL\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"T09-Booking-{{t9bRun}}\",\n  \"dailyRate\": 1000000,\n  \"inspectionExpiresOn\": \"{{t9bDocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{t9bDocumentExpiry}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Draft vehicle', () => { pm.expect(b.data.code).to.match(/^XE-[A-Z0-9]{6}$/); pm.expect(b.data.status).to.equal('DRAFT'); }); pm.collectionVariables.set('t9bVehicle1',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 - submit-for-approval vehicle 1",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/vehicles/{{t9bVehicle1}}/submit-for-approval",
+                "description": "BR-005: đi đúng vòng đời xe trước khi báo giá."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Vehicle status', () => pm.expect(b.data.status).to.equal('PENDING_APPROVAL'));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "05 - approve vehicle 1",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/vehicles/{{t9bVehicle1}}/approve",
+                "description": "BR-005: đi đúng vòng đời xe trước khi báo giá."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Vehicle status', () => pm.expect(b.data.status).to.equal('ACTIVE'));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "06 - Create vehicle 2",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/vehicles",
+                "description": "BR-001/005/018: tạo xe công ty, đủ giá và giấy tờ fixture.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"plateNumber\": \"T09-B2-{{t9bRun}}\",\n  \"branchCode\": \"{{t9bBranch}}\",\n  \"fuelType\": \"PETROL\",\n  \"seats\": 5,\n  \"transmission\": \"AUTOMATIC\",\n  \"make\": \"Toyota\",\n  \"model\": \"T09-Booking-{{t9bRun}}\",\n  \"dailyRate\": 1000000,\n  \"inspectionExpiresOn\": \"{{t9bDocumentExpiry}}\",\n  \"liabilityInsuranceExpiresOn\": \"{{t9bDocumentExpiry}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Draft vehicle', () => { pm.expect(b.data.code).to.match(/^XE-[A-Z0-9]{6}$/); pm.expect(b.data.status).to.equal('DRAFT'); }); pm.collectionVariables.set('t9bVehicle2',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "07 - submit-for-approval vehicle 2",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/vehicles/{{t9bVehicle2}}/submit-for-approval",
+                "description": "BR-005: đi đúng vòng đời xe trước khi báo giá."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Vehicle status', () => pm.expect(b.data.status).to.equal('PENDING_APPROVAL'));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "08 - approve vehicle 2",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/vehicles/{{t9bVehicle2}}/approve",
+                "description": "BR-005: đi đúng vòng đời xe trước khi báo giá."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Vehicle status', () => pm.expect(b.data.status).to.equal('ACTIVE'));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "B - CUSTOMER A creates and reads booking",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Check eligible CUSTOMER A identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120/801: xác nhận tài khoản và vai trước khi chạy các request kế thừa cùng token."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9bIdentityChecked');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "const correct = b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('CUSTOMER') && Boolean(b.data.termsVersion);",
+                      "pm.test('Expected identity and role', () => pm.expect(Boolean(correct)).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Select the expected account token and restart this folder.'); }",
+                      "pm.variables.set('t9bIdentityChecked',true);",
+                      "for (const k of ['t9bVehicle1','t9bVehicle2','t9bStart','t9bEnd']) if (!pm.collectionVariables.get(k)) { pm.execution.setNextRequest(null); throw new Error('Run folder A first: missing '+k); }",
+                      "pm.collectionVariables.set('t9bOwnerA',b.data.code); const stateKey = 't9bState-'+b.data.code; pm.variables.set('t9bStateKey', stateKey);",
+                      "let state = JSON.parse(pm.collectionVariables.get(stateKey) || 'null');",
+                      "if (state && state.createdAt && Date.now() >= Date.parse(state.createdAt)+86400000) { pm.execution.setNextRequest(null); throw new Error('The saved idempotency key is older than 24 hours. Use a different eligible test customer until booking cancellation is available; do not delete the saved key or database rows.'); }",
+                      "if (!state) { state = {key:pm.variables.replaceIn('{{$guid}}')}; pm.collectionVariables.set(stateKey,JSON.stringify(state)); }",
+                      "pm.collectionVariables.set('t9bKey',state.key); if (state.quoteCode) pm.collectionVariables.set('t9bQuote',state.quoteCode);",
+                      "if (state.snapshot) { pm.collectionVariables.set('t9bBooking',state.snapshot.code); pm.collectionVariables.set('t9bSnapshot',JSON.stringify(state.snapshot)); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Create owned quote if needed",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes",
+                "description": "BR-122: tạo báo giá lần đầu; chạy lại dùng mã/key đã lưu để không tạo đơn chờ thứ hai.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"vehicleCode\": \"{{t9bVehicle1}}\",\n  \"startAt\": \"{{t9bStart}}\",\n  \"endAt\": \"{{t9bEnd}}\",\n  \"rentalType\": \"DAILY\",\n  \"driveMode\": \"SELF_DRIVE\",\n  \"pickupMethod\": \"BRANCH\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }",
+                      "const state = JSON.parse(pm.collectionVariables.get(pm.variables.get('t9bStateKey'))); if (state.quoteCode) pm.execution.skipRequest();"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Quote code', () => pm.expect(b.data.code).to.match(/^BG-[0-9]{4}-[A-Z0-9]{6}$/));",
+                      "const stateKey = pm.variables.get('t9bStateKey'); const state = JSON.parse(pm.collectionVariables.get(stateKey)); state.quoteCode=b.data.code; state.quoteSnapshot=b.data; pm.collectionVariables.set(stateKey,JSON.stringify(state)); pm.collectionVariables.set('t9bQuote',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Create or replay booking",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{t9bKey}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings",
+                "description": "BR-102/122/201: giữ chỗ và tạo đơn; key cùng chủ phát lại response đầu tiên trong 24 giờ.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quoteCode\": \"{{t9bQuote}}\",\n  \"totalAmount\": 1,\n  \"deposit\": 0,\n  \"customerAccountCode\": \"TK-FAKE01\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Booking contract without internal IDs', () => { pm.expect(b.data).to.have.all.keys('code','quoteCode','vehicleCode','branchCode','startAt','endAt','rentalType','driveMode','pickupMethod','lines','rentalAmount','insuranceFee','totalAmount','depositRatio','deposit','balance','status','holdExpiresAt','createdAt','statusChangedAt'); pm.expect(b.data.code).to.match(/^DT-[0-9]{4}-[A-Z0-9]{6}$/); pm.expect(b.data.branchCode).to.match(/^CN-[A-Z0-9]{6}$/); });",
+                      "pm.test('Frozen deposit and balance', () => { pm.expect(b.data.depositRatio).to.equal(0.3); pm.expect(b.data.deposit).to.equal(Math.round(b.data.totalAmount*0.3/1000)*1000); pm.expect(b.data.deposit+b.data.balance).to.equal(b.data.totalAmount); });",
+                      "pm.test('Pending booking with stored hold deadline', () => { pm.expect(b.data.status).to.equal('PENDING_PAYMENT'); pm.expect(Date.parse(b.data.holdExpiresAt)).to.be.above(Date.parse(b.data.createdAt)); });",
+                      "pm.test('Location uses business code', () => pm.expect(pm.response.headers.get('Location')).to.equal('/api/v1/client/bookings/'+b.data.code));",
+                      "const stateKey = pm.variables.get('t9bStateKey'); const state = JSON.parse(pm.collectionVariables.get(stateKey));",
+                      "pm.test('Quote snapshot is preserved', () => { for (const field of ['vehicleCode','startAt','endAt','rentalType','driveMode','pickupMethod','lines','rentalAmount','insuranceFee','totalAmount']) pm.expect(b.data[field]).to.deep.equal(state.quoteSnapshot[field]); });",
+                      "if (state.snapshot) pm.test('Same initial creation response', () => pm.expect(b.data).to.deep.equal(state.snapshot));",
+                      "state.snapshot=b.data; state.createdAt=b.data.createdAt; pm.collectionVariables.set(stateKey,JSON.stringify(state)); pm.collectionVariables.set('t9bBooking',b.data.code); pm.collectionVariables.set('t9bSnapshot',JSON.stringify(b.data));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 - Read own booking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9bBooking}}",
+                "description": "BR-122: chủ đọc snapshot đã lưu, không định giá lại."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Booking contract without internal IDs', () => { pm.expect(b.data).to.have.all.keys('code','quoteCode','vehicleCode','branchCode','startAt','endAt','rentalType','driveMode','pickupMethod','lines','rentalAmount','insuranceFee','totalAmount','depositRatio','deposit','balance','status','holdExpiresAt','createdAt','statusChangedAt'); pm.expect(b.data.code).to.match(/^DT-[0-9]{4}-[A-Z0-9]{6}$/); pm.expect(b.data.branchCode).to.match(/^CN-[A-Z0-9]{6}$/); });",
+                      "pm.test('Frozen deposit and balance', () => { pm.expect(b.data.depositRatio).to.equal(0.3); pm.expect(b.data.deposit).to.equal(Math.round(b.data.totalAmount*0.3/1000)*1000); pm.expect(b.data.deposit+b.data.balance).to.equal(b.data.totalAmount); });",
+                      "pm.test('Pending booking with stored hold deadline', () => { pm.expect(b.data.status).to.equal('PENDING_PAYMENT'); pm.expect(Date.parse(b.data.holdExpiresAt)).to.be.above(Date.parse(b.data.createdAt)); });",
+                      "pm.test('Stored creation snapshot', () => pm.expect(b.data).to.deep.equal(JSON.parse(pm.collectionVariables.get('t9bSnapshot'))));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "05 - Replay same key",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{t9bKey}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings",
+                "description": "api-guideline §5: cùng key và báo giá trả cùng mã/giá/hạn.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quoteCode\": \"{{t9bQuote}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Identical replay', () => pm.expect(b.data).to.deep.equal(JSON.parse(pm.collectionVariables.get('t9bSnapshot'))));",
+                      "pm.test('Same Location', () => pm.expect(pm.response.headers.get('Location')).to.equal('/api/v1/client/bookings/'+pm.collectionVariables.get('t9bBooking')));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "06 - Reject changed payload for same key",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{t9bKey}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings",
+                "description": "api-guideline §5: key đã dùng không được đổi báo giá, dù mã mới chưa tồn tại.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quoteCode\": \"BG-2611-CHANGE\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 409', () => pm.response.to.have.status(409));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 409) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Exact error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('IDEMPOTENCY_KEY_REUSED'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "07 - Reject missing idempotency key",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings",
+                "description": "api-guideline §5: thiếu key không được tạo đơn.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quoteCode\": \"{{t9bQuote}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 400) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Exact error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "08 - Reject invalid quote code",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings",
+                "description": "BR-122: cấu trúc mã báo giá sai bị chặn trước ghi dữ liệu.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quoteCode\": \"invalid\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 400', () => pm.response.to.have.status(400));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 400) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Exact error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('INVALID_REQUEST'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "09 - Quote another vehicle",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes",
+                "description": "BR-122/131: vẫn được hỏi giá xe khác khi có đơn chờ; báo giá không giữ chỗ.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"vehicleCode\": \"{{t9bVehicle2}}\",\n  \"startAt\": \"{{t9bStart}}\",\n  \"endAt\": \"{{t9bEnd}}\",\n  \"rentalType\": \"DAILY\",\n  \"driveMode\": \"SELF_DRIVE\",\n  \"pickupMethod\": \"BRANCH\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 201) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Different vehicle', () => pm.expect(b.data.vehicleCode).to.equal(pm.collectionVariables.get('t9bVehicle2'))); pm.collectionVariables.set('t9bSecondQuote',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "10 - Reject second pending booking",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings",
+                "description": "BR-131: key mới và xe khác vẫn không tạo được đơn chờ thứ hai.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quoteCode\": \"{{t9bSecondQuote}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 409', () => pm.response.to.have.status(409));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 409) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Exact error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('BOOKING_PENDING_PAYMENT_EXISTS'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "11 - Reject unknown booking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/DT-2611-MISS99",
+                "description": "security-guideline §2: mã không tồn tại trả BOOKING_NOT_FOUND."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 404) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Exact error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('BOOKING_NOT_FOUND'); });"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "C - CUSTOMER B cannot access A booking",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Check different CUSTOMER B identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120/801: xác nhận tài khoản và vai trước khi chạy các request kế thừa cùng token."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9bIdentityChecked');",
+                      "for (const k of ['t9bOwnerA','t9bBooking','t9bQuote']) if (!pm.collectionVariables.get(k)) throw new Error('Run folder B first: missing '+k);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "const correct = b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('CUSTOMER') && Boolean(b.data.termsVersion);",
+                      "pm.test('Expected identity and role', () => pm.expect(Boolean(correct)).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Select the expected account token and restart this folder.'); }",
+                      "pm.variables.set('t9bIdentityChecked',true);",
+                      "const different = b.data.code !== pm.collectionVariables.get('t9bOwnerA'); pm.test('Different customer', () => pm.expect(different).to.equal(true)); if (!different) { pm.execution.setNextRequest(null); throw new Error('Choose a customer other than A.'); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Hide A booking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9bBooking}}",
+                "description": "security-guideline §2: khách B không đọc đơn của A."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 404) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Exact error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('BOOKING_NOT_FOUND'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Reject A quote for booking",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings",
+                "description": "BR-122: chỉ chủ được dùng báo giá; kiểm chủ trước hạn và giấy tờ.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quoteCode\": \"{{t9bQuote}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 404) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Exact error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('QUOTE_NOT_FOUND'); });"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "D - Reject non-customer access",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "admin-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 admin-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Check ADMIN identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+                "description": "BR-120/801: xác nhận tài khoản và vai trước khi chạy các request kế thừa cùng token."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9bIdentityChecked');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "const correct = b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('ADMIN');",
+                      "pm.test('Expected identity and role', () => pm.expect(Boolean(correct)).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error('Select the expected account token and restart this folder.'); }",
+                      "pm.variables.set('t9bIdentityChecked',true);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Reject admin booking read",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9bBooking}}",
+                "description": "BR-801: ADMIN thuần không có quyền khách."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 403) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Exact error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Reject admin booking create",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{$guid}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings",
+                "description": "BR-801: không tạo đơn thay khách bằng token ADMIN thuần.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quoteCode\": \"{{t9bQuote}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9bIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from its account check with the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 403) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Exact error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 - Reject unauthenticated read",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9bBooking}}",
+                "description": "security-guideline §2: không có token phải từ chối.",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 401) { pm.execution.setNextRequest(null); throw new Error('Unexpected HTTP status; inspect the response before continuing.'); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Exact error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('UNAUTHENTICATED'); });"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }

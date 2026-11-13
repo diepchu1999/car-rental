@@ -1,0 +1,43 @@
+package com.carrental.booking.adapter.in.rest.client;
+
+import com.carrental.booking.adapter.in.rest.client.request.CreateBookingRequest;
+import com.carrental.booking.adapter.in.rest.client.response.BookingResponse;
+import com.carrental.booking.application.command.CreateBookingCommand;
+import com.carrental.booking.application.port.in.CreateBookingUseCase;
+import com.carrental.booking.application.port.in.GetBookingUseCase;
+import com.carrental.booking.application.query.GetBookingQuery;
+import com.carrental.shared.api.ApiResponse;
+import java.net.URI;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+/** API khách tạo/đọc đơn; BR-103/122/131 được thực hiện trong use case, không ở controller. */
+@RestController
+@RequestMapping(path = ClientBookingController.BASE_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
+class ClientBookingController {
+    static final String BASE_PATH = "/api/v1/client/bookings";
+    private final CreateBookingUseCase create;
+    private final GetBookingUseCase get;
+
+    /** Chỉ nhận port/in, không gọi JDBC hoặc module khác ở biên HTTP. */
+    ClientBookingController(CreateBookingUseCase create, GetBookingUseCase get) {
+        this.create = create;
+        this.get = get;
+    }
+
+    /** Tạo hoặc phát lại kết quả ban đầu, cùng 201 và Location theo api-guideline §5. */
+    @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<ApiResponse<BookingResponse>> create(@RequestBody CreateBookingRequest request,
+            @RequestHeader("Idempotency-Key") String key) {
+        var detail = create.create(CreateBookingCommand.from(request.quoteCode(), key));
+        return ResponseEntity.created(URI.create(BASE_PATH + "/" + detail.code()))
+                .body(ApiResponse.success(BookingResponse.fromDomain(detail)));
+    }
+
+    /** Chỉ chủ đọc được; GET trả trạng thái hiện tại và không tự chuyển trạng thái theo đồng hồ. */
+    @GetMapping("/{code}")
+    public ApiResponse<BookingResponse> get(@PathVariable("code") String code) {
+        return ApiResponse.success(BookingResponse.fromDomain(get.get(GetBookingQuery.from(code))));
+    }
+}
