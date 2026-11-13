@@ -1,6 +1,7 @@
 package com.carrental.booking.adapter.out.persistence;
 
 import com.carrental.booking.domain.*;
+import com.carrental.booking.application.view.BookingListItem;
 import com.carrental.shared.rental.DriveMode;
 import com.carrental.shared.rental.PickupMethod;
 import com.carrental.shared.rental.RentalType;
@@ -17,6 +18,11 @@ import org.springframework.jdbc.core.RowMapper;
 
 /** Khôi phục nguyên snapshot đã lưu; không gọi pricing/rental/config (ADR-0014). */
 final class BookingRowMappers {
+    static final RowMapper<BookingListItem> LIST_ITEM = (rs, row) -> new BookingListItem(
+            rs.getString("code"), rs.getString("vehicle_code"), rs.getString("branch_code"),
+            instant(rs, "start_at"), instant(rs, "end_at"), BookingStatus.valueOf(rs.getString("status")),
+            rs.getLong("total_amount"), rs.getLong("deposit"), rs.getLong("balance"),
+            instant(rs, "hold_expires_at"), instant(rs, "created_at"));
     static final RowMapper<Header> HEADER = BookingRowMappers::header;
     static final RowMapper<BookingPriceLine> LINE = (rs, row) -> new BookingPriceLine(
             rs.getString("type"), rs.getString("day_type"), instant(rs, "start_at"), rs.getInt("hours"),

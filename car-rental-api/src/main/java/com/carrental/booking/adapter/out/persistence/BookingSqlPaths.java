@@ -7,6 +7,7 @@ final class BookingSqlPaths {
     static final String INSERT_CREATED = "sql/booking/insert_booking_created_history.sql";
     static final String FIND_OWNED = "sql/booking/find_owned_booking.sql";
     static final String FIND_LINES = "sql/booking/find_booking_lines.sql";
+    static final String SEARCH_OWNED = "sql/booking/search_owned_bookings.sql";
     static final String CLAIM_KEY = "sql/booking/claim_booking_idempotency.sql";
     static final String LOCK_KEY = "sql/booking/lock_booking_idempotency.sql";
     static final String REPLACE_KEY_BOOKING = "sql/booking/replace_claimed_booking_code.sql";
