@@ -2,6 +2,7 @@ package com.carrental.booking.adapter.in.rest.client;
 
 import com.carrental.PostgresTestConfiguration;
 import com.carrental.booking.application.port.out.ReadBookingPort;
+import com.carrental.booking.adapter.out.persistence.BookingListTestFixture;
 import com.carrental.identity.adapter.out.persistence.BookingEligibilityTestFixture;
 import com.carrental.identity.config.HttpIdentityTestConfiguration;
 import com.carrental.identity.config.HttpIdentityTestConfiguration.TestJwtIssuer;
@@ -42,7 +43,7 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "car-rental.availability.hold-duration=PT37M")
 @Import({PostgresTestConfiguration.class, HttpIdentityTestConfiguration.class,
-        BookingEligibilityTestFixture.class, BookingApiIntegrationTest.ApiConfiguration.class})
+        BookingEligibilityTestFixture.class, BookingListTestFixture.class, BookingApiIntegrationTest.ApiConfiguration.class})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class BookingApiIntegrationTest {
     private static final String PATH = "/api/v1/client/bookings";
@@ -52,6 +53,7 @@ class BookingApiIntegrationTest {
     @Autowired private TestJwtIssuer tokens;
     @Autowired private ObjectMapper mapper;
     @Autowired private BookingEligibilityTestFixture documents;
+    @Autowired private BookingListTestFixture bookingLists;
     @Autowired private ReadBookingPort reads;
     @Autowired private ReadVehiclePort vehicles;
     @Autowired private NamedParameterJdbcTemplate jdbc;
@@ -91,6 +93,12 @@ class BookingApiIntegrationTest {
         assertEquals("PENDING_PAYMENT", created.path("status").asString());
         assertEquals(NOW.plusSeconds(2220), Instant.parse(created.path("holdExpiresAt").asString()));
         assertEquals(created, bookingSuccess(send("GET", PATH + "/" + code, null, owner.token(), null), 200));
+        var listed = pageSuccess(send("GET", PATH, null, owner.token(), null));
+        assertEquals(1, listed.path("items").size());
+        var summary = listed.path("items").get(0);
+        for (String field : summary.propertyNames()) assertEquals(created.path(field), summary.path(field), field);
+        assertFalse(listed.path("hasMore").booleanValue());
+        assertTrue(listed.path("nextCursor").isNull());
         var replay = send("POST", PATH, Map.of("quoteCode", quote.path("code").asString()), owner.token(), key);
         assertEquals(created, bookingSuccess(replay, 201));
         assertEquals(createdResponse.headers().firstValue("Location"), replay.headers().firstValue("Location"));
@@ -215,6 +223,109 @@ class BookingApiIntegrationTest {
             error(send("POST", PATH, body, owner.token(), "input-test"), 400, "INVALID_REQUEST");
         }
         error(send("POST", PATH, null, owner.token(), "input-test"), 400, "INVALID_REQUEST");
+    }
+
+    /** HTTP thật nối trang theo mã, giữ snapshot và không lộ chủ khác dù có nhiều đơn cùng mốc. */
+    @Test
+    void paginatesOwnedHistoryThroughHttp() throws Exception {
+        var owner = customer(false, "B", "2025-01-01");
+        var other = customer(false, "B", "2025-01-01");
+        var at = NOW.minusSeconds(86400).plusNanos(123456000);
+        String oldest = bookingLists.cancelled(owner.code(), at.minusSeconds(1));
+        String middle = bookingLists.cancelled(owner.code(), at);
+        String newest = bookingLists.cancelled(owner.code(), at);
+        bookingLists.cancelled(other.code(), NOW);
+        var first = pageSuccess(send("GET", PATH + "?limit=2", null, owner.token(), null));
+        assertEquals(List.of(newest, middle), pageCodes(first));
+        assertTrue(first.path("hasMore").booleanValue());
+        String cursor = first.path("nextCursor").asString();
+        // Dữ liệu mới trước cursor chỉ xuất hiện khi tải lại trang đầu, không đẩy lặp hàng cũ.
+        bookingLists.cancelled(owner.code(), NOW);
+        var last = pageSuccess(send("GET", PATH + "?limit=1&cursor=" + cursor, null, owner.token(), null));
+        assertEquals(List.of(oldest), pageCodes(last));
+        assertFalse(last.path("hasMore").booleanValue());
+        assertTrue(last.path("nextCursor").isNull());
+        var item = first.path("items").get(0);
+        assertEquals("CANCELLED", item.path("status").asString());
+        assertEquals(at, Instant.parse(item.path("createdAt").asString()));
+        assertEquals(1_100_000L, item.path("totalAmount").longValue());
+        assertEquals(330_000L, item.path("deposit").longValue());
+        assertEquals(770_000L, item.path("balance").longValue());
+        error(send("GET", PATH + "?cursor=" + cursor, null, other.token(), null), 400, "INVALID_REQUEST");
+        byte[] oldVersion = Base64.getUrlDecoder().decode(cursor);
+        oldVersion[0] = 0;
+        error(send("GET", PATH + "?cursor=" + Base64.getUrlEncoder().withoutPadding().encodeToString(oldVersion),
+                null, owner.token(), null), 400, "INVALID_REQUEST");
+    }
+
+    /** Giới hạn mặc định thực sự là 20 ở HTTP; 100 hợp lệ và không trả metadata tổng giả. */
+    @Test
+    void appliesDefaultLimitAndAcceptsMaximumThroughHttp() throws Exception {
+        var owner = customer(false, "B", "2025-01-01");
+        for (int i = 0; i < 21; i++) bookingLists.cancelled(owner.code(), NOW.minusSeconds(i));
+        var first = pageSuccess(send("GET", PATH, null, owner.token(), null));
+        assertEquals(20, first.path("items").size());
+        assertTrue(first.path("hasMore").booleanValue());
+        var all = pageSuccess(send("GET", PATH + "?limit=100", null, owner.token(), null));
+        assertEquals(21, all.path("items").size());
+        assertFalse(all.path("hasMore").booleanValue());
+    }
+
+    /** Không bắt khách có giấy tờ hoặc có đơn mới được đọc trang rỗng của chính mình. */
+    @Test
+    void returnsEmptyHistoryWithoutVerifiedDocuments() throws Exception {
+        var owner = customer(false, "B", "2025-01-01");
+        var page = pageSuccess(send("GET", PATH, null, owner.token(), null));
+        assertTrue(page.path("items").isEmpty());
+        assertFalse(page.path("hasMore").booleanValue());
+        assertTrue(page.path("nextCursor").isNull());
+    }
+
+    /** Không âm thầm bỏ bộ lọc lạ, chọn một giá trị trong tham số lặp hoặc cắt limit quá lớn. */
+    @ParameterizedTest
+    @ValueSource(strings = {"limit=0", "limit=-1", "limit=101", "limit=2147483648", "limit=abc", "limit=1.5",
+            "limit=", "limit=%20", "limit=1&limit=2", "cursor=", "cursor=%20", "cursor=broken",
+            "cursor=one&cursor=two", "customerAccountCode=TK-OTHER1", "status=CANCELLED"})
+    void rejectsInvalidListParameters(String query) throws Exception {
+        var owner = customer(false, "B", "2025-01-01");
+        error(send("GET", PATH + "?" + query, null, owner.token(), null), 400, "INVALID_REQUEST");
+    }
+
+    /** Namespace danh sách dùng cùng bảo vệ JWT/CUSTOMER như đọc chi tiết. */
+    @Test
+    void rejectsUnauthenticatedAndStaffListRequests() throws Exception {
+        error(send("GET", PATH, null, null, null), 401, "UNAUTHENTICATED");
+        for (String token : List.of(tokens.adminToken(clock), tokens.branchStaffToken(clock), tokens.documentVerifierToken(clock))) {
+            error(send("GET", PATH, null, token, null), 403, "ACCESS_DENIED");
+        }
+    }
+
+    /** Khoá danh sách trường công khai; mọi item phải là tóm tắt không chứa ID số. */
+    private JsonNode pageSuccess(HttpResponse<String> response) {
+        var page = success(response, 200);
+        assertEquals(Set.of("items", "nextCursor", "hasMore"), Set.copyOf(page.propertyNames()));
+        assertTrue(page.path("items").isArray());
+        assertTrue(page.path("hasMore").isBoolean());
+        if (page.path("hasMore").booleanValue()) {
+            assertFalse(page.path("items").isEmpty());
+            assertTrue(page.path("nextCursor").isString());
+            assertFalse(page.path("nextCursor").asString().isBlank());
+        } else assertTrue(page.path("nextCursor").isNull());
+        for (var item : page.path("items")) {
+            assertEquals(Set.of("code", "vehicleCode", "branchCode", "startAt", "endAt", "status", "totalAmount",
+                    "deposit", "balance", "holdExpiresAt", "createdAt"), Set.copyOf(item.propertyNames()));
+            assertTrue(item.path("code").asString().matches("DT-[0-9]{4}-[A-Z0-9]{6}"));
+            assertTrue(item.path("vehicleCode").asString().matches("XE-[A-Z0-9]{6}"));
+            assertTrue(item.path("branchCode").asString().matches("CN-[A-Z0-9]{6}"));
+        }
+        return page;
+    }
+
+    /** Lấy mã đúng thứ tự HTTP mà không dựa vào ID của hàng SQL. */
+    private List<String> pageCodes(JsonNode page) {
+        var codes = new ArrayList<String>();
+        for (var item : page.path("items")) codes.add(item.path("code").asString());
+        return codes;
     }
 
     /** Tạo tài khoản bằng HTTP rồi gắn metadata giả, không giả CallerDirectory hay bỏ consent. */

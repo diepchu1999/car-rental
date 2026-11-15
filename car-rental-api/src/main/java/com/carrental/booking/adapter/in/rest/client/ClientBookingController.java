@@ -2,14 +2,18 @@ package com.carrental.booking.adapter.in.rest.client;
 
 import com.carrental.booking.adapter.in.rest.client.request.CreateBookingRequest;
 import com.carrental.booking.adapter.in.rest.client.response.BookingResponse;
+import com.carrental.booking.adapter.in.rest.client.response.SearchBookingsResponse;
+import com.carrental.booking.adapter.in.rest.client.query.SearchBookingsParameters;
 import com.carrental.booking.application.command.CreateBookingCommand;
 import com.carrental.booking.application.port.in.CreateBookingUseCase;
 import com.carrental.booking.application.port.in.GetBookingUseCase;
+import com.carrental.booking.application.port.in.SearchBookingsUseCase;
 import com.carrental.booking.application.query.GetBookingQuery;
 import com.carrental.shared.api.ApiResponse;
 import java.net.URI;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
 /** API khách tạo/đọc đơn; BR-103/122/131 được thực hiện trong use case, không ở controller. */
@@ -19,11 +23,13 @@ class ClientBookingController {
     static final String BASE_PATH = "/api/v1/client/bookings";
     private final CreateBookingUseCase create;
     private final GetBookingUseCase get;
+    private final SearchBookingsUseCase search;
 
     /** Chỉ nhận port/in, không gọi JDBC hoặc module khác ở biên HTTP. */
-    ClientBookingController(CreateBookingUseCase create, GetBookingUseCase get) {
+    ClientBookingController(CreateBookingUseCase create, GetBookingUseCase get, SearchBookingsUseCase search) {
         this.create = create;
         this.get = get;
+        this.search = search;
     }
 
     /** Tạo hoặc phát lại kết quả ban đầu, cùng 201 và Location theo api-guideline §5. */
@@ -39,5 +45,12 @@ class ClientBookingController {
     @GetMapping("/{code}")
     public ApiResponse<BookingResponse> get(@PathVariable("code") String code) {
         return ApiResponse.success(BookingResponse.fromDomain(get.get(GetBookingQuery.from(code))));
+    }
+
+    /** BR-122: trả trang đơn riêng từ snapshot; chủ và vị trí trang được kiểm trong use case. */
+    @GetMapping
+    public ApiResponse<SearchBookingsResponse> search(@RequestParam MultiValueMap<String, String> parameters) {
+        return ApiResponse.success(SearchBookingsResponse.fromDomain(
+                search.search(SearchBookingsParameters.toQuery(parameters))));
     }
 }

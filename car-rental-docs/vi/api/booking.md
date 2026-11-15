@@ -21,6 +21,7 @@ Gửi `Authorization: Bearer <access-token>`, `X-Client-Platform`, `X-Client-Ver
 |---|---|---|
 | POST | `/api/v1/client/bookings` | 201, Location theo mã đơn; phát lại cũng 201 |
 | GET | `/api/v1/client/bookings/{code}` | 200, trạng thái hiện tại và snapshot đã lưu |
+| GET | `/api/v1/client/bookings` | 200, trang đơn riêng của khách theo cursor |
 
 Mã `DT-<yymm>-<6>` dùng tháng tạo theo giờ Việt Nam. Không đưa ID số lên URL hoặc response.
 Hiện hỗ trợ `HOURLY`/`DAILY`, `SELF_DRIVE`, nhận/trả tại `BRANCH` theo lựa chọn trong báo giá.
@@ -106,11 +107,66 @@ GET trả cùng cấu trúc response, nhưng `status`/`statusChangedAt` là **tr
 Không tự huỷ theo đồng hồ, gia hạn hold, gọi lại pricing hoặc kiểm lại giấy tờ. Đơn hết hạn giữ chỗ vẫn đọc được.
 Kiểm chủ trong SQL trước khi đọc dòng giá. Mã có nội dung được tra nguyên văn, không đổi hoa thường/cắt khoảng trắng.
 
+## Danh sách đơn của khách
+
+`GET /api/v1/client/bookings?limit=20` dùng cùng quyền CUSTOMER và consent như đọc chi tiết.
+Không yêu cầu giấy tờ vẫn còn hạn để đọc lịch sử. Không nhận mã tài khoản từ client; chủ lấy từ
+CallerDirectory và được lọc ngay trong SQL (security-guideline §2).
+
+| Query | Bắt buộc | Ý nghĩa |
+|---|---|---|
+| `limit` | Không | Số nguyên 1–100, mặc định 20 khi không gửi. Vượt 100 trả 400, không cắt ngầm |
+| `cursor` | Không | Chuỗi opaque từ `nextCursor` của trang trước; bỏ hẳn tham số để tải trang đầu |
+
+Tham số rỗng/trắng, lặp tên, sai kiểu hoặc tên ngoài hai trường trên đều trả `400 INVALID_REQUEST`.
+Chưa có bộ lọc trạng thái, offset hoặc lựa chọn sắp xếp. Trả tất cả trạng thái đang được lưu,
+bao gồm đơn CANCELLED và đơn có hạn giữ chỗ đã qua; không tự đổi trạng thái khi đọc.
+
+Thứ tự **`createdAt` giảm dần, rồi mã đơn giảm dần** khi trùng thời điểm. Cursor không chứa khóa chính
+số và chỉ dùng cho cùng khách; cursor hỏng, sai phiên bản hoặc của khách khác trả `400 INVALID_REQUEST`.
+Client truyền nguyên cursor, không tự giải mã/tạo cursor. Có thể đổi `limit` giữa hai trang.
+
+Response 200:
+
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "code": "DT-2611-9M2Q4A",
+        "vehicleCode": "XE-8KQ4M2",
+        "branchCode": "CN-3ZP5K8",
+        "startAt": "2026-11-13T03:00:00Z",
+        "endAt": "2026-11-14T03:00:00Z",
+        "status": "PENDING_PAYMENT",
+        "totalAmount": 1100000,
+        "deposit": 330000,
+        "balance": 770000,
+        "holdExpiresAt": "2026-11-10T04:00:00Z",
+        "createdAt": "2026-11-10T03:00:00Z"
+      }
+    ],
+    "nextCursor": null,
+    "hasMore": false
+  },
+  "error": null
+}
+```
+
+Tiền là snapshot đã lưu theo BR-122, cùng giá trị với GET chi tiết; không tính lại từ giá xe hiện tại.
+Danh sách không chứa dòng giá, ID số, chủ nội bộ, mã khóa lịch hoặc tham số cấu hình.
+Khi còn hàng, `hasMore=true` và `nextCursor` là chuỗi; dùng nó cho lần GET kế tiếp.
+Khi hết hàng, `hasMore=false`, `nextCursor=null`. Khách chưa có đơn nhận `items=[]`, không phải 404.
+
+Phân trang không đóng băng cả tập kết quả: đơn mới nằm trước cursor xuất hiện khi tải lại trang đầu.
+Mỗi trang phản ánh dữ liệu tại lần đọc; không cam kết trạng thái bất biến giữa hai request.
+
 ## Mã lỗi
 
 | HTTP | `error.code` | Khi nào |
 |---|---|---|
-| 400 | INVALID_REQUEST | JSON sai, thiếu body/quoteCode/header key, key trắng, mã báo giá sai định dạng |
+| 400 | INVALID_REQUEST | JSON sai, thiếu body/quoteCode/header key, key trắng, mã báo giá sai định dạng; query danh sách sai/lặp/lạ, limit ngoài 1–100, cursor sai hoặc của chủ khác |
 | 401 | UNAUTHENTICATED | Thiếu token hoặc token không hợp lệ |
 | 403 | ACCESS_DENIED | Không có quyền CUSTOMER hoặc sai quyền namespace |
 | 403 | CONSENT_REQUIRED | Chưa có bằng chứng đồng ý điều khoản hợp lệ |
@@ -157,3 +213,18 @@ cho tới khi có luồng huỷ/hết hạn đơn; không xoá row để né BR-
 15 phút, API trả `QUOTE_EXPIRED`; đây là hạn nghiệp vụ, không nới hạn chỉ để test.
 Khoảng thuê sinh sau hai ngày lúc 10:00 giờ VN, trả sau 24 giờ; cần lịch lễ local đã khai báo tới ngày trả.
 Các request phá hoại phải xanh với đúng HTTP/mã lỗi, không chỉ bất kỳ 4xx nào.
+
+Folder **Part 3.6 - List own bookings** chỉ đọc và chạy lại được nhiều lần, không phụ thuộc key/báo giá
+còn hiệu lực. Chạy riêng A → B → C bằng Runner, một iteration, Keep variable values bật:
+
+- A: CUSTOMER đã có ít nhất một đơn, ví dụ khách A ở Phần 3.5. Tự đi hết từng trang (limit 1), so danh
+  sách với chi tiết, kiểm mặc định 20/biên 100 và các tham số sai. Không cần tạo đơn mới.
+- B: CUSTOMER khác A, có consent. Tự đi hết danh sách riêng, kiểm không chứa đơn A, không được tự khai
+  chủ bằng query, đọc mã đơn A phải 404. B có đơn riêng vẫn chạy được.
+- C: ADMIN thuần không kiêm CUSTOMER nhận 403; request No Auth nhận 401.
+
+Chọn token tại từng folder, chạy từ request kiểm danh tính; không chạy cả ba folder bằng cùng token.
+Request phân trang tự lặp trong Runner tới khi `hasMore=false`, nên tổng số lượt gửi có thể lớn hơn
+số request hiển thị. Các biến `t9l*` tự được tạo khi chạy A; không sửa/xóa state `t9bState-*` của phần trước.
+HTTP integration test kiểm riêng trường hợp chuyển trang với nhiều đơn cùng mốc và dùng cursor khác chủ;
+không sửa CSDL local hoặc tạo thêm đơn chờ chỉ để có nhiều trang demo.
