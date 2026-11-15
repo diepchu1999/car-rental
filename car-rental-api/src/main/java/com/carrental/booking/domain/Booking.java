@@ -1,10 +1,13 @@
 package com.carrental.booking.domain;
 
+import com.carrental.shared.error.DomainException;
+import com.carrental.shared.error.ErrorCode;
 import com.carrental.shared.rental.DriveMode;
 import com.carrental.shared.rental.PickupMethod;
 import com.carrental.shared.rental.RentalType;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * Đơn thuê và các giá trị đã đóng băng; không tự đọc cấu hình hoặc quyết định xe còn trống (BR-102/122).
@@ -63,6 +66,50 @@ public record Booking(String code, String customerAccountCode, String quoteCode,
         return new Booking(code, customerAccountCode, quoteCode, vehicleCode, branchCode, reservationCode,
                 startAt, endAt, rentalType, driveMode, pickupMethod, price, rentalTerms, holdExpiresAt,
                 BookingStatus.PENDING_PAYMENT, createdAt, createdAt);
+    }
+
+    /**
+     * BR-301, status-flow §1: khách chỉ huỷ đơn đang chờ trả cọc, kể cả khi job chưa xử lý hạn đã qua.
+     * Application phải kiểm chủ đơn và ghi việc nhả chỗ cùng transaction (BR-304).
+     * @param at mốc huỷ có độ chính xác micro giây, không trước lần đổi trạng thái gần nhất
+     * @return bản đã huỷ, giữ nguyên mọi giá trị đóng băng và hạn giữ chỗ
+     * @throws DomainException nếu đơn không còn chờ trả cọc, gồm cả lần huỷ lặp lại
+     */
+    public Booking cancel(Instant at) {
+        requireTransitionTimestamp(at);
+        if (status != BookingStatus.PENDING_PAYMENT) {
+            throw DomainException.ruleViolation(ErrorCode.BOOKING_INVALID_STATUS_TRANSITION);
+        }
+        return cancelledAt(at);
+    }
+
+    /**
+     * BR-103: huỷ đơn chờ ngay từ hạn đã lưu; không tính lại hạn bằng cấu hình hiện tại.
+     * Application phải ghi việc nhả chỗ cùng transaction cho riêng đơn này (BR-304).
+     * @param at mốc kiểm tra có độ chính xác micro giây, không trước lần đổi trạng thái gần nhất
+     * @return bản đã huỷ nếu đến hạn; rỗng nếu chưa đến hạn hoặc đơn đã được xử lý
+     */
+    public Optional<Booking> expire(Instant at) {
+        requireTransitionTimestamp(at);
+        if (status != BookingStatus.PENDING_PAYMENT || at.isBefore(holdExpiresAt)) {
+            return Optional.empty();
+        }
+        return Optional.of(cancelledAt(at));
+    }
+
+    /** Chỉ đổi trạng thái và mốc chuyển; không tính lại giá hoặc điều kiện của đơn (ADR-0014). */
+    private Booking cancelledAt(Instant at) {
+        return new Booking(code, customerAccountCode, quoteCode, vehicleCode, branchCode, reservationCode,
+                startAt, endAt, rentalType, driveMode, pickupMethod, price, rentalTerms, holdExpiresAt,
+                BookingStatus.CANCELLED, createdAt, at);
+    }
+
+    /** Chặn lỗi mốc thời gian do caller nội bộ cung cấp, không cho lịch sử trạng thái đi lùi. */
+    private void requireTransitionTimestamp(Instant at) {
+        requireTimestamp(at);
+        if (at.isBefore(statusChangedAt)) {
+            throw new IllegalArgumentException("Booking transition timestamp must not go backwards.");
+        }
     }
 
     /** Chặn mã hỏng mà không đưa giá trị đầu vào vào thông báo lỗi. */

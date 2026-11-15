@@ -93,6 +93,9 @@ public enum ErrorCode {
     /** BR-131: CSDL từ chối đơn chờ thứ hai của cùng khách; trả 409. */
     BOOKING_PENDING_PAYMENT_EXISTS("The customer already has a booking awaiting deposit payment."),
 
+    /** BR-301, status-flow §1: không cho huỷ đơn ngoài trạng thái chờ trả cọc; trả 422. */
+    BOOKING_INVALID_STATUS_TRANSITION("The booking status does not allow this operation."),
+
     /** api-guideline §5: key còn hạn đã được dùng với nội dung khác; trả 409. */
     IDEMPOTENCY_KEY_REUSED("The idempotency key was already used with a different request."),
 
