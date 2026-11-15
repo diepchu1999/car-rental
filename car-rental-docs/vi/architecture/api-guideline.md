@@ -113,6 +113,11 @@ Cursor cho danh sách lớn (kết quả tìm xe, lịch sử đơn). Offset ch�
 Kích thước trang: mặc định **20**, tối đa **100** — chung cho mọi danh sách. Vượt tối đa thì báo lỗi đầu
 vào, không tự cắt về 100: client tưởng đã nhận đủ trong khi bị cắt im lặng.
 
+## 8a. Đặc tả OpenAPI
+Backend sinh đặc tả OpenAPI từ code bằng **springdoc** (chốt 15/11/2026). Frontend sinh kiểu và client từ đặc tả
+này, không viết tay (frontend-guideline §3). Đặc tả là hợp đồng máy đọc; danh mục `../api/` là hợp đồng người đọc —
+hai thứ phải khớp.
+
 ## 9. Danh mục endpoint
 
 Danh mục endpoint được lưu trong `../api/`, theo từng module.

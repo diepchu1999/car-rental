@@ -27,6 +27,9 @@ Keycloak không hỗ trợ sẵn — phải viết Authenticator SPI bằng Java
   Keycloak sau proxy hay load balancer thì **phải** cấu hình Keycloak đọc IP từ header của proxy tin cậy,
   và chỉ từ proxy đó. Không làm thì mọi người dùng chung một IP, và giới hạn 20 lần gửi/giờ chặn cả hệ thống.
 
+### Token trên web
+Chỉ giữ trong bộ nhớ, làm mới bằng refresh token; không lưu `localStorage`/`sessionStorage` (frontend-guideline §6).
+
 ### Token trên mobile
 - Lưu ở **Keychain (iOS) / Keystore (Android)**. Không lưu ở AsyncStorage hay SharedPreferences.
 - Refresh token có xoay vòng. Phát hiện dùng lại token cũ ⇒ thu hồi cả phiên.

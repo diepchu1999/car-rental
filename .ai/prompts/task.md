@@ -143,7 +143,8 @@ Bảng là **mặc định**, không phải chốt cứng: mỗi lần soạn pr
 |---|---|---|
 | `payment` — trả cọc, xác nhận thủ công | Astra · `high` | Tiền, `Idempotency-Key` |
 | `customer-web` | Sol · `high` | Giao diện, không tranh chấp; task frontend đầu tiên — review soi kỹ |
-| `admin-web` (nếu chốt phạm vi) | Sol · `high` | Giao diện |
+| Nền frontend — springdoc, sinh client, pnpm workspace | Sol · `high` | Hạ tầng, không tranh chấp |
+| `admin-web` tối thiểu — hàng chờ giấy tờ, hàng chờ cọc | Sol · `high` | Giao diện; nút xác nhận cọc dựa vào chống trùng ở backend (BR-213) |
 | Lát cắt 2 — bàn giao, trả xe, quyết toán | Astra · `high` | Ba khoản tiền, bằng chứng bất biến, đóng băng giá trị quyết toán |
 | Lát cắt 3 — huỷ, đổi xe giữ cọc | Astra · `high` | Hoàn tiền; giữ chỗ mới trước khi nhả chỗ cũ |
 | Lát cắt 4 — thuê có tài xế | Astra · `high` | Chống trùng lịch tài xế |

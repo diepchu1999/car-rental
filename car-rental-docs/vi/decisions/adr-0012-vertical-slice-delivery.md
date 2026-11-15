@@ -42,8 +42,12 @@ Lý do giữ mốc này: lý do gốc của ADR là **phát hiện hiểu sai ng
 lộ ra khi nhìn thấy một màn hình tìm xe không có giá. Làm API cho nhiều lát cắt rồi mới làm giao diện
 là đúng loại rủi ro ADR này sinh ra để tránh.
 
-Chưa chốt: phạm vi `admin-web` cho lát cắt 1 (duyệt xe, xác nhận cọc thủ công — ADR-0011), và thời
-điểm làm mobile.
+**Phạm vi `admin-web` cho lát cắt 1 — chốt 15/11/2026: tối thiểu.** Chỉ hai màn hình mà luồng tìm xe →
+đặt xe → trả cọc bắt buộc có nhân viên: **hàng chờ xác minh giấy tờ** (BR-130) và **hàng chờ xác nhận cọc**
+(BR-213). Quản lý xe, chi nhánh, gán chi nhánh nhân viên vẫn qua Postman ở lát cắt 1. Làm **ngay sau
+`customer-web`**, trước khi sang lát cắt 2.
+
+Chưa chốt: thời điểm làm mobile.
 
 **3. `identity` làm trước `booking`, không phải trước cả lát cắt 1.** Hệ quả gốc ghi "nền tảng dùng
 chung (`identity`…) phải làm trước lát cắt 1". Tìm xe không cần đăng nhập (`/api/v1/public`,
@@ -52,6 +56,9 @@ tài khoản và giấy phép lái xe đã xác minh (BR-106, BR-120).
 
 Thứ tự còn lại của lát cắt 1: chốt BR-218 → `pricing` → `identity` → `booking` → `payment` →
 `customer-web`.
+
+*Cập nhật 15/11/2026:* … → `payment` → **nền frontend** (OpenAPI sinh từ backend, workspace dùng chung —
+frontend-guideline §1a) → `customer-web` → `admin-web` tối thiểu.
 
 ## Hệ quả
 - Nền tảng dùng chung (`identity`, hạ tầng local, tiện ích, test kiến trúc) phải làm trước lát cắt 1.

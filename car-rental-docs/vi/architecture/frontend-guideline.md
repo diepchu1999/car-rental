@@ -10,6 +10,16 @@ React + TypeScript. Hai ứng dụng riêng ở giai đoạn 1.
 | `customer-web` | Khách thuê, phần lớn là người lạ đến từ tìm kiếm | Tải nhanh, SEO, chạy tốt trên mạng di động |
 | `admin-web` | Vận hành, kế toán, quản trị | Màn hình dày dữ liệu, bộ lọc nhiều cột |
 
+## 1a. Công cụ — chốt 15/11/2026
+
+| Việc | Chốt |
+|---|---|
+| Kiểu API | Backend sinh đặc tả OpenAPI bằng **springdoc**; client TypeScript **sinh** từ đặc tả (§3) |
+| Build · routing · gọi API | **Vite** · **React Router** · **TanStack Query** |
+| Thư viện giao diện | `admin-web`: **Ant Design** — bảng dày dữ liệu, bộ lọc nhiều cột. `customer-web`: **không** dùng Ant Design (nặng cho mạng di động); chọn thư viện nhẹ khi soạn task `customer-web` |
+| Dùng chung giữa hai app | **pnpm workspace**; gói `web-shared/` chứa client API sinh ra, auth, bảng thông báo lỗi tiếng Việt (§4) |
+| Ngôn ngữ giao diện | **Chỉ tiếng Việt** ở giai đoạn 1 |
+
 ## 2. Cấu trúc
 ```text
 src/
@@ -55,13 +65,18 @@ Gộp thành một con số là đi ngược yêu cầu minh bạch của nghi�
 bán hàng mạnh nhất — khách không thấy mình được bảo hiểm.
 
 ## 6. Auth
-Authorization Code + PKCE với Keycloak. Mỗi app là một client riêng với redirect URI riêng.
+Authorization Code + PKCE với Keycloak. Mỗi app là một client riêng với redirect URI riêng — realm local
+khai báo đúng địa chỉ dev server của từng app, không dùng ký tự đại diện.
+
+**Token chỉ giữ trong bộ nhớ**, làm mới bằng refresh token; **không** lưu `localStorage` hay `sessionStorage` —
+một lỗ XSS là đọc được token. Tải lại trang thì đăng nhập lại qua Keycloak (phiên Keycloak còn thì không
+phải nhập lại).
 
 ## 7. Không đặt quy tắc nghiệp vụ ở frontend
 Frontend được **hiển thị** quy tắc — ví dụ ẩn nút huỷ khi quá hạn huỷ — nhưng server phải kiểm lại
 toàn bộ. Mọi quy tắc chỉ tồn tại ở frontend đều là quy tắc không tồn tại.
 
 ## 8. Bản đồ
-`customer-web` cần bản đồ để chọn điểm nhận xe và xem xe quanh mình.
+`customer-web` cần bản đồ để chọn điểm nhận xe và xem xe quanh mình. `admin-web` lát cắt 1 không cần.
 ⚠️ Thư viện bản đồ và nhà cung cấp tile **chưa chốt** — cần quyết trước khi làm màn hình tìm kiếm,
 vì nó ảnh hưởng chi phí vận hành khi lên production.
