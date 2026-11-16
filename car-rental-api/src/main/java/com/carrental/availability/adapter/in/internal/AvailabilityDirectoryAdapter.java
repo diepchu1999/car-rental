@@ -4,6 +4,12 @@ import com.carrental.availability.api.AvailabilityDirectory;
 import com.carrental.availability.api.BlockKind;
 import com.carrental.availability.api.Period;
 import com.carrental.availability.api.ReservationRef;
+import com.carrental.availability.api.ExpiredHoldRef;
+import com.carrental.availability.api.HoldExpiryResult;
+import com.carrental.availability.application.command.ExpireReservationHoldCommand;
+import com.carrental.availability.application.query.ListExpiredReservationHoldsQuery;
+import com.carrental.availability.application.port.in.ExpireReservationHoldUseCase;
+import com.carrental.availability.application.port.in.ListExpiredReservationHoldsUseCase;
 import com.carrental.availability.application.command.BlockReservationCommand;
 import com.carrental.availability.application.command.CompleteReservationCommand;
 import com.carrental.availability.application.command.ConfirmReservationCommand;
@@ -27,6 +33,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -50,13 +57,16 @@ class AvailabilityDirectoryAdapter implements AvailabilityDirectory {
     private final CompleteReservationUseCase completions;
     private final MoveComplianceHoldStartUseCase complianceMoves;
     private final ListBusyVehiclesUseCase queries;
+    private final ListExpiredReservationHoldsUseCase expiredHolds;
+    private final ExpireReservationHoldUseCase expiry;
 
     /** Nhận các cổng đầu vào; không phụ thuộc port ghi/đọc hoặc adapter persistence. */
     AvailabilityDirectoryAdapter(
             HoldReservationUseCase holds, BlockReservationUseCase blocks,
             ConfirmReservationUseCase confirmations, ReleaseReservationUseCase releases,
             MarkReservationInUseUseCase departures, CompleteReservationUseCase completions,
-            ListBusyVehiclesUseCase queries, MoveComplianceHoldStartUseCase complianceMoves
+            ListBusyVehiclesUseCase queries, MoveComplianceHoldStartUseCase complianceMoves,
+            ListExpiredReservationHoldsUseCase expiredHolds, ExpireReservationHoldUseCase expiry
     ) {
         this.holds = holds;
         this.blocks = blocks;
@@ -66,6 +76,20 @@ class AvailabilityDirectoryAdapter implements AvailabilityDirectory {
         this.completions = completions;
         this.queries = queries;
         this.complianceMoves = complianceMoves;
+        this.expiredHolds = expiredHolds;
+        this.expiry = expiry;
+    }
+
+    /** Chỉ tạo query, không nhả chỗ hoặc thay mốc bằng đồng hồ riêng. */
+    @Override
+    public List<ExpiredHoldRef> findExpiredHolds(Instant expiredAt) {
+        return expiredHolds.list(new ListExpiredReservationHoldsQuery(expiredAt));
+    }
+
+    /** Chỉ chuyển mã và mốc dọn; giữ nguyên kết quả để bên gọi đồng bộ đơn cùng transaction. */
+    @Override
+    public HoldExpiryResult expireHold(String reservationCode, Instant expiredAt) {
+        return expiry.expire(new ExpireReservationHoldCommand(reservationCode, expiredAt));
     }
 
     /** Chuyển khoảng thuê chưa cộng đệm vào command; use case tự áp dụng đệm và TTL. */

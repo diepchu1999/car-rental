@@ -19,6 +19,9 @@ import java.util.OptionalLong;
  */
 public interface WriteReservationPort {
 
+    /** BR-103: CAS theo mã, HELD và hạn; savepoint/retry 40P01 như mọi câu ghi bảng lịch. */
+    boolean releaseExpiredHold(String code, Instant expiredAt);
+
     /**
      * Chèn một khóa lịch mới và trả về khóa chính do database sinh.
      *

@@ -5,6 +5,7 @@ import com.carrental.shared.error.DomainException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -24,6 +25,16 @@ import java.util.Set;
  * Module khác chỉ cần import các kiểu trong availability.api.
  */
 public interface AvailabilityDirectory {
+
+    /** BR-103: đọc ứng viên HELD tới hạn, không nhả chỗ; mốc do job nội bộ cấp, không phải TTL. */
+    List<ExpiredHoldRef> findExpiredHolds(Instant expiredAt);
+
+    /**
+     * Nhả riêng một hold tới hạn trong transaction bên gọi; không tự commit riêng khỏi đơn (BR-304).
+     * Không dùng cho khách huỷ chủ động. Mốc cắt xuống micro giây, kiểm lại trạng thái/hạn tại SQL.
+     * Bên điều phối phải rollback việc huỷ đơn nếu nhận NOT_ELIGIBLE; mã thiếu báo RESERVATION_NOT_FOUND.
+     */
+    HoldExpiryResult expireHold(String reservationCode, Instant expiredAt);
 
     /**
      * Giữ chỗ cho một đơn thuê theo BR-102, BR-103 và BR-104.
