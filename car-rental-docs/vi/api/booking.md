@@ -6,6 +6,7 @@
 - BR-106/106b/128/130: CCCD/GPLX VERIFIED còn hiệu lực tới hết chuyến; hạng phù hợp xe.
 - BR-122/ADR-0014: chép giá từ báo giá; đọc đơn không định giá lại.
 - BR-131: mỗi khách tối đa một đơn `PENDING_PAYMENT`, ép bằng ràng buộc CSDL.
+- BR-301/304: khách huỷ đơn chờ của mình, ghi lịch sử và nhả chỗ trong cùng transaction.
 - BR-201/236: cọc 30% tổng gồm bảo hiểm cho gói giờ/ngày, làm tròn HALF_UP tới 1.000 VND;
   phần còn lại bằng tổng trừ cọc. Không phải khoản thế chấp và chưa có thao tác thu tiền.
 - Cần access token có vai `CUSTOMER` và consent hợp lệ (BR-120/801).
@@ -22,6 +23,7 @@ Gửi `Authorization: Bearer <access-token>`, `X-Client-Platform`, `X-Client-Ver
 | POST | `/api/v1/client/bookings` | 201, Location theo mã đơn; phát lại cũng 201 |
 | GET | `/api/v1/client/bookings/{code}` | 200, trạng thái hiện tại và snapshot đã lưu |
 | GET | `/api/v1/client/bookings` | 200, trang đơn riêng của khách theo cursor |
+| POST | `/api/v1/client/bookings/{code}/cancel` | 200, đơn CANCELLED với snapshot giữ nguyên |
 
 Mã `DT-<yymm>-<6>` dùng tháng tạo theo giờ Việt Nam. Không đưa ID số lên URL hoặc response.
 Hiện hỗ trợ `HOURLY`/`DAILY`, `SELF_DRIVE`, nhận/trả tại `BRANCH` theo lựa chọn trong báo giá.
@@ -107,6 +109,27 @@ GET trả cùng cấu trúc response, nhưng `status`/`statusChangedAt` là **tr
 Không tự huỷ theo đồng hồ, gia hạn hold, gọi lại pricing hoặc kiểm lại giấy tờ. Đơn hết hạn giữ chỗ vẫn đọc được.
 Kiểm chủ trong SQL trước khi đọc dòng giá. Mã có nội dung được tra nguyên văn, không đổi hoa thường/cắt khoảng trắng.
 
+## Khách huỷ đơn chờ
+
+`POST /api/v1/client/bookings/{code}/cancel` không cần body hoặc `Idempotency-Key`.
+Cần CUSTOMER và consent hợp lệ như khi đọc đơn; chủ lấy từ danh tính đã xác thực.
+CUSTOMER kiêm vai nhân viên vẫn được huỷ đơn riêng; ADMIN thuần không dùng thao tác này để huỷ hộ.
+
+- Chỉ cho phép `PENDING_PAYMENT → CANCELLED`. Huỷ lại trả `422 BOOKING_INVALID_STATUS_TRANSITION`.
+- Đơn sai chủ và mã không tồn tại cùng trả `404 BOOKING_NOT_FOUND`.
+- Không kiểm lại báo giá/giấy tờ/điều kiện thuê hoặc tính lại giá. Không thu/hoàn tiền vì đơn chưa trả cọc.
+- Đơn còn PENDING_PAYMENT và hold chưa được nhả vẫn có thể được khách huỷ dù đã qua hạn chờ.
+- Trạng thái, lịch sử (chủ đơn, mốc huỷ, lý do CUSTOMER_CANCELLED) và nhả chỗ cùng commit hoặc rollback.
+- Hai yêu cầu huỷ đồng thời: một trả 200, một trả 422; không ghi thêm sự kiện huỷ hoặc nhả lần hai.
+
+Response dùng cùng cấu trúc chi tiết đơn: chỉ `status` thành `CANCELLED` và `statusChangedAt` thành mốc huỷ.
+Các mã tham chiếu công khai, dòng giá, tiền, giờ thuê và `holdExpiresAt` giữ nguyên.
+GET sau đó trả trạng thái CANCELLED. Gửi lại request **tạo** với key còn trong 24 giờ vẫn nhận kết quả
+tạo ban đầu (PENDING_PAYMENT), không tạo lại đơn hoặc giữ chỗ. Muốn đặt đơn mới phải dùng key mới và
+báo giá còn hạn; mọi điều kiện đặt xe được kiểm lại.
+
+Chưa hỗ trợ huỷ đơn đã trả cọc/xác nhận trong lát cắt này.
+
 ## Danh sách đơn của khách
 
 `GET /api/v1/client/bookings?limit=20` dùng cùng quyền CUSTOMER và consent như đọc chi tiết.
@@ -179,6 +202,7 @@ Mỗi trang phản ánh dữ liệu tại lần đọc; không cam kết trạng
 | 409 | BOOKING_PENDING_PAYMENT_EXISTS | Khách đã có đơn PENDING_PAYMENT |
 | 409 | VEHICLE_NOT_AVAILABLE | Constraint từ chối khoảng giữ chỗ chồng lịch |
 | 422 | QUOTE_EXPIRED | Báo giá đã đến/quá hạn khi thực hiện request mới |
+| 422 | BOOKING_INVALID_STATUS_TRANSITION | Huỷ đơn không còn PENDING_PAYMENT, huỷ lặp hoặc thua cuộc đua huỷ |
 | 422 | IDENTITY_CARD_EXPIRES_BEFORE_TRIP_END | CCCD hết hạn trước ngày trả xe theo giờ VN |
 | 422 | DRIVER_LICENSE_EXPIRES_BEFORE_TRIP_END | GPLX hết hạn trước ngày trả xe theo giờ VN |
 | 422 | DRIVER_LICENSE_CLASS_NOT_SUPPORTED | Hạng không được hỗ trợ trong bảng tương ứng ngày cấp |
@@ -208,8 +232,9 @@ Chọn token ở Authorization của folder; request con kế thừa. Bật **Ke
 không Share/Sync token. Script tự chuyển mã/key. Trường gửi ngoài hợp đồng không thay chủ/giá/cọc.
 
 Collection lưu key, báo giá và snapshot theo mã tài khoản để chạy lại trong **24 giờ** mà không dọn CSDL.
-Không xoá biến `t9bState-<mã tài khoản>` sau khi đã tạo đơn. Hết 24 giờ, dùng khách thử đủ điều kiện khác
-cho tới khi có luồng huỷ/hết hạn đơn; không xoá row để né BR-131. Nếu dừng giữa báo giá và lần đặt đầu quá
+Không xoá biến `t9bState-<mã tài khoản>` sau khi đã tạo đơn. Bộ request Phần 3.5 hiện giữ state theo key;
+hết 24 giờ, dùng khách thử đủ điều kiện khác cho bộ request này, không xoá row để né BR-131.
+Nếu dừng giữa báo giá và lần đặt đầu quá
 15 phút, API trả `QUOTE_EXPIRED`; đây là hạn nghiệp vụ, không nới hạn chỉ để test.
 Khoảng thuê sinh sau hai ngày lúc 10:00 giờ VN, trả sau 24 giờ; cần lịch lễ local đã khai báo tới ngày trả.
 Các request phá hoại phải xanh với đúng HTTP/mã lỗi, không chỉ bất kỳ 4xx nào.
@@ -228,3 +253,17 @@ Request phân trang tự lặp trong Runner tới khi `hasMore=false`, nên tổ
 số request hiển thị. Các biến `t9l*` tự được tạo khi chạy A; không sửa/xóa state `t9bState-*` của phần trước.
 HTTP integration test kiểm riêng trường hợp chuyển trang với nhiều đơn cùng mốc và dùng cursor khác chủ;
 không sửa CSDL local hoặc tạo thêm đơn chờ chỉ để có nhiều trang demo.
+
+Folder **Part 4.3 - Cancel own pending booking**: chạy riêng A → B → C → D bằng Runner,
+một iteration, Keep variable values bật. Lượt nghiệm thu local chạy sau khi hoàn tất đồng bộ job hết hạn
+của Task 9; dữ liệu đơn cũ có thể đang PENDING_PAYMENT dù job cũ đã nhả hold.
+
+- A: CUSTOMER A đã có đơn PENDING_PAYMENT; tự đi hết danh sách để tìm đơn, rồi lưu snapshot.
+- B: CUSTOMER khác A; huỷ mã đơn A và mã không tồn tại đều nhận 404.
+- C: ADMIN thuần nhận 403, request No Auth nhận 401.
+- D: dùng lại CUSTOMER A; huỷ không body/key nhận 200, huỷ lại nhận 422, GET giữ snapshot CANCELLED.
+
+Chạy lại cả nhóm dùng đơn đã huỷ được ghi nhớ theo chủ, D kiểm 422 thay vì tạo thêm đơn.
+Để kiểm lại nhánh 200, chuẩn bị một đơn chờ mới cho cùng khách rồi chạy A từ đầu.
+Nếu lần đầu A không tìm được đơn chờ, collection dừng với hướng dẫn tạo đơn; không tự huỷ đơn khác
+hoặc nới assertion. Request tìm đơn dùng biến local của Runner, phải chạy từ request 01.

@@ -5,6 +5,8 @@ import com.carrental.booking.adapter.in.rest.client.response.BookingResponse;
 import com.carrental.booking.adapter.in.rest.client.response.SearchBookingsResponse;
 import com.carrental.booking.adapter.in.rest.client.query.SearchBookingsParameters;
 import com.carrental.booking.application.command.CreateBookingCommand;
+import com.carrental.booking.application.command.CancelBookingCommand;
+import com.carrental.booking.application.port.in.CancelBookingUseCase;
 import com.carrental.booking.application.port.in.CreateBookingUseCase;
 import com.carrental.booking.application.port.in.GetBookingUseCase;
 import com.carrental.booking.application.port.in.SearchBookingsUseCase;
@@ -16,7 +18,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 
-/** API khách tạo/đọc đơn; BR-103/122/131 được thực hiện trong use case, không ở controller. */
+/** API khách tạo/đọc/huỷ đơn; quy tắc BR-103/122/131/301/304 nằm trong use case. */
 @RestController
 @RequestMapping(path = ClientBookingController.BASE_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
 class ClientBookingController {
@@ -24,12 +26,15 @@ class ClientBookingController {
     private final CreateBookingUseCase create;
     private final GetBookingUseCase get;
     private final SearchBookingsUseCase search;
+    private final CancelBookingUseCase cancel;
 
     /** Chỉ nhận port/in, không gọi JDBC hoặc module khác ở biên HTTP. */
-    ClientBookingController(CreateBookingUseCase create, GetBookingUseCase get, SearchBookingsUseCase search) {
+    ClientBookingController(CreateBookingUseCase create, GetBookingUseCase get, SearchBookingsUseCase search,
+            CancelBookingUseCase cancel) {
         this.create = create;
         this.get = get;
         this.search = search;
+        this.cancel = cancel;
     }
 
     /** Tạo hoặc phát lại kết quả ban đầu, cùng 201 và Location theo api-guideline §5. */
@@ -45,6 +50,12 @@ class ClientBookingController {
     @GetMapping("/{code}")
     public ApiResponse<BookingResponse> get(@PathVariable("code") String code) {
         return ApiResponse.success(BookingResponse.fromDomain(get.get(GetBookingQuery.from(code))));
+    }
+
+    /** BR-301/304: không nhận body hoặc tiền; use case kiểm chủ và huỷ/nhả chỗ nguyên tử. */
+    @PostMapping("/{code}/cancel")
+    public ApiResponse<BookingResponse> cancel(@PathVariable("code") String code) {
+        return ApiResponse.success(BookingResponse.fromDomain(cancel.cancel(CancelBookingCommand.from(code))));
     }
 
     /** BR-122: trả trang đơn riêng từ snapshot; chủ và vị trí trang được kiểm trong use case. */

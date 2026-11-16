@@ -300,6 +300,101 @@ class BookingApiIntegrationTest {
         }
     }
 
+    /** Huỷ HTTP không cần body/key, giữ snapshot; GET đọc trạng thái mới còn phát lại POST giữ kết quả đầu. */
+    @ParameterizedTest @ValueSource(strings = {"DAILY", "HOURLY"})
+    void cancelsOwnedBookingAndPreservesCreationReplay(String rentalType) throws Exception {
+        var owner = customer(true, "B", "2025-01-01");
+        String vehicle = vehicle(5);
+        var quote = quote(owner, vehicle, rentalType);
+        String key = UUID.randomUUID().toString();
+        var created = bookingSuccess(create(owner, quote, key), 201);
+        String code = created.path("code").asString();
+        when(clock.instant()).thenReturn(NOW.plusSeconds(60));
+        var cancelled = bookingSuccess(send("POST", PATH + "/" + code + "/cancel", null, owner.token(), null), 200);
+        assertEquals("CANCELLED", cancelled.path("status").asString());
+        assertEquals(NOW.plusSeconds(60), Instant.parse(cancelled.path("statusChangedAt").asString()));
+        for (String field : created.propertyNames()) {
+            if (!Set.of("status", "statusChangedAt").contains(field)) assertEquals(created.path(field), cancelled.path(field), field);
+        }
+        assertEquals(cancelled, bookingSuccess(send("GET", PATH + "/" + code, null, owner.token(), null), 200));
+        assertEquals(created, bookingSuccess(create(owner, quote, key), 201));
+        error(send("POST", PATH + "/" + code + "/cancel", null, owner.token(), null), 422, "BOOKING_INVALID_STATUS_TRANSITION");
+        var state = cancellationState(code);
+        assertEquals("CANCELLED", state.get("booking_status"));
+        assertEquals("RELEASED", state.get("reservation_status"));
+        assertEquals(2L, state.get("history_count"));
+        assertEquals("CUSTOMER_CANCELLED", state.get("reason"));
+        assertEquals(owner.code(), state.get("actor_account_code"));
+        // Đặt lại cùng xe/khoảng bằng key mới chứng minh chỗ và hạn mức BR-131 đã được nhả.
+        var replacement = bookingSuccess(create(owner, quote, UUID.randomUUID().toString()), 201);
+        assertNotEquals(code, replacement.path("code").asString());
+    }
+
+    /** Đổi mã trên URL không huỷ được đơn khách khác và không lộ việc đơn đó có tồn tại. */
+    @Test
+    void hidesCancellationFromAnotherCustomer() throws Exception {
+        var owner = customer(true, "B", "2025-01-01");
+        var other = customer(false, "B", "2025-01-01");
+        var created = bookingSuccess(create(owner, quote(owner, vehicle(5), "DAILY"), UUID.randomUUID().toString()), 201);
+        String code = created.path("code").asString();
+        var hidden = send("POST", PATH + "/" + code + "/cancel", null, other.token(), null);
+        var missing = send("POST", PATH + "/DT-2611-ABSENT/cancel", null, other.token(), null);
+        error(hidden, 404, "BOOKING_NOT_FOUND");
+        error(missing, 404, "BOOKING_NOT_FOUND");
+        assertEquals(mapper.readTree(missing.body()), mapper.readTree(hidden.body()));
+        var state = cancellationState(code);
+        assertEquals("PENDING_PAYMENT", state.get("booking_status"));
+        assertEquals("HELD", state.get("reservation_status"));
+        assertEquals(1L, state.get("history_count"));
+        assertEquals(created, bookingSuccess(send("GET", PATH + "/" + code, null, owner.token(), null), 200));
+    }
+
+    /** Thiếu JWT hoặc nhân viên thuần không được đi vào luồng khách huỷ đơn. */
+    @Test
+    void rejectsUnauthenticatedAndStaffCancellation() throws Exception {
+        var owner = customer(true, "B", "2025-01-01");
+        String code = bookingSuccess(create(owner, quote(owner, vehicle(5), "DAILY"), UUID.randomUUID().toString()), 201)
+                .path("code").asString();
+        error(send("POST", PATH + "/" + code + "/cancel", null, null, null), 401, "UNAUTHENTICATED");
+        for (String token : List.of(tokens.adminToken(clock), tokens.branchStaffToken(clock), tokens.documentVerifierToken(clock))) {
+            error(send("POST", PATH + "/" + code + "/cancel", null, token, null), 403, "ACCESS_DENIED");
+        }
+        assertEquals("PENDING_PAYMENT", cancellationState(code).get("booking_status"));
+        assertEquals("HELD", cancellationState(code).get("reservation_status"));
+    }
+
+    /** Hai HTTP thật gọi huỷ cùng lúc: một 200, một 422, lịch sử/nhả chỗ chỉ xảy ra một lần. */
+    @Test
+    void concurrentHttpCancellationsHaveOneWinner() throws Exception {
+        var owner = customer(true, "B", "2025-01-01");
+        String code = bookingSuccess(create(owner, quote(owner, vehicle(5), "DAILY"), UUID.randomUUID().toString()), 201)
+                .path("code").asString();
+        var barrier = new CyclicBarrier(2);
+        try (var pool = Executors.newFixedThreadPool(2)) {
+            Callable<HttpResponse<String>> action = () -> {
+                barrier.await(10, TimeUnit.SECONDS);
+                return send("POST", PATH + "/" + code + "/cancel", null, owner.token(), null);
+            };
+            var first = pool.submit(action);
+            var second = pool.submit(action);
+            var results = List.of(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS));
+            assertEquals(List.of(200, 422), results.stream().map(HttpResponse::statusCode).sorted().toList());
+            for (var response : results) {
+                if (response.statusCode() == 200) assertEquals("CANCELLED", bookingSuccess(response, 200).path("status").asString());
+                else error(response, 422, "BOOKING_INVALID_STATUS_TRANSITION");
+            }
+        }
+        var state = cancellationState(code);
+        assertEquals("CANCELLED", state.get("booking_status"));
+        assertEquals("RELEASED", state.get("reservation_status"));
+        assertEquals(2L, state.get("history_count"));
+    }
+
+    /** Đọc độc lập sau HTTP, không coi response 200 là đủ để chứng minh nhả chỗ. */
+    private Map<String, Object> cancellationState(String code) {
+        return jdbc.queryForMap(sql.load("sql/booking/read_cancellation_state_for_use_case_test.sql"), Map.of("code", code));
+    }
+
     /** Khoá danh sách trường công khai; mọi item phải là tóm tắt không chứa ID số. */
     private JsonNode pageSuccess(HttpResponse<String> response) {
         var page = success(response, 200);

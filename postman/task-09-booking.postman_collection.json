@@ -4406,6 +4406,1084 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Part 4.3 - Cancel own pending booking",
+      "description": "BR-301/304: chạy Runner từng folder A → B → C → D với đúng token, Keep variable values bật. Lần đầu cần một đơn PENDING_PAYMENT do CUSTOMER A tạo. Chạy lại giữ selection theo chủ và kiểm trạng thái cuối; muốn chứng minh lại 200 thì tạo một đơn mới. Chạy nghiệm thu local sau khi hoàn tất job hết hạn đồng bộ của Task 9.",
+      "item": [
+        {
+          "name": "A - CUSTOMER A selects own booking",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Check owner identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120/801: kiểm danh tính trước thao tác của folder."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9cIdentityChecked');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "const correct = b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('CUSTOMER');",
+                      "pm.test('Expected role', () => pm.expect(Boolean(correct)).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error(\"Select the expected account token and restart this folder.\"); }",
+                      "pm.variables.set('t9cIdentityChecked',true);",
+                      "pm.collectionVariables.set('t9cOwnerA',b.data.code);",
+                      "const saved=JSON.parse(pm.collectionVariables.get('t9cSelection-'+b.data.code)||'null'); pm.variables.set('t9cPrevious',saved);",
+                      "pm.variables.set('t9cPageQuery','?limit=100'); pm.variables.set('t9cSeen',[]); pm.variables.unset('t9cPending'); pm.collectionVariables.unset('t9cBooking');"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Find own pending booking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings{{t9cPageQuery}}",
+                "description": "BR-131: tìm đúng đơn chờ của chủ; phân trang tự chạy trong Runner. Chạy lại dùng đơn đã huỷ được lưu từ lượt trước."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9cIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from request 01 using the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "const page=b.data; pm.test('Page contract',()=>{pm.expect(page.items).to.be.an('array'); pm.expect(page.hasMore).to.be.a('boolean');});",
+                      "const seen=pm.variables.get('t9cSeen')||[]; for(const item of page.items){ if(seen.includes(item.code)){ pm.execution.setNextRequest(null); throw new Error(\"Repeated booking while paging; stop and inspect pagination.\"); } seen.push(item.code); if(item.status==='PENDING_PAYMENT') pm.variables.set('t9cPending',item.code); } pm.variables.set('t9cSeen',seen);",
+                      "if(page.hasMore){ if(typeof page.nextCursor!=='string'||!page.nextCursor){ pm.execution.setNextRequest(null); throw new Error(\"Missing next cursor.\"); } pm.variables.set('t9cPageQuery','?limit=100&cursor='+encodeURIComponent(page.nextCursor)); pm.execution.setNextRequest(pm.info.requestId); } else {",
+                      " const previous=pm.variables.get('t9cPrevious'); const chosen=pm.variables.get('t9cPending')||(previous&&previous.completed&&seen.includes(previous.code)?previous.code:null);",
+                      " pm.test('Own booking fixture exists',()=>pm.expect(Boolean(chosen)).to.equal(true)); if(!chosen){ pm.execution.setNextRequest(null); throw new Error(\"No pending booking. Create one with this eligible customer using Part 3.5, then rerun folder A. Do not edit database rows.\"); }",
+                      " pm.collectionVariables.set('t9cBooking',chosen); pm.collectionVariables.set('t9cSelection-'+pm.collectionVariables.get('t9cOwnerA'),JSON.stringify({code:chosen,completed:Boolean(previous&&previous.code===chosen&&previous.completed)})); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Read selected booking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9cBooking}}",
+                "description": "BR-122: lưu snapshot đơn riêng để kiểm việc huỷ không đổi giá/hạn."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9cIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from request 01 using the same token.'); }",
+                      "if (!pm.collectionVariables.get('t9cBooking') || !pm.collectionVariables.get('t9cOwnerA')) { pm.execution.setNextRequest(null); throw new Error(\"Run folder A first to select the booking.\"); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Selected booking',()=>{pm.expect(b.data.code).to.equal(pm.collectionVariables.get('t9cBooking')); pm.expect(['PENDING_PAYMENT','CANCELLED']).to.include(b.data.status);});",
+                      "pm.collectionVariables.set('t9cSnapshot',JSON.stringify(b.data));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "B - CUSTOMER B cannot cancel A booking",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Check other customer identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120/801: kiểm danh tính trước thao tác của folder."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9cIdentityChecked');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "const correct = b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('CUSTOMER');",
+                      "pm.test('Expected role', () => pm.expect(Boolean(correct)).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error(\"Select the expected account token and restart this folder.\"); }",
+                      "pm.variables.set('t9cIdentityChecked',true);",
+                      "if (!pm.collectionVariables.get('t9cBooking') || !pm.collectionVariables.get('t9cOwnerA')) { pm.execution.setNextRequest(null); throw new Error(\"Run folder A first to select the booking.\"); }",
+                      "const different=b.data.code!==pm.collectionVariables.get('t9cOwnerA'); pm.test('Different customer',()=>pm.expect(different).to.equal(true)); if(!different){ pm.execution.setNextRequest(null); throw new Error(\"Choose a customer different from folder A.\"); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Reject cancellation of another customer booking",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9cBooking}}/cancel",
+                "description": "security-guideline §2: khách khác không được huỷ đơn, trả 404."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9cIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from request 01 using the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 404) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Expected error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('BOOKING_NOT_FOUND'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Reject unknown booking",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/DT-0001-ABSENT/cancel",
+                "description": "security-guideline §2: mã không tồn tại trả cùng 404."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9cIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from request 01 using the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 404', () => pm.response.to.have.status(404));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 404) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Expected error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('BOOKING_NOT_FOUND'); });"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "C - Reject non-customer cancellation",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "admin-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 admin-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Check ADMIN without CUSTOMER",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/admin/accounts/me",
+                "description": "BR-120/801: kiểm danh tính trước thao tác của folder."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9cIdentityChecked');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "const correct = b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('ADMIN');",
+                      "pm.test('Expected role', () => pm.expect(Boolean(correct)).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error(\"Select the expected account token and restart this folder.\"); }",
+                      "pm.variables.set('t9cIdentityChecked',true);",
+                      "if (!pm.collectionVariables.get('t9cBooking') || !pm.collectionVariables.get('t9cOwnerA')) { pm.execution.setNextRequest(null); throw new Error(\"Run folder A first to select the booking.\"); }",
+                      "const pure=!b.data.roles.includes('CUSTOMER'); pm.test('ADMIN without CUSTOMER',()=>pm.expect(pure).to.equal(true)); if(!pure){ pm.execution.setNextRequest(null); throw new Error(\"Choose an ADMIN token without CUSTOMER for this negative test.\"); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Reject ADMIN cancellation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9cBooking}}/cancel",
+                "description": "BR-301: ADMIN thuần không gọi thao tác khách huỷ đơn."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9cIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from request 01 using the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 403', () => pm.response.to.have.status(403));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 403) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Expected error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('ACCESS_DENIED'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Reject unauthenticated cancellation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9cBooking}}/cancel",
+                "description": "security-guideline §2: thiếu token trả 401.",
+                "auth": {
+                  "type": "noauth"
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9cIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from request 01 using the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 401', () => pm.response.to.have.status(401));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 401) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Expected error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('UNAUTHENTICATED'); });"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "D - CUSTOMER A cancels own booking",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Recheck owner identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120/801: kiểm danh tính trước thao tác của folder."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9cIdentityChecked');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "const correct = b.data && /^TK-[A-Z0-9]{6}$/.test(b.data.code || '') && b.data.roles.includes('CUSTOMER');",
+                      "pm.test('Expected role', () => pm.expect(Boolean(correct)).to.equal(true));",
+                      "if (!correct) { pm.execution.setNextRequest(null); throw new Error(\"Select the expected account token and restart this folder.\"); }",
+                      "pm.variables.set('t9cIdentityChecked',true);",
+                      "if (!pm.collectionVariables.get('t9cBooking') || !pm.collectionVariables.get('t9cOwnerA')) { pm.execution.setNextRequest(null); throw new Error(\"Run folder A first to select the booking.\"); }",
+                      "const same=b.data.code===pm.collectionVariables.get('t9cOwnerA'); pm.test('Same owner as folder A',()=>pm.expect(same).to.equal(true)); if(!same){ pm.execution.setNextRequest(null); throw new Error(\"Choose the same customer as folder A.\"); }"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Read booking before cancellation",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9cBooking}}",
+                "description": "BR-122: kiểm snapshot còn nguyên sau các request bị từ chối."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9cIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from request 01 using the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "const before=JSON.parse(pm.collectionVariables.get('t9cSnapshot')); pm.test('Rejected requests did not change booking',()=>pm.expect(b.data).to.deep.equal(before));",
+                      "if(JSON.stringify(b.data)!==JSON.stringify(before)){ pm.execution.setNextRequest(null); throw new Error(\"Booking changed since folder A; restart folder A to inspect current state.\"); }",
+                      "pm.variables.set('t9cCancelStatus',b.data.status==='PENDING_PAYMENT'?200:422);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Cancel pending or check completed rerun",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9cBooking}}/cancel",
+                "description": "BR-301/304: lần đầu huỷ trả 200; chạy lại trên đơn đã huỷ trả 422, không cần body/key."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9cIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from request 01 using the same token.'); }",
+                      "if(![200,422].includes(Number(pm.variables.get('t9cCancelStatus')))){ pm.execution.setNextRequest(null); throw new Error(\"Run request 02 before cancelling.\"); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "const expected=Number(pm.variables.get('t9cCancelStatus'));",
+                      "pm.test('Expected cancellation status',()=>pm.response.to.have.status(expected));",
+                      "pm.test('Request ID is present',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==expected){ pm.execution.setNextRequest(null); throw new Error(\"Unexpected cancellation status; inspect the response.\"); }",
+                      "const b=pm.response.json(); const before=JSON.parse(pm.collectionVariables.get('t9cSnapshot'));",
+                      "if(expected===200){ pm.test('Cancelled snapshot',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);pm.expect(b.data.status).to.equal('CANCELLED'); for(const field of Object.keys(before)) if(!['status','statusChangedAt'].includes(field)) pm.expect(b.data[field]).to.deep.equal(before[field]); pm.expect(Date.parse(b.data.statusChangedAt)).to.be.at.least(Date.parse(before.statusChangedAt));}); pm.collectionVariables.set('t9cCancelled',JSON.stringify(b.data)); }",
+                      "else { pm.test('Already cancelled',()=>{pm.expect(b.success).to.equal(false);pm.expect(b.data).to.equal(null);pm.expect(b.error.code).to.equal('BOOKING_INVALID_STATUS_TRANSITION');}); pm.collectionVariables.set('t9cCancelled',JSON.stringify(before)); }",
+                      "pm.collectionVariables.set('t9cSelection-'+pm.collectionVariables.get('t9cOwnerA'),JSON.stringify({code:pm.collectionVariables.get('t9cBooking'),completed:true}));"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 - Reject repeated cancellation",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9cBooking}}/cancel",
+                "description": "BR-301: huỷ lại luôn trả 422 BOOKING_INVALID_STATUS_TRANSITION."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9cIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from request 01 using the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 422', () => pm.response.to.have.status(422));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 422) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Expected error', () => { pm.expect(b.success).to.equal(false); pm.expect(b.data).to.equal(null); pm.expect(b.error.code).to.equal('BOOKING_INVALID_STATUS_TRANSITION'); });"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "05 - Read unchanged cancelled booking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9cBooking}}",
+                "description": "BR-122/301: trạng thái CANCELLED và snapshot không đổi sau yêu cầu huỷ lặp."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (!pm.variables.get('t9cIdentityChecked')) { pm.execution.setNextRequest(null); throw new Error('Run this folder from request 01 using the same token.'); }"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                      "pm.test('Request ID is present', () => pm.expect(pm.response.headers.get('X-Request-Id') || '').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached', () => pm.expect(pm.response.headers.get('Cache-Control') || '').to.include('no-store'));",
+                      "if (pm.response.code !== 200) { pm.execution.setNextRequest(null); throw new Error(\"Unexpected HTTP status; inspect the response before continuing.\"); }",
+                      "const b = pm.response.json();",
+                      "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
+                      "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
+                      "pm.test('Cancelled result is unchanged',()=>pm.expect(b.data).to.deep.equal(JSON.parse(pm.collectionVariables.get('t9cCancelled'))));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
     }
   ]
 }
