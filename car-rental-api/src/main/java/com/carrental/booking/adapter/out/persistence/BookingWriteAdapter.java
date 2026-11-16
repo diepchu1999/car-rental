@@ -24,6 +24,7 @@ class BookingWriteAdapter implements WriteBookingPort {
     private final String insert;
     private final String insertLine;
     private final String insertCreated;
+    private final String cancelByCustomer;
 
     /** Tải SQL một lần; không tự commit header trước khi lưu dòng giá/lịch sử. */
     BookingWriteAdapter(NamedParameterJdbcTemplate jdbc, SqlLoader loader) {
@@ -31,6 +32,7 @@ class BookingWriteAdapter implements WriteBookingPort {
         insert = loader.load(BookingSqlPaths.INSERT);
         insertLine = loader.load(BookingSqlPaths.INSERT_LINE);
         insertCreated = loader.load(BookingSqlPaths.INSERT_CREATED);
+        cancelByCustomer = loader.load(BookingSqlPaths.CANCEL_BY_CUSTOMER);
     }
 
     /**
@@ -73,6 +75,22 @@ class BookingWriteAdapter implements WriteBookingPort {
             throw new IncorrectUpdateSemanticsDataAccessException("Expected one created booking history event.");
         }
         return true;
+    }
+
+    /** Chỉ cập nhật trạng thái và mốc huỷ; SQL dùng chủ lưu ở CSDL làm tác nhân lịch sử. */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean cancelPendingByCustomer(Booking cancelled) {
+        if (cancelled.status() != BookingStatus.CANCELLED) {
+            throw new IllegalArgumentException("Expected a cancelled booking.");
+        }
+        int affected = jdbc.update(cancelByCustomer, new MapSqlParameterSource()
+                .addValue("code", cancelled.code(), Types.VARCHAR)
+                .addValue("customerAccountCode", cancelled.customerAccountCode(), Types.VARCHAR)
+                .addValue("changedAt", timestamp(cancelled.statusChangedAt()), Types.TIMESTAMP_WITH_TIMEZONE));
+        if (affected == 0) return false;
+        if (affected == 1) return true;
+        throw new IncorrectUpdateSemanticsDataAccessException("Expected zero or one cancelled booking history event.");
     }
 
     /** Chỉ nhận đúng SQLSTATE, schema, bảng và unique BR-131; không bắt mọi lỗi 23505. */

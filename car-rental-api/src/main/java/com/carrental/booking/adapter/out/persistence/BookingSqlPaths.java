@@ -5,6 +5,7 @@ final class BookingSqlPaths {
     static final String INSERT = "sql/booking/insert_booking.sql";
     static final String INSERT_LINE = "sql/booking/insert_booking_line.sql";
     static final String INSERT_CREATED = "sql/booking/insert_booking_created_history.sql";
+    static final String CANCEL_BY_CUSTOMER = "sql/booking/cancel_pending_booking_by_customer.sql";
     static final String FIND_OWNED = "sql/booking/find_owned_booking.sql";
     static final String FIND_LINES = "sql/booking/find_booking_lines.sql";
     static final String SEARCH_OWNED = "sql/booking/search_owned_bookings.sql";

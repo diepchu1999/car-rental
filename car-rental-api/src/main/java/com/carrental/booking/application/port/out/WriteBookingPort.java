@@ -10,4 +10,11 @@ public interface WriteBookingPort {
      * Không tự mở transaction riêng: giữ chỗ và đơn phải cùng commit hoặc cùng rollback.
      */
     boolean insert(Booking booking);
+
+    /**
+     * BR-301: nhận bản CANCELLED từ domain, cập nhật đúng chủ chỉ khi CSDL còn PENDING_PAYMENT.
+     * Ghi một lịch sử CUSTOMER_CANCELLED cùng câu SQL; false khi không còn khớp, không ghi lịch sử.
+     * Tham gia transaction ngoài để use case nhả chỗ cùng commit/rollback (BR-304).
+     */
+    boolean cancelPendingByCustomer(Booking cancelled);
 }
