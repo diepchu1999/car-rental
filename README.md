@@ -113,7 +113,8 @@ Ngày cấp của bản đang dùng chọn bảng hạng; B1 cấp từ mốc tr
 khi thuê ô tô. Ngày nộp, ngày kiểm và ngày trả xe không thay thế ngày cấp.
 Giấy tờ hết hạn ngày D còn dùng được hết ngày D theo múi giờ ứng dụng (Việt Nam);
 `tripEnd` là giờ trả thực tế, không cộng đệm.
-Cổng không giữ chỗ, tạo đơn hoặc thay việc xác thực/phân quyền của bên gọi; hiện chưa nối vào booking.
+Luồng tạo đơn mới của `booking` gọi cổng này để kiểm giấy tờ trước khi giữ chỗ.
+Cổng không tự giữ chỗ, tạo đơn hoặc thay việc xác thực/phân quyền của bên gọi.
 
 ### 2. Khởi động hạ tầng
 
