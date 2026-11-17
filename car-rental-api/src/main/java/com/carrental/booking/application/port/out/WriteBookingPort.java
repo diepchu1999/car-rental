@@ -4,6 +4,9 @@ import com.carrental.booking.domain.Booking;
 
 /** Ghi đơn, dòng giá và lịch sử trong transaction của use case (BR-102/122/131). */
 public interface WriteBookingPort {
+    /** BR-103: CAS PENDING_PAYMENT đến hạn và ghi HOLD_EXPIRED với tác nhân hệ thống (null). */
+    boolean cancelExpiredPending(Booking cancelled);
+
     /**
      * Chỉ nhận đơn mới PENDING_PAYMENT. False chỉ khi trùng uq_booking_code; không ghi dòng con khi đó.
      * PendingBookingExistsException chỉ cho uq_booking_pending_customer; mọi lỗi phải rollback transaction ngoài.

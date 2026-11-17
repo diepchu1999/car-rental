@@ -1,6 +1,6 @@
-package com.carrental.availability.adapter.in.scheduler;
+package com.carrental.booking.adapter.in.scheduler;
 
-import com.carrental.availability.application.port.in.ExpireReservationHoldsUseCase;
+import com.carrental.booking.application.port.in.SweepExpiredBookingHoldsUseCase;
 import com.carrental.shared.logging.LogEventCapture;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -29,26 +29,26 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 /** Kiểm adapter và wiring lịch chạy thật, không dùng datasource hoặc Docker. */
-class ReservationHoldExpirySchedulerTest {
+class BookingHoldExpirySchedulerTest {
 
     /** Kiểm mỗi lần scheduler gọi đúng một use case, không tự xử lý nghiệp vụ. */
     @Test
     void delegatesOneSweep() {
-        var useCase = mock(ExpireReservationHoldsUseCase.class);
-        new ReservationHoldExpiryScheduler(useCase).sweep();
-        verify(useCase).expireHolds();
+        var useCase = mock(SweepExpiredBookingHoldsUseCase.class);
+        new BookingHoldExpiryScheduler(useCase).sweep();
+        verify(useCase).sweep();
         verifyNoMoreInteractions(useCase);
     }
 
     /** Kiểm lỗi use case không bị adapter nuốt hoặc tự thử lại trong cùng lượt. */
     @Test
     void propagatesUseCaseFailure() {
-        var useCase = mock(ExpireReservationHoldsUseCase.class);
+        var useCase = mock(SweepExpiredBookingHoldsUseCase.class);
         var failure = new IllegalStateException("Storage unavailable.");
-        when(useCase.expireHolds()).thenThrow(failure);
+        when(useCase.sweep()).thenThrow(failure);
         assertSame(failure, assertThrows(IllegalStateException.class,
-                () -> new ReservationHoldExpiryScheduler(useCase).sweep()));
-        verify(useCase).expireHolds();
+                () -> new BookingHoldExpiryScheduler(useCase).sweep()));
+        verify(useCase).sweep();
         verifyNoMoreInteractions(useCase);
     }
 
@@ -73,12 +73,12 @@ class ReservationHoldExpirySchedulerTest {
     /** Kiểm timer thật vẫn gọi lượt sau khi lượt đầu ném lỗi; không sleep hoặc gọi tay sweep. */
     @Test
     void realSchedulerContinuesAfterFailedInvocation() {
-        var useCase = mock(ExpireReservationHoldsUseCase.class);
+        var useCase = mock(SweepExpiredBookingHoldsUseCase.class);
         AtomicInteger calls = new AtomicInteger();
         CountDownLatch nextSucceeded = new CountDownLatch(1);
         var ids = new CopyOnWriteArrayList<String>();
         var apis = new CopyOnWriteArrayList<String>();
-        when(useCase.expireHolds()).thenAnswer(invocation -> {
+        when(useCase.sweep()).thenAnswer(invocation -> {
             ids.add(MDC.get("requestId"));
             apis.add(MDC.get("api"));
             if (calls.incrementAndGet() == 1) {
@@ -97,13 +97,13 @@ class ReservationHoldExpirySchedulerTest {
                     assertTrue(ids.getFirst().startsWith("job-"));
                     assertNotEquals(ids.getFirst(), ids.get(1));
                     assertTrue(apis.size() >= 2);
-                    apis.forEach(api -> assertEquals("ReservationHoldExpiryScheduler.sweep", api));
+                    apis.forEach(api -> assertEquals("BookingHoldExpiryScheduler.sweep", api));
                     assertEquals(1, logs.events().size());
                     assertEquals(ids.getFirst(), logs.events().getFirst().getMDCPropertyMap().get("requestId"));
-                    assertEquals("ReservationHoldExpiryScheduler.sweep",
+                    assertEquals("BookingHoldExpiryScheduler.sweep",
                             logs.events().getFirst().getMDCPropertyMap().get("api"));
                     assertTrue(logs.events().getFirst().getFormattedMessage()
-                            .contains("api=\"ReservationHoldExpiryScheduler.sweep\""));
+                            .contains("api=\"BookingHoldExpiryScheduler.sweep\""));
                 });
         }
     }
@@ -113,7 +113,7 @@ class ReservationHoldExpirySchedulerTest {
      * Callback do Spring tạo chỉ được kích hoạt sau khi đã khẳng định use case chưa chạy.
      */
     private static void assertScheduledDelay(String interval, String... extraProperties) {
-        var useCase = mock(ExpireReservationHoldsUseCase.class);
+        var useCase = mock(SweepExpiredBookingHoldsUseCase.class);
         TaskScheduler scheduler = mock(TaskScheduler.class);
         when(scheduler.getClock()).thenReturn(java.time.Clock.systemUTC());
         when(scheduler.scheduleWithFixedDelay(any(Runnable.class), any(Instant.class), any(Duration.class)))
@@ -125,7 +125,7 @@ class ReservationHoldExpirySchedulerTest {
                 .withBean("taskScheduler", TaskScheduler.class, () -> scheduler)
                 .run(context -> {
                     assertNull(context.getStartupFailure());
-                    assertEquals(1, context.getBeansOfType(ReservationHoldExpiryScheduler.class).size());
+                    assertEquals(1, context.getBeansOfType(BookingHoldExpiryScheduler.class).size());
                     assertEquals(1, context.getBean(ScheduledAnnotationBeanPostProcessor.class)
                             .getScheduledTasks().size());
                     var task = ArgumentCaptor.forClass(Runnable.class);
@@ -135,21 +135,21 @@ class ReservationHoldExpirySchedulerTest {
                     assertFalse(start.getValue().isAfter(Instant.now().plus(expectedDelay)));
                     verifyNoInteractions(useCase);
                     task.getValue().run();
-                    verify(useCase).expireHolds();
+                    verify(useCase).sweep();
                     verifyNoMoreInteractions(useCase);
                 });
     }
 
     /** Nạp cấu hình và adapter thật trong context nhỏ; không đọc application.properties của test. */
-    private static ApplicationContextRunner runner(ExpireReservationHoldsUseCase useCase) {
+    private static ApplicationContextRunner runner(SweepExpiredBookingHoldsUseCase useCase) {
         return new ApplicationContextRunner()
                 .withConfiguration(AutoConfigurations.of(TaskSchedulingAutoConfiguration.class,
                         ObservationAutoConfiguration.class, ScheduledTasksObservationAutoConfiguration.class))
                 .withPropertyValues("car-rental.availability.hold-duration=PT1H",
                         "car-rental.availability.hold-sweep-interval=PT30S",
                         "car-rental.time-zone=Asia/Ho_Chi_Minh", "spring.threads.virtual.enabled=false")
-                .withBean(ExpireReservationHoldsUseCase.class, () -> useCase)
-                .withUserConfiguration(ReservationHoldExpiryScheduler.class)
+                .withBean(SweepExpiredBookingHoldsUseCase.class, () -> useCase)
+                .withUserConfiguration(BookingHoldExpiryScheduler.class)
                 .withInitializer(context -> new ClassPathBeanDefinitionScanner((BeanDefinitionRegistry) context)
                         .scan("com.carrental.availability.config", "com.carrental.shared.config"));
     }

@@ -15,7 +15,6 @@ import com.carrental.availability.application.port.in.ReleaseReservationUseCase;
 import com.carrental.availability.application.port.in.MarkReservationInUseUseCase;
 import com.carrental.availability.application.port.in.CompleteReservationUseCase;
 import com.carrental.availability.application.port.in.MoveComplianceHoldStartUseCase;
-import com.carrental.availability.application.port.in.ExpireReservationHoldsUseCase;
 import com.carrental.availability.application.port.out.ReadReservationPort;
 import com.carrental.availability.application.port.out.ReadReservationPolicyPort;
 import com.carrental.availability.application.port.out.ReservationOverlapException;
@@ -48,7 +47,7 @@ import java.util.OptionalLong;
 @Service
 class ReservationCommandService implements HoldReservationUseCase, BlockReservationUseCase, ConfirmReservationUseCase,
         ReleaseReservationUseCase, MarkReservationInUseUseCase, CompleteReservationUseCase,
-        ExpireReservationHoldsUseCase, MoveComplianceHoldStartUseCase {
+        MoveComplianceHoldStartUseCase {
 
     private static final String CODE_PREFIX = "KL";
 
@@ -84,20 +83,6 @@ class ReservationCommandService implements HoldReservationUseCase, BlockReservat
         this.clock = clock;
     }
 
-    /**
-     * Nhả giữ chỗ đến hạn theo BR-103 bằng một cập nhật có điều kiện trong transaction.
-     *
-     * <p>Lấy applicationClock đúng một lần; không đọc lại chính sách, không đọc
-     * trước danh sách khóa. Port bảo vệ đồng thời bằng điều kiện HELD và hạn đã lưu.
-     * Lỗi được truyền ra để rollback cả lượt, scheduler sẽ chạy lượt kế tiếp.
-     *
-     * @return số bản ghi vừa chuyển sang RELEASED, chưa cam kết transaction ngoài đã commit
-     */
-    @Override
-    @Transactional(propagation = Propagation.REQUIRED)
-    public int expireHolds() {
-        return writePort.releaseExpiredHolds(clock.instant());
-    }
 
     /**
      * Cộng đệm, đóng băng hạn giữ chỗ và ghi trong transaction REQUIRED.

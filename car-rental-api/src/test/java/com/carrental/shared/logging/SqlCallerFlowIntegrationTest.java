@@ -254,20 +254,23 @@ class SqlCallerFlowIntegrationTest {
                 assertTrue(logs.events().isEmpty(), "A real scheduled UPDATE must also bypass SQL logging by default.");
                 return;
             }
-            await().atMost(Duration.ofSeconds(10)).until(() -> jobSql(logs).size() >= 2);
+            await().atMost(Duration.ofSeconds(10)).until(() -> !jobSql(logs).isEmpty()
+                    && logs.events().stream().filter(event -> event.getFormattedMessage().contains("FROM booking.booking")
+                            && event.getMDCPropertyMap().getOrDefault("requestId", "").startsWith("job-"))
+                    .map(event -> event.getMDCPropertyMap().get("requestId")).distinct().count() >= 2);
             var events = jobSql(logs);
-            var ids = new java.util.HashSet<String>();
             for (var event : events) {
                 String id = event.getMDCPropertyMap().get("requestId");
                 assertNotNull(id);
                 assertTrue(id.startsWith("job-"));
                 assertEquals(id.substring(4), UUID.fromString(id.substring(4)).toString());
-                assertTrue(ids.add(id), "Each scheduled SQL execution must belong to a fresh job invocation.");
-                assertContext(event, id, "ReservationHoldExpiryScheduler.sweep");
+                assertContext(event, id, "BookingHoldExpiryScheduler.sweep");
                 assertCallerOrder(event,
-                        "availability.adapter.out.persistence.ReservationWriteAdapter.releaseExpiredHolds",
-                        "availability.application.service.ReservationCommandService.expireHolds",
-                        "availability.adapter.in.scheduler.ReservationHoldExpiryScheduler.sweep");
+                        "availability.adapter.out.persistence.ReservationWriteAdapter.releaseExpiredHold",
+                        "availability.application.service.ReservationHoldExpiryService.expire",
+                        "booking.application.service.BookingHoldExpiryService.expire",
+                        "booking.application.service.BookingHoldSweepService.sweep",
+                        "booking.adapter.in.scheduler.BookingHoldExpiryScheduler.sweep");
             }
         }
     }

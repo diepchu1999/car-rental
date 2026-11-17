@@ -255,8 +255,10 @@ HTTP integration test kiểm riêng trường hợp chuyển trang với nhiều
 không sửa CSDL local hoặc tạo thêm đơn chờ chỉ để có nhiều trang demo.
 
 Folder **Part 4.3 - Cancel own pending booking**: chạy riêng A → B → C → D bằng Runner,
-một iteration, Keep variable values bật. Lượt nghiệm thu local chạy sau khi hoàn tất đồng bộ job hết hạn
-của Task 9; dữ liệu đơn cũ có thể đang PENDING_PAYMENT dù job cũ đã nhả hold.
+một iteration, Keep variable values bật. Job hết hạn chuyển đơn chờ quá hạn thành CANCELLED với lịch sử
+HOLD_EXPIRED và nhả giữ chỗ cùng transaction từng dòng (BR-103/304). Một dòng lỗi không chặn các dòng
+khác; lần dọn sau thử lại dòng đó. Đơn local còn PENDING_PAYMENT nhưng hold đã nhả cũng được job xử lý.
+API đọc không tự chạy job; sau khi khởi động, đợi một nhịp dọn cấu hình trước khi kiểm trạng thái.
 
 - A: CUSTOMER A đã có đơn PENDING_PAYMENT; tự đi hết danh sách để tìm đơn, rồi lưu snapshot.
 - B: CUSTOMER khác A; huỷ mã đơn A và mã không tồn tại đều nhận 404.

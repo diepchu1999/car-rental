@@ -25,6 +25,7 @@ class BookingWriteAdapter implements WriteBookingPort {
     private final String insertLine;
     private final String insertCreated;
     private final String cancelByCustomer;
+    private final String cancelExpired;
 
     /** Tải SQL một lần; không tự commit header trước khi lưu dòng giá/lịch sử. */
     BookingWriteAdapter(NamedParameterJdbcTemplate jdbc, SqlLoader loader) {
@@ -33,6 +34,7 @@ class BookingWriteAdapter implements WriteBookingPort {
         insertLine = loader.load(BookingSqlPaths.INSERT_LINE);
         insertCreated = loader.load(BookingSqlPaths.INSERT_CREATED);
         cancelByCustomer = loader.load(BookingSqlPaths.CANCEL_BY_CUSTOMER);
+        cancelExpired = loader.load(BookingSqlPaths.CANCEL_EXPIRED_PENDING);
     }
 
     /**
@@ -75,6 +77,23 @@ class BookingWriteAdapter implements WriteBookingPort {
             throw new IncorrectUpdateSemanticsDataAccessException("Expected one created booking history event.");
         }
         return true;
+    }
+
+    /** Cùng transaction ngoài với availability; lịch sử dùng tác nhân hệ thống, không giả tài khoản. */
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public boolean cancelExpiredPending(Booking cancelled) {
+        if (cancelled.status() != BookingStatus.CANCELLED || cancelled.statusChangedAt().isBefore(cancelled.holdExpiresAt())) {
+            throw new IllegalArgumentException("Expected a cancelled, expired booking.");
+        }
+        int affected = jdbc.update(cancelExpired, new MapSqlParameterSource()
+                .addValue("code", cancelled.code(), Types.VARCHAR)
+                .addValue("reservationCode", cancelled.reservationCode(), Types.VARCHAR)
+                .addValue("holdExpiresAt", timestamp(cancelled.holdExpiresAt()), Types.TIMESTAMP_WITH_TIMEZONE)
+                .addValue("changedAt", timestamp(cancelled.statusChangedAt()), Types.TIMESTAMP_WITH_TIMEZONE));
+        if (affected == 0) return false;
+        if (affected == 1) return true;
+        throw new IncorrectUpdateSemanticsDataAccessException("Expected zero or one expired booking history event.");
     }
 
     /** Chỉ cập nhật trạng thái và mốc huỷ; SQL dùng chủ lưu ở CSDL làm tác nhân lịch sử. */

@@ -2,6 +2,9 @@ package com.carrental.booking.adapter.out.persistence;
 
 /** Đường dẫn SQL riêng của booking, không truy cập bảng thuộc module khác. */
 final class BookingSqlPaths {
+    static final String FIND_FOR_EXPIRY = "sql/booking/find_booking_for_expiry.sql";
+    static final String FIND_EXPIRED_PENDING = "sql/booking/find_expired_pending_bookings.sql";
+    static final String CANCEL_EXPIRED_PENDING = "sql/booking/cancel_expired_pending_booking.sql";
     static final String INSERT = "sql/booking/insert_booking.sql";
     static final String INSERT_LINE = "sql/booking/insert_booking_line.sql";
     static final String INSERT_CREATED = "sql/booking/insert_booking_created_history.sql";

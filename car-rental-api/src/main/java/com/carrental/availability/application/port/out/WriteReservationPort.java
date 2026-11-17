@@ -93,18 +93,5 @@ public interface WriteReservationPort {
      */
     boolean moveComplianceHoldStart(String code, Instant expectedStartInclusive, Instant newStartInclusive);
 
-    /**
-     * Nhả nguyên tử các bản ghi còn HELD với hold_expires_at <= expiredAt theo BR-103.
-     *
-     * <p>Đây là chuyển trạng thái theo tập: điều kiện trạng thái và hạn nằm trong
-     * cùng UPDATE, không tải danh sách rồi gọi release từng bản ghi. Không nhả
-     * CONFIRMED nếu xác nhận thắng tranh chấp. Chỉ sửa status và status_changed_at;
-     * không xóa hồ sơ, đổi khoảng hoặc tính lại hạn. Chạy lại không sửa bản đã nhả.
-     * Adapter dùng savepoint, chỉ thử lại 40P01 tối đa ba lần với cùng expiredAt;
-     * hết lượt truyền đúng lỗi deadlock đầu tiên.
-     *
-     * @param expiredAt mốc dọn đồng thời là mốc chuyển trạng thái, từ Clock chung
-     * @return số bản ghi được nhả; số không là kết quả hợp lệ
-     */
-    int releaseExpiredHolds(Instant expiredAt);
+
 }

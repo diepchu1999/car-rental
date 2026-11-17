@@ -3,7 +3,8 @@ package com.carrental.availability.application.service;
 import com.carrental.PostgresTestConfiguration;
 import com.carrental.availability.application.command.ConfirmReservationCommand;
 import com.carrental.availability.application.port.in.ConfirmReservationUseCase;
-import com.carrental.availability.application.port.in.ExpireReservationHoldsUseCase;
+import com.carrental.availability.api.AvailabilityDirectory;
+import com.carrental.availability.api.HoldExpiryResult;
 import com.carrental.availability.application.port.out.ReadReservationPort;
 import com.carrental.availability.application.port.out.WriteReservationPort;
 import com.carrental.availability.domain.Reservation;
@@ -64,7 +65,7 @@ class ReservationExpiryConcurrencyIntegrationTest {
     private final ThreadLocal<Instant> invocationTime = ThreadLocal.withInitial(() -> EXPIRES);
 
     @Autowired
-    private ExpireReservationHoldsUseCase expiry;
+    private AvailabilityDirectory expiry;
     @Autowired
     private ConfirmReservationUseCase confirms;
     @Autowired
@@ -204,7 +205,7 @@ class ReservationExpiryConcurrencyIntegrationTest {
                 confirms.confirm(ConfirmReservationCommand.from(code));
                 return 1;
             }
-            return expiry.expireHolds();
+            return expiry.expireHold(code, EXPIRES) == HoldExpiryResult.RELEASED ? 1 : 0;
         } finally {
             invocationTime.remove();
         }

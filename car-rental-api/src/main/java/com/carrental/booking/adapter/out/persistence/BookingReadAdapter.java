@@ -1,5 +1,7 @@
 package com.carrental.booking.adapter.out.persistence;
 
+import com.carrental.booking.application.view.ExpiredBookingHold;
+import java.time.Instant;
 import com.carrental.booking.application.port.out.ReadBookingPort;
 import com.carrental.booking.domain.Booking;
 import com.carrental.booking.application.query.BookingPagePosition;
@@ -21,6 +23,8 @@ class BookingReadAdapter implements ReadBookingPort {
     private final String find;
     private final String lines;
     private final String search;
+    private final String forExpiry;
+    private final String expiredPending;
 
     /** Tải SQL một lần khi lắp bean. */
     BookingReadAdapter(NamedParameterJdbcTemplate jdbc, SqlLoader loader) {
@@ -28,6 +32,23 @@ class BookingReadAdapter implements ReadBookingPort {
         find = loader.load(BookingSqlPaths.FIND_OWNED);
         lines = loader.load(BookingSqlPaths.FIND_LINES);
         search = loader.load(BookingSqlPaths.SEARCH_OWNED);
+        forExpiry = loader.load(BookingSqlPaths.FIND_FOR_EXPIRY);
+        expiredPending = loader.load(BookingSqlPaths.FIND_EXPIRED_PENDING);
+    }
+
+    /** Đọc cho job, không kiểm CallerDirectory ngoài HTTP, không định giá lại. */
+    @Override
+    public Optional<Booking> loadForExpiry(String code) {
+        return DataAccessUtils.optionalResult(jdbc.query(forExpiry, Map.of("code", code), BookingRowMappers.HEADER))
+                .map(header -> header.booking(jdbc.query(lines, Map.of("bookingId", header.id()), BookingRowMappers.LINE)));
+    }
+
+    /** Dùng hạn đã đóng băng, trả tham chiếu tối thiểu thay vì tải mọi dòng giá. */
+    @Override
+    public List<ExpiredBookingHold> findExpiredPending(Instant expiredAt) {
+        return jdbc.query(expiredPending, new MapSqlParameterSource()
+                        .addValue("expiredAt", BookingJdbcValues.timestamp(expiredAt), Types.TIMESTAMP_WITH_TIMEZONE),
+                (row, index) -> new ExpiredBookingHold(row.getString("code"), row.getString("reservation_code")));
     }
 
     /** Không truy vấn dòng con khi sai chủ; không nuốt lỗi toàn vẹn hoặc dữ liệu hỏng. */
