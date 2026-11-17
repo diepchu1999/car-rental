@@ -2,7 +2,7 @@
   "info": {
     "name": "Car Rental - Task 09 - Booking",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "BR-122: Phần 2 kiểm chủ báo giá. Chạy riêng từng folder A → B → C → D, mỗi folder một lượt Runner. Chọn ADMIN cho A, cùng CUSTOMER A cho B/D, CUSTOMER B khác tài khoản cho C. Dùng token sẵn có tại Authorization của folder; không lưu token vào collection/environment và không Share/Sync token. Dữ liệu thử local, mỗi vòng tạo xe/chi nhánh mới."
+    "description": "BR-122: Phần 2 kiểm chủ báo giá. Chạy riêng từng folder A → B → C → D, mỗi folder một lượt Runner. Chọn ADMIN cho A, cùng CUSTOMER A cho B/D, CUSTOMER B khác tài khoản cho C. Dùng token sẵn có tại Authorization của folder; không lưu token vào collection/environment và không Share/Sync token. Dữ liệu thử local, mỗi vòng tạo xe/chi nhánh mới.\n\nTask 9: Phần 3.5 tạo/đọc đơn, 3.6 danh sách, 4.3 huỷ và 4.6 chuẩn bị đơn/nghiệm thu hết hạn. Phần 4.6 tạo khoảng thuê mới và key riêng, không thay state của 3.5. Xem mô tả từng folder; chạy riêng theo tài khoản, Keep variable values bật."
   },
   "variable": [
     {
@@ -4594,7 +4594,7 @@
                       "const seen=pm.variables.get('t9cSeen')||[]; for(const item of page.items){ if(seen.includes(item.code)){ pm.execution.setNextRequest(null); throw new Error(\"Repeated booking while paging; stop and inspect pagination.\"); } seen.push(item.code); if(item.status==='PENDING_PAYMENT') pm.variables.set('t9cPending',item.code); } pm.variables.set('t9cSeen',seen);",
                       "if(page.hasMore){ if(typeof page.nextCursor!=='string'||!page.nextCursor){ pm.execution.setNextRequest(null); throw new Error(\"Missing next cursor.\"); } pm.variables.set('t9cPageQuery','?limit=100&cursor='+encodeURIComponent(page.nextCursor)); pm.execution.setNextRequest(pm.info.requestId); } else {",
                       " const previous=pm.variables.get('t9cPrevious'); const chosen=pm.variables.get('t9cPending')||(previous&&previous.completed&&seen.includes(previous.code)?previous.code:null);",
-                      " pm.test('Own booking fixture exists',()=>pm.expect(Boolean(chosen)).to.equal(true)); if(!chosen){ pm.execution.setNextRequest(null); throw new Error(\"No pending booking. Create one with this eligible customer using Part 3.5, then rerun folder A. Do not edit database rows.\"); }",
+                      " pm.test('Own booking fixture exists',()=>pm.expect(Boolean(chosen)).to.equal(true)); if(!chosen){ pm.execution.setNextRequest(null); throw new Error(\"No pending booking. Run Part 4.6 / A - CUSTOMER A prepare cancellation booking, then rerun this folder A. Do not edit database rows.\"); }",
                       " pm.collectionVariables.set('t9cBooking',chosen); pm.collectionVariables.set('t9cSelection-'+pm.collectionVariables.get('t9cOwnerA'),JSON.stringify({code:chosen,completed:Boolean(previous&&previous.code===chosen&&previous.completed)})); }"
                     ]
                   }
@@ -5476,6 +5476,1047 @@
                       "pm.test('Response envelope', () => pm.expect(b).to.have.all.keys('success','data','error'));",
                       "pm.test('Success envelope', () => { pm.expect(b.success).to.equal(true); pm.expect(b.error).to.equal(null); });",
                       "pm.test('Cancelled result is unchanged',()=>pm.expect(b.data).to.deep.equal(JSON.parse(pm.collectionVariables.get('t9cCancelled'))));"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Part 4.6 - Cancellation and expiry acceptance",
+      "description": "BR-103/301/304: A chuẩn bị đơn cho Part 4.3 A→B→C→D. Sau khi huỷ xong, B chuẩn bị đơn để chờ hết hạn thật. Không huỷ đơn của B. Sau holdExpiresAt và một nhịp job, chạy C. Mỗi folder dùng Runner một iteration, Keep variable values bật. Không sửa TTL hoặc CSDL để giả hết hạn.",
+      "item": [
+        {
+          "name": "A - CUSTOMER A prepare cancellation booking",
+          "description": "BR-102/103/131: tìm đơn chờ của chính khách trước; chỉ tạo khi chưa có. Cần CUSTOMER đã có giấy tờ VERIFIED còn hiệu lực. Chạy cả folder bằng Runner, Keep variable values bật.",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Check CUSTOMER identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120: xác nhận khách và consent trước khi chuẩn bị."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9pIdentityChecked');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==200){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "const ok=b.data&&/^TK-[A-Z0-9]{6}$/.test(b.data.code||'')&&b.data.roles.includes('CUSTOMER')&&Boolean(b.data.termsVersion);",
+                      "pm.test('Consented CUSTOMER',()=>pm.expect(Boolean(ok)).to.equal(true));",
+                      "if(!ok){pm.execution.setNextRequest(null);throw new Error('Choose a consented CUSTOMER token.');}",
+                      "pm.variables.set('t9pIdentityChecked',true);pm.variables.set('t9pOwner',b.data.code);",
+                      "for(const key of ['t9pPending','t9pSelected','t9pQuote','t9pKey']) pm.variables.unset(key);pm.variables.set('t9pPageQuery','?limit=100');pm.variables.set('t9pSeen',[]);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Find existing pending booking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings{{t9pPageQuery}}",
+                "description": "BR-131: đi hết các trang, dùng lại đơn chờ thay vì tạo thêm."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==200){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "const seen=pm.variables.get('t9pSeen')||[];pm.test('Page shape',()=>{pm.expect(b.data.items).to.be.an('array');pm.expect(b.data.hasMore).to.be.a('boolean');});",
+                      "for(const item of b.data.items){if(seen.includes(item.code)){pm.execution.setNextRequest(null);throw new Error('Repeated booking while paging.');}seen.push(item.code);if(item.status==='PENDING_PAYMENT'){if(pm.variables.get('t9pPending')){pm.execution.setNextRequest(null);throw new Error('More than one pending booking for this customer.');}pm.variables.set('t9pPending',item.code);pm.variables.set('t9pSelected',item.code);}}pm.variables.set('t9pSeen',seen);",
+                      "if(b.data.hasMore){if(!b.data.nextCursor){pm.execution.setNextRequest(null);throw new Error('Missing cursor.');}pm.variables.set('t9pPageQuery','?limit=100&cursor='+encodeURIComponent(b.data.nextCursor));pm.execution.setNextRequest(pm.info.requestId);}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Quote only when no pending booking",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes",
+                "description": "BR-122: báo giá mới cho xe thử, nhận sau hai ngày lúc 10:00 giờ Việt Nam.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"vehicleCode\": \"{{t9bVehicle1}}\",\n  \"startAt\": \"{{t9pStart}}\",\n  \"endAt\": \"{{t9pEnd}}\",\n  \"rentalType\": \"DAILY\",\n  \"driveMode\": \"SELF_DRIVE\",\n  \"pickupMethod\": \"BRANCH\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}",
+                      "if(pm.variables.get('t9pPending')) pm.execution.skipRequest();",
+                      "if(!pm.variables.get('t9pPending')){if(!pm.collectionVariables.get('t9bVehicle1')){pm.execution.setNextRequest(null);throw new Error('Run Part 3.5 / A - ADMIN booking vehicle fixtures first.');}const day=new Date(Date.now()+7*3600000+2*86400000);const start=new Date(Date.UTC(day.getUTCFullYear(),day.getUTCMonth(),day.getUTCDate(),3));pm.variables.set('t9pStart',start.toISOString());pm.variables.set('t9pEnd',new Date(start.getTime()+86400000).toISOString());pm.variables.set('t9pKey',pm.variables.replaceIn('{{$guid}}'));}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==201){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "pm.test('Quote code',()=>pm.expect(b.data.code).to.match(/^BG-[0-9]{4}-[A-Z0-9]{6}$/));pm.variables.set('t9pQuote',b.data.code);pm.variables.set('t9pQuoteSnapshot',b.data);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 - Create only when no pending booking",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{t9pKey}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings",
+                "description": "BR-102/122/131: giữ chỗ và tạo đơn bằng key mới của lượt này, không đổi key của Part 3.5.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quoteCode\": \"{{t9pQuote}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}",
+                      "if(pm.variables.get('t9pPending')) pm.execution.skipRequest();",
+                      "if(!pm.variables.get('t9pPending')&&(!pm.variables.get('t9pQuote')||!pm.variables.get('t9pKey'))){pm.execution.setNextRequest(null);throw new Error('Run request 03 first.');}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==201){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "pm.test('New pending booking',()=>{pm.expect(b.data.code).to.match(/^DT-[0-9]{4}-[A-Z0-9]{6}$/);pm.expect(b.data.status).to.equal('PENDING_PAYMENT');pm.expect(Date.parse(b.data.holdExpiresAt)).to.be.above(Date.parse(b.data.createdAt));pm.expect(pm.response.headers.get('Location')).to.equal('/api/v1/client/bookings/'+b.data.code);});",
+                      "const quote=pm.variables.get('t9pQuoteSnapshot');pm.test('Frozen quote',()=>{for(const field of ['vehicleCode','startAt','endAt','lines','totalAmount','insuranceFee','rentalAmount'])pm.expect(b.data[field]).to.deep.equal(quote[field]);});pm.variables.set('t9pSelected',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "05 - Read pending booking and save deadline",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9pSelected}}",
+                "description": "BR-103: lưu snapshot và hạn thật; không thay đổi dữ liệu hoặc thời hạn giữ chỗ."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}",
+                      "if(!pm.variables.get('t9pSelected')){pm.execution.setNextRequest(null);throw new Error('No booking selected; run from request 01.');}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==200){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "pm.test('Selected pending booking',()=>{pm.expect(b.data.code).to.equal(pm.variables.get('t9pSelected'));pm.expect(b.data.status).to.equal('PENDING_PAYMENT');pm.expect(Date.parse(b.data.holdExpiresAt)).to.be.above(Date.now());});",
+                      "if(b.data.status!=='PENDING_PAYMENT'||Date.parse(b.data.holdExpiresAt)<=Date.now()){pm.execution.setNextRequest(null);throw new Error('Booking is already due. Wait for one scheduler sweep and rerun this preparation folder.');}",
+                      "pm.collectionVariables.set('t9pCancel-'+pm.variables.get('t9pOwner'),JSON.stringify({code:b.data.code,snapshot:b.data}));",
+                      "console.info('Booking '+b.data.code+'; actual hold deadline: '+b.data.holdExpiresAt);"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "B - CUSTOMER A prepare expiry booking",
+          "description": "BR-102/103/131: tìm đơn chờ của chính khách trước; chỉ tạo khi chưa có. Cần CUSTOMER đã có giấy tờ VERIFIED còn hiệu lực. Chạy cả folder bằng Runner, Keep variable values bật.",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Check CUSTOMER identity",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120: xác nhận khách và consent trước khi chuẩn bị."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.variables.unset('t9pIdentityChecked');"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==200){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "const ok=b.data&&/^TK-[A-Z0-9]{6}$/.test(b.data.code||'')&&b.data.roles.includes('CUSTOMER')&&Boolean(b.data.termsVersion);",
+                      "pm.test('Consented CUSTOMER',()=>pm.expect(Boolean(ok)).to.equal(true));",
+                      "if(!ok){pm.execution.setNextRequest(null);throw new Error('Choose a consented CUSTOMER token.');}",
+                      "pm.variables.set('t9pIdentityChecked',true);pm.variables.set('t9pOwner',b.data.code);",
+                      "for(const key of ['t9pPending','t9pSelected','t9pQuote','t9pKey']) pm.variables.unset(key);pm.variables.set('t9pPageQuery','?limit=100');pm.variables.set('t9pSeen',[]);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Find existing pending booking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings{{t9pPageQuery}}",
+                "description": "BR-131: đi hết các trang, dùng lại đơn chờ thay vì tạo thêm."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==200){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "const seen=pm.variables.get('t9pSeen')||[];pm.test('Page shape',()=>{pm.expect(b.data.items).to.be.an('array');pm.expect(b.data.hasMore).to.be.a('boolean');});",
+                      "for(const item of b.data.items){if(seen.includes(item.code)){pm.execution.setNextRequest(null);throw new Error('Repeated booking while paging.');}seen.push(item.code);if(item.status==='PENDING_PAYMENT'){if(pm.variables.get('t9pPending')){pm.execution.setNextRequest(null);throw new Error('More than one pending booking for this customer.');}pm.variables.set('t9pPending',item.code);pm.variables.set('t9pSelected',item.code);}}pm.variables.set('t9pSeen',seen);",
+                      "if(b.data.hasMore){if(!b.data.nextCursor){pm.execution.setNextRequest(null);throw new Error('Missing cursor.');}pm.variables.set('t9pPageQuery','?limit=100&cursor='+encodeURIComponent(b.data.nextCursor));pm.execution.setNextRequest(pm.info.requestId);}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Quote only when no pending booking",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/quotes",
+                "description": "BR-122: báo giá mới cho xe thử, nhận sau hai ngày lúc 10:00 giờ Việt Nam.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"vehicleCode\": \"{{t9bVehicle1}}\",\n  \"startAt\": \"{{t9pStart}}\",\n  \"endAt\": \"{{t9pEnd}}\",\n  \"rentalType\": \"DAILY\",\n  \"driveMode\": \"SELF_DRIVE\",\n  \"pickupMethod\": \"BRANCH\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}",
+                      "if(pm.variables.get('t9pPending')) pm.execution.skipRequest();",
+                      "if(!pm.variables.get('t9pPending')){if(!pm.collectionVariables.get('t9bVehicle1')){pm.execution.setNextRequest(null);throw new Error('Run Part 3.5 / A - ADMIN booking vehicle fixtures first.');}const day=new Date(Date.now()+7*3600000+2*86400000);const start=new Date(Date.UTC(day.getUTCFullYear(),day.getUTCMonth(),day.getUTCDate(),3));pm.variables.set('t9pStart',start.toISOString());pm.variables.set('t9pEnd',new Date(start.getTime()+86400000).toISOString());pm.variables.set('t9pKey',pm.variables.replaceIn('{{$guid}}'));}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==201){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "pm.test('Quote code',()=>pm.expect(b.data.code).to.match(/^BG-[0-9]{4}-[A-Z0-9]{6}$/));pm.variables.set('t9pQuote',b.data.code);pm.variables.set('t9pQuoteSnapshot',b.data);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 - Create only when no pending booking",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  },
+                  {
+                    "key": "Idempotency-Key",
+                    "value": "{{t9pKey}}"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings",
+                "description": "BR-102/122/131: giữ chỗ và tạo đơn bằng key mới của lượt này, không đổi key của Part 3.5.",
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"quoteCode\": \"{{t9pQuote}}\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}",
+                      "if(pm.variables.get('t9pPending')) pm.execution.skipRequest();",
+                      "if(!pm.variables.get('t9pPending')&&(!pm.variables.get('t9pQuote')||!pm.variables.get('t9pKey'))){pm.execution.setNextRequest(null);throw new Error('Run request 03 first.');}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 201',()=>pm.response.to.have.status(201));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==201){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "pm.test('New pending booking',()=>{pm.expect(b.data.code).to.match(/^DT-[0-9]{4}-[A-Z0-9]{6}$/);pm.expect(b.data.status).to.equal('PENDING_PAYMENT');pm.expect(Date.parse(b.data.holdExpiresAt)).to.be.above(Date.parse(b.data.createdAt));pm.expect(pm.response.headers.get('Location')).to.equal('/api/v1/client/bookings/'+b.data.code);});",
+                      "const quote=pm.variables.get('t9pQuoteSnapshot');pm.test('Frozen quote',()=>{for(const field of ['vehicleCode','startAt','endAt','lines','totalAmount','insuranceFee','rentalAmount'])pm.expect(b.data[field]).to.deep.equal(quote[field]);});pm.variables.set('t9pSelected',b.data.code);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "05 - Read pending booking and save deadline",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9pSelected}}",
+                "description": "BR-103: lưu snapshot và hạn thật; không thay đổi dữ liệu hoặc thời hạn giữ chỗ."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}",
+                      "if(!pm.variables.get('t9pSelected')){pm.execution.setNextRequest(null);throw new Error('No booking selected; run from request 01.');}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==200){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "pm.test('Selected pending booking',()=>{pm.expect(b.data.code).to.equal(pm.variables.get('t9pSelected'));pm.expect(b.data.status).to.equal('PENDING_PAYMENT');pm.expect(Date.parse(b.data.holdExpiresAt)).to.be.above(Date.now());});",
+                      "if(b.data.status!=='PENDING_PAYMENT'||Date.parse(b.data.holdExpiresAt)<=Date.now()){pm.execution.setNextRequest(null);throw new Error('Booking is already due. Wait for one scheduler sweep and rerun this preparation folder.');}",
+                      "pm.collectionVariables.set('t9pExpiry-'+pm.variables.get('t9pOwner'),JSON.stringify({code:b.data.code,snapshot:b.data}));",
+                      "console.info('Booking '+b.data.code+'; actual hold deadline: '+b.data.holdExpiresAt);"
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "C - CUSTOMER A verify actual expiry",
+          "description": "BR-103/304: chạy sau hạn thật cộng một nhịp job, dùng đúng khách ở B. Kiểm snapshot, trạng thái, huỷ lại 422. Lý do HOLD_EXPIRED được đối chiếu bằng SQL chỉ đọc, không suy từ response.",
+          "auth": {
+            "type": "oauth2",
+            "oauth2": [
+              {
+                "key": "grant_type",
+                "value": "authorization_code_with_pkce",
+                "type": "string"
+              },
+              {
+                "key": "authUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/auth",
+                "type": "string"
+              },
+              {
+                "key": "accessTokenUrl",
+                "value": "{{keycloakBaseUrl}}/realms/{{realm}}/protocol/openid-connect/token",
+                "type": "string"
+              },
+              {
+                "key": "clientId",
+                "value": "customer-web",
+                "type": "string"
+              },
+              {
+                "key": "clientSecret",
+                "value": "",
+                "type": "string"
+              },
+              {
+                "key": "redirect_uri",
+                "value": "https://oauth.pstmn.io/v1/callback",
+                "type": "string"
+              },
+              {
+                "key": "scope",
+                "value": "openid",
+                "type": "string"
+              },
+              {
+                "key": "challengeAlgorithm",
+                "value": "S256",
+                "type": "string"
+              },
+              {
+                "key": "state",
+                "value": "{{$guid}}",
+                "type": "string"
+              },
+              {
+                "key": "client_authentication",
+                "value": "body",
+                "type": "string"
+              },
+              {
+                "key": "addTokenTo",
+                "value": "header",
+                "type": "string"
+              },
+              {
+                "key": "tokenName",
+                "value": "Car Rental Task 09 customer-web",
+                "type": "string"
+              },
+              {
+                "key": "useBrowser",
+                "value": false,
+                "type": "boolean"
+              }
+            ]
+          },
+          "item": [
+            {
+              "name": "01 - Check expiry owner and saved deadline",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/accounts/me",
+                "description": "BR-120/103: lấy đúng state theo chủ, không trộn khách hoặc token."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "for(const key of ['t9pIdentityChecked','t9pExpiredSnapshot','t9pExpiryState','t9pSelected']) pm.variables.unset(key);"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==200){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "const ok=b.data&&/^TK-[A-Z0-9]{6}$/.test(b.data.code||'')&&b.data.roles.includes('CUSTOMER')&&Boolean(b.data.termsVersion);",
+                      "pm.test('Consented CUSTOMER',()=>pm.expect(Boolean(ok)).to.equal(true));",
+                      "if(!ok){pm.execution.setNextRequest(null);throw new Error('Choose a consented CUSTOMER token.');}",
+                      "pm.variables.set('t9pIdentityChecked',true);pm.variables.set('t9pOwner',b.data.code);",
+                      "const saved=JSON.parse(pm.collectionVariables.get('t9pExpiry-'+b.data.code)||'null');pm.test('Expiry fixture was prepared',()=>pm.expect(Boolean(saved&&saved.code&&saved.snapshot)).to.equal(true));if(!saved||!saved.snapshot){pm.execution.setNextRequest(null);throw new Error('Run folder B using this CUSTOMER first.');}",
+                      "pm.variables.set('t9pExpiryState',saved);pm.variables.set('t9pSelected',saved.code);if(Date.now()<Date.parse(saved.snapshot.holdExpiresAt)){pm.execution.setNextRequest(null);throw new Error('Not due yet. Run this folder after '+saved.snapshot.holdExpiresAt+' and one scheduler interval. Do not change TTL or database values.');}"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "02 - Read automatically cancelled booking",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9pSelected}}",
+                "description": "BR-103/304: CANCELLED sau hạn, toàn bộ giá và điều kiện response giữ nguyên."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==200){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "const before=pm.variables.get('t9pExpiryState').snapshot;pm.test('Cancelled after stored deadline',()=>{pm.expect(b.data.status).to.equal('CANCELLED');pm.expect(Date.parse(b.data.statusChangedAt)).to.be.at.least(Date.parse(before.holdExpiresAt));});",
+                      "pm.test('Frozen snapshot is unchanged',()=>{pm.expect(b.data).to.have.all.keys(Object.keys(before));for(const field of Object.keys(before))if(!['status','statusChangedAt'].includes(field))pm.expect(b.data[field]).to.deep.equal(before[field]);});",
+                      "if(b.data.status!=='CANCELLED'){pm.execution.setNextRequest(null);throw new Error('Job has not cancelled this booking. Wait one sweep interval; if it persists, inspect job logs.');}pm.variables.set('t9pExpiredSnapshot',b.data);"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "03 - Reject cancellation after expiry",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9pSelected}}/cancel",
+                "description": "BR-301/103: đơn đã huỷ bởi job không thể huỷ lần nữa."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}",
+                      "if(!pm.variables.get('t9pExpiredSnapshot')){pm.execution.setNextRequest(null);throw new Error('Run request 02 first.');}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 422',()=>pm.response.to.have.status(422));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "const b=pm.response.json();pm.test('Exact status error',()=>{pm.expect(b.success).to.equal(false);pm.expect(b.data).to.equal(null);pm.expect(b.error.code).to.equal('BOOKING_INVALID_STATUS_TRANSITION');});"
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "name": "04 - Read unchanged expired result",
+              "request": {
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "Accept",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "X-Client-Platform",
+                    "value": "web"
+                  },
+                  {
+                    "key": "X-Client-Version",
+                    "value": "0.0.1"
+                  }
+                ],
+                "url": "{{baseUrl}}/api/v1/client/bookings/{{t9pSelected}}",
+                "description": "BR-103/304: thử huỷ lại không viết lại trạng thái, thời gian hoặc snapshot."
+              },
+              "event": [
+                {
+                  "listen": "prerequest",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if(!pm.variables.get('t9pIdentityChecked')){pm.execution.setNextRequest(null);throw new Error('Run this folder from request 01 with the same token.');}"
+                    ]
+                  }
+                },
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "pm.test('HTTP 200',()=>pm.response.to.have.status(200));",
+                      "pm.test('Request ID',()=>pm.expect(pm.response.headers.get('X-Request-Id')||'').to.match(/^[A-Za-z0-9-]{1,64}$/));",
+                      "pm.test('Private response is not cached',()=>pm.expect(pm.response.headers.get('Cache-Control')||'').to.include('no-store'));",
+                      "if(pm.response.code!==200){pm.execution.setNextRequest(null);throw new Error('Unexpected HTTP status; inspect response.');}",
+                      "const b=pm.response.json();",
+                      "pm.test('Success envelope',()=>{pm.expect(b.success).to.equal(true);pm.expect(b.error).to.equal(null);});",
+                      "pm.test('Unchanged expired booking',()=>pm.expect(b.data).to.deep.equal(pm.variables.get('t9pExpiredSnapshot')));",
+                      "pm.collectionVariables.set('t9pExpiryCheckedBooking',b.data.code);"
                     ]
                   }
                 }

@@ -267,5 +267,26 @@ API đọc không tự chạy job; sau khi khởi động, đợi một nhịp d
 
 Chạy lại cả nhóm dùng đơn đã huỷ được ghi nhớ theo chủ, D kiểm 422 thay vì tạo thêm đơn.
 Để kiểm lại nhánh 200, chuẩn bị một đơn chờ mới cho cùng khách rồi chạy A từ đầu.
-Nếu lần đầu A không tìm được đơn chờ, collection dừng với hướng dẫn tạo đơn; không tự huỷ đơn khác
-hoặc nới assertion. Request tìm đơn dùng biến local của Runner, phải chạy từ request 01.
+Nếu lần đầu A không tìm được đơn chờ, chạy **Part 4.6 / A** để chuẩn bị đơn, rồi chạy lại Part 4.3 / A;
+không tự huỷ đơn khác hoặc nới assertion. Request tìm đơn dùng biến local của Runner, phải chạy từ request 01.
+
+
+Folder **Part 4.6 - Cancellation and expiry acceptance** chuẩn bị và kiểm bằng hạn thật (BR-103/301/304).
+Sau khi import Replace, chạy **Part 3.5 / A - ADMIN booking vehicle fixtures** nếu chưa có biến xe thử.
+Dùng CUSTOMER A có consent, CCCD/GPLX VERIFIED phù hợp xe 5 chỗ số tự động, còn hiệu lực hết chuyến:
+
+1. **A - CUSTOMER A prepare cancellation booking**: tìm đơn chờ qua toàn bộ danh sách. Có đơn thì dùng
+   lại và bỏ qua hai request báo giá/tạo đơn; chưa có thì tạo báo giá, key mới và đơn mới. Lưu hạn thật.
+2. Chạy **Part 4.3 / A → B → C → D** theo đúng tài khoản mô tả ở trên để nghiệm thu huỷ chủ động.
+3. **B - CUSTOMER A prepare expiry booking**: chuẩn bị một đơn chờ tiếp theo theo cùng cách; không huỷ
+   đơn này. Request 05 trả `holdExpiresAt`; giữ backend chạy qua hạn đó cộng một nhịp job.
+4. **C - CUSTOMER A verify actual expiry**: dùng đúng CUSTOMER A ở B, kiểm CANCELLED, các giá trị đóng
+   băng không đổi, thử huỷ lại nhận 422 `BOOKING_INVALID_STATUS_TRANSITION`, rồi GET không thay đổi.
+
+Chạy từng folder bằng Runner từ request 01, một iteration, bật Keep variable values. Biến `t9p*` được
+script tự quản lý; không sửa state `t9bState-*` của Phần 3.5. Hai request bị skip khi đã có đơn chờ là
+đúng thiết kế. Hạn giữ chỗ là 1 tiếng; nhịp job mặc định 30 giây, theo cấu hình local đang chạy.
+Không sửa TTL hay dữ liệu đóng băng để giả hết hạn. `holdExpiresAt` có hậu tố Z là giờ UTC (giờ VN +7).
+Lý do `HOLD_EXPIRED`, người thực hiện hệ thống và trạng thái giữ chỗ RELEASED phải đối chiếu bằng SQL
+chỉ đọc; response HTTP không chứa lịch sử để khẳng định ba điều này. Sau C, mã đơn được lưu ở biến
+collection `t9pExpiryCheckedBooking` phục vụ đối chiếu. Chạy lại C chỉ đọc và thử thao tác bị từ chối.
