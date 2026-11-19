@@ -147,7 +147,8 @@ Các cổng chính:
 | Module cần | Module cung cấp | Qua |
 |---|---|---|
 | `booking` kiểm tra xe và lấy loại sở hữu | `vehicle` | `VehicleDirectory` → `VehicleRef` |
-| `booking` giữ chỗ | `availability` | `AvailabilityDirectory.hold(...)` |
+| `booking` giữ chỗ | `availability` | `AvailabilityDirectory.hold(...)` — trả cả hạn đã lưu; đơn chép đúng hạn này |
+| `booking` hết hạn giữ chỗ, khách huỷ đơn chờ | `availability` | `findExpiredHolds(...)`, `expireHold(...)`, `release(...)` — **job hết hạn ở `booking`**, mỗi dòng một transaction: huỷ đơn và nhả chỗ cùng commit (từ Task 9) |
 | `search` lọc xe đang bận | `availability` | `AvailabilityDirectory.findBusyVehicleIds(...)` |
 | `search` tìm chi nhánh trong bán kính | `branch` | `BranchDirectory` — PostGIS, trả cả khoảng cách |
 | `search` lấy xe hiển thị được | `vehicle` | `VehicleSearchDirectory` → `VehicleSearchView` |

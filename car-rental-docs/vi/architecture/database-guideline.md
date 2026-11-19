@@ -149,7 +149,9 @@ một ràng buộc, mọi lý do bận đều bình đẳng.
 application khi tạo bản ghi, **không phải** khi hiển thị cho khách.
 
 **`HELD` bắt buộc có hạn** — 1 tiếng (BR-103), có job dọn. Không có hạn thì xe bị khoá vĩnh viễn
-bởi đơn khách bỏ dở.
+bởi đơn khách bỏ dở. Từ Task 9, job nằm ở `booking` và đi qua `availability.api`: mỗi khoá lịch hết hạn xử lý
+trong transaction riêng, nhả chỗ và huỷ đơn cùng commit; một dòng lỗi không chặn các dòng khác. Ghi vào bảng
+khoá lịch vẫn chỉ do `availability` (R7).
 
 `CHECK` chỉ ép **hình dạng**: có hạn, và hạn nằm sau lúc tạo. **Độ dài một tiếng là tham số cấu
 hình** (BR-225) do ứng dụng giữ, không viết vào `CHECK` — nhúng một con số nghiệp vụ vào DDL nghĩa

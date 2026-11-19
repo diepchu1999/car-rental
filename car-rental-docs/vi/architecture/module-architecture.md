@@ -44,7 +44,7 @@ com/carrental/<module>/
     │   │   └── response/
     │   └── admin/            # /api/v1/admin/**   → admin-web
     ├── in/internal/          # cài đặt api/<X>Directory — cổng module khác gọi vào
-    ├── in/scheduler/         # job định kỳ: dọn HELD quá hạn, nhắc kỳ thanh toán
+    ├── in/scheduler/         # job định kỳ: hết hạn đơn chờ cọc (booking), nhắc kỳ thanh toán
     └── out/
         ├── persistence/      # Native SQL
         │   ├── <X>ReadAdapter.java
