@@ -113,7 +113,8 @@ Ngày cấp của bản đang dùng chọn bảng hạng; B1 cấp từ mốc tr
 khi thuê ô tô. Ngày nộp, ngày kiểm và ngày trả xe không thay thế ngày cấp.
 Giấy tờ hết hạn ngày D còn dùng được hết ngày D theo múi giờ ứng dụng (Việt Nam);
 `tripEnd` là giờ trả thực tế, không cộng đệm.
-Cổng không giữ chỗ, tạo đơn hoặc thay việc xác thực/phân quyền của bên gọi; hiện chưa nối vào booking.
+Luồng tạo đơn mới của `booking` gọi cổng này để kiểm giấy tờ trước khi giữ chỗ.
+Cổng không tự giữ chỗ, tạo đơn hoặc thay việc xác thực/phân quyền của bên gọi.
 
 ### 2. Khởi động hạ tầng
 
@@ -298,7 +299,11 @@ chưa gán chi nhánh nhận `403 STAFF_BRANCH_REQUIRED`, đọc chéo hoặc sa
 Đổi giá ngày chỉ cho ADMIN hoặc MANAGER của chi nhánh có xe; STAFF không được đổi giá.
 Giá phải dương, nguyên VND và chia hết cho 1.000; cập nhật không đổi trạng thái hay báo giá cũ.
 Chỉ dùng dữ liệu giả ở local, không dùng bản này với dữ liệu thật.
-Báo giá hiện chưa gắn chủ sở hữu.
+Báo giá chỉ cho CUSTOMER đã tạo nó đọc và dùng để đặt xe (BR-122); mã của người khác trả
+`404 QUOTE_NOT_FOUND`. Báo giá cũ chưa có chủ cũng bị từ chối — xin báo giá mới, không gán chủ cho lịch sử.
+Kiểm quyền bằng folder **Part 2 - Quote ownership (BR-122)** trong
+[collection booking](postman/task-09-booking.postman_collection.json): chạy riêng A → B → C → D;
+A dùng ADMIN, B/D cùng khách A, C khách B khác A. Chọn token tại từng folder; mã tài nguyên được truyền tự động.
 Kiểm bằng thư mục `Part 3 - Backend namespace security` trong
 [collection identity](postman/task-08a-identity.postman_collection.json), environment `Car Rental - Local`.
 Các request OAuth2 dùng **Get New Access Token → Use Token**, không copy token vào file hay bật đồng bộ token.
@@ -463,7 +468,7 @@ Job `@Scheduled` có `requestId=job-<UUID>` mới mỗi lượt và `api=Class.m
 Khi job lỗi, `method/path` là `-`; vẫn ghi stack trace và tiếp tục lượt định kỳ sau, không ghi lỗi hai lần:
 
 ```text
-ERROR [requestId=job-7ea10e02-1f17-443a-bfa2-dc228d25d847] [api=ReservationHoldExpiryScheduler.sweep] Failure summary: rootType="java.net.ConnectException" rootMessage="Connection refused" source="-" method="-" path="-" requestId="job-7ea10e02-1f17-443a-bfa2-dc228d25d847" api="ReservationHoldExpiryScheduler.sweep"
+ERROR [requestId=job-7ea10e02-1f17-443a-bfa2-dc228d25d847] [api=BookingHoldExpiryScheduler.sweep] Failure summary: rootType="java.net.ConnectException" rootMessage="Connection refused" source="-" method="-" path="-" requestId="job-7ea10e02-1f17-443a-bfa2-dc228d25d847" api="BookingHoldExpiryScheduler.sweep"
 ```
 
 **Quan sát và kiểm tra**
@@ -472,7 +477,7 @@ Postman: import [SQL Caller](postman/task-sql-caller.postman_collection.json), c
 Kiểm profile với dữ liệu giả trong PostgreSQL Testcontainers (Docker Desktop hoạt động), từ `car-rental-api/`:
 
 ```bash
-./mvnw -Dspring.profiles.active=sql-log '-Dtest=SqlLoggingIntegrationTest,SqlCallerFlowIntegrationTest,ReservationHoldExpirySchedulerTest,ReservationWriteAdapterIntegrationTest,ReservationHoldIntegrationTest,ReservationDeadlockIntegrationTest,ReservationInsertRetryTest,ReservationHoldConcurrencyIntegrationTest' test
+./mvnw -Dspring.profiles.active=sql-log '-Dtest=SqlLoggingIntegrationTest,SqlCallerFlowIntegrationTest,BookingHoldExpirySchedulerTest,ReservationWriteAdapterIntegrationTest,ReservationHoldIntegrationTest,ReservationDeadlockIntegrationTest,ReservationInsertRetryTest,ReservationHoldConcurrencyIntegrationTest' test
 ```
 
 Kỳ vọng `BUILD SUCCESS`, không failure/error. Ca cố tình gây lỗi có thể in ERROR/stack trace dù test xanh.
@@ -493,23 +498,28 @@ không dùng mã đơn. Kết quả tra cứu rảnh không bảo đảm giữ �
 
 Theo BR-103, backend tự chuyển `HELD` thành `RELEASED` khi `hold_expires_at` đã đến hạn.
 Job luôn được đăng ký, không có công tắc tắt; dùng `applicationClock` chung và không tính lại TTL từ cấu hình hiện tại.
-Chỉ `status` và `status_changed_at` được cập nhật; không xóa bản ghi lịch.
+Với đơn chờ trả cọc, job chuyển đơn thành `CANCELLED`, ghi lịch sử `HOLD_EXPIRED` với tác nhân hệ thống,
+và nhả hold trong cùng transaction của dòng đó. Không thay giá đã đóng băng hoặc xử lý tiền.
 
 Nhịp chạy lấy từ `car-rental.availability.hold-sweep-interval`
 (`CAR_RENTAL_HOLD_SWEEP_INTERVAL`, mặc định `PT30S`). Job đợi một nhịp sau khởi động;
 sau mỗi lượt kết thúc mới đợi tiếp một nhịp, không chạy bù dồn các lượt bị chậm.
 Nhịp phải lớn hơn không. Đây là cấu hình vận hành, không đi qua port chính sách TTL.
 
-Hai instance cùng chạy được bảo vệ bởi điều kiện `status = 'HELD'` và
-`hold_expires_at <= mốc_dọn` trong cùng câu `UPDATE`. Bản đã nhả hoặc đã xác nhận
-không bị job ghi đè. Nếu một lượt gặp lỗi, transaction rollback, scheduler ghi nhận
-lỗi và tiếp tục ở lượt định kỳ sau. Job chỉ nhả khóa lịch, không xử lý đơn thuê hay tiền.
+`BookingHoldExpiryScheduler` xử lý mỗi dòng bằng transaction riêng. Câu ghi kiểm lại trạng thái
+và hạn đã lưu, nên hai instance hoặc khách huỷ cùng lúc chỉ có một lịch sử chuyển trạng thái.
+Dòng lỗi rollback cả đơn, lịch sử và nhả chỗ; log có `Failure summary:`, mã đơn/hold, `job-UUID`
+và tên job. Các dòng khác vẫn tiếp tục, dòng lỗi được thử lại ở lượt sau. Lỗi đọc danh sách
+được scheduler ghi nhận và thử lại lượt định kỳ sau.
+
+Job quét cả đơn chờ quá hạn lẫn hold quá hạn: đơn local có hold đã nhả vẫn được đóng lại;
+hold độc lập chưa có đơn vẫn được dọn. Không ghi đè hold đã xác nhận hoặc lịch sử đã có.
 
 Test đặt `car-rental.availability.hold-sweep-interval=PT24H`
 trong `src/test/resources/application.properties`. Job vẫn được đăng ký, nhưng độ trễ ban đầu
 cũng là 24 giờ nên không tự sửa fixture trong thời gian chạy suite thông thường.
 File này không được đóng gói vào ứng dụng local. Các test expiry gọi use case chủ động;
-`ReservationHoldExpirySchedulerTest` dùng context riêng để kiểm đăng ký job, nhịp chạy,
+`BookingHoldExpirySchedulerTest` dùng context riêng để kiểm đăng ký job, nhịp chạy,
 độ trễ ban đầu và khả năng tiếp tục sau lỗi. Cấu hình công tắc cũ không còn tác dụng.
 Không thêm biến bắt buộc vào `.env`.
 

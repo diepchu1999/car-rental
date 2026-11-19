@@ -130,3 +130,34 @@ Tiêu chí (Tech Owner duyệt 11/10/2026):
 
 Không dùng mức `low` cho prompt task: prompt dài, nhiều ràng buộc đan nhau (BR, R1–R12, ADR), mức thấp
 dễ bỏ sót đúng những thứ đó.
+
+**Prompt sửa lỗi sau review:** chạm đúng vùng tranh chấp hoặc tiền thì giữ model của task gốc; sửa nhỏ
+(Postman, tài liệu API, đổi tên) dùng model chính · `medium`.
+
+### Bảng áp dụng cho các task còn lại (Tech Owner duyệt 15/11/2026)
+
+Bảng là **mặc định**, không phải chốt cứng: mỗi lần soạn prompt vẫn đọc lại danh sách model và ghi dòng gợi
+ý riêng. Review cho thấy model chính để lọt lỗi ranh giới hay quy tắc ở loại task nào thì đề xuất nâng loại đó.
+
+| Task | Model · mức | Vì sao |
+|---|---|---|
+| `payment` — trả cọc, xác nhận thủ công | Astra · `high` | Tiền, `Idempotency-Key` |
+| `customer-web` | Sol · `high` | Giao diện, không tranh chấp; task frontend đầu tiên — review soi kỹ |
+| Nền frontend — springdoc, sinh client, pnpm workspace | Sol · `high` | Hạ tầng, không tranh chấp |
+| `admin-web` tối thiểu — hàng chờ giấy tờ, hàng chờ cọc | Sol · `high` | Giao diện; nút xác nhận cọc dựa vào chống trùng ở backend (BR-213) |
+| Lát cắt 2 — bàn giao, trả xe, quyết toán | Astra · `high` | Ba khoản tiền, bằng chứng bất biến, đóng băng giá trị quyết toán |
+| Lát cắt 3 — huỷ, đổi xe giữ cọc | Astra · `high` | Hoàn tiền; giữ chỗ mới trước khi nhả chỗ cũ |
+| Lát cắt 4 — thuê có tài xế | Astra · `high` | Chống trùng lịch tài xế |
+| Lát cắt 5 — thuê dài hạn | Astra · `high` | Kỳ thanh toán, phí trễ hạn, đình chỉ |
+| Lát cắt 6 — bảo dưỡng, đăng kiểm, điều chuyển | Astra · `high` | Ghi vào bảng khoá lịch |
+| Lát cắt 6 — sự cố, phạt nguội | Astra · `high` | Thu tiền của khách (miễn thường, tiền phạt) |
+| Lát cắt 6 — đánh giá | Sol · `high` | Không tranh chấp, không tiền |
+| `config` (trước khi chạy thật) | Sol · `high` | Không tranh chấp; review soi kỹ việc đọc tham số theo mốc thời gian |
+| Thông báo — `notification`, outbox | Astra · `high` | Chống gửi trùng (BR-1008), xử lý đồng thời |
+| Giao xe tận nơi | Astra · `high` | Chống trùng lịch nhân viên giao xe |
+| Xoay vòng khoá mã hoá | Astra · `high` | Mã hoá, dữ liệu nhạy cảm |
+| Mobile | Sol · `high` | Giao diện |
+| Việc dọn nhỏ — job dọn OTP, cấu hình IP sau proxy… | Sol · `medium` | Phạm vi hẹp |
+
+Model chưa có căn cứ (ví dụ `gpt-6.1-terra`, xuất hiện 15/11/2026, Codex không mô tả năng lực) không đưa
+vào bảng. Muốn thử thì dùng cho một việc nhỏ `$task` trước, rồi xem kết quả review.

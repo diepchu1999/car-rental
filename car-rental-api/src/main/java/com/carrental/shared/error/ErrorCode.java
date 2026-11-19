@@ -87,8 +87,23 @@ public enum ErrorCode {
     /** BR-120: khách thiếu bằng chứng đồng ý điều khoản hợp lệ. */
     CONSENT_REQUIRED("Valid consent to the terms is required."),
 
+    /** Đơn không tồn tại hoặc không thuộc khách đang gọi; trả 404 theo security-guideline §2. */
+    BOOKING_NOT_FOUND("The booking was not found."),
+
+    /** BR-131: CSDL từ chối đơn chờ thứ hai của cùng khách; trả 409. */
+    BOOKING_PENDING_PAYMENT_EXISTS("The customer already has a booking awaiting deposit payment."),
+
+    /** BR-301, status-flow §1: không cho huỷ đơn ngoài trạng thái chờ trả cọc; trả 422. */
+    BOOKING_INVALID_STATUS_TRANSITION("The booking status does not allow this operation."),
+
+    /** api-guideline §5: key còn hạn đã được dùng với nội dung khác; trả 409. */
+    IDEMPOTENCY_KEY_REUSED("The idempotency key was already used with a different request."),
+
     /** Báo giá không tồn tại khi đọc theo BR-122. */
     QUOTE_NOT_FOUND("The requested quote was not found."),
+
+    /** BR-122: báo giá đúng chủ nhưng đã hết hạn dùng để đặt xe; trả 422. */
+    QUOTE_EXPIRED("The quote has expired. Please request a new quote."),
 
     /** BR-125: lát cắt báo giá chưa hỗ trợ có tài xế. */
     QUOTE_DRIVE_MODE_NOT_SUPPORTED("Quotes with a driver are not supported yet."),

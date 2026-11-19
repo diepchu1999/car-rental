@@ -1,7 +1,9 @@
 package com.carrental.availability.api;
 
+import java.time.Instant;
+
 /**
- * Trả thông tin định danh tối thiểu của khóa lịch vừa được ghi.
+ * Trả định danh và hạn thực tế của khóa lịch vừa được ghi (BR-103, ADR-0014).
  *
  * <p>Module gọi sử dụng code cho các thao tác xác nhận, giải phóng,
  * bàn giao và hoàn tất. Không dùng bookingCode thay cho mã reservation
@@ -15,9 +17,11 @@ package com.carrental.availability.api;
  *
  * @param id khóa chính nội bộ do database sinh
  * @param code mã nghiệp vụ của reservation
+ * @param holdExpiresAt hạn thực tế đã lưu khi giữ chỗ; null với khóa vận hành, không tính lại từ TTL
  */
 public record ReservationRef(
         long id,
-        String code
+        String code,
+        Instant holdExpiresAt
 ) {
 }

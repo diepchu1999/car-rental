@@ -23,7 +23,7 @@ import java.util.*;
 import static com.carrental.pricing.domain.PricingTestFixtures.*;
 import static org.junit.jupiter.api.Assertions.*;
 
-/** HTTP thật đi qua controller, booking/vehicle API, pricing và PostgreSQL; không dùng transaction bao ngoài test. */
+/** HTTP thật đi qua controller, rental/vehicle API, pricing và PostgreSQL; không dùng transaction bao ngoài test. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @Import({PostgresTestConfiguration.class, HttpIdentityTestConfiguration.class,
         QuoteApiIntegrationTest.ApiConfiguration.class})
@@ -37,6 +37,42 @@ class QuoteApiIntegrationTest {
     @Autowired private ObjectMapper mapper;
     @Autowired private com.carrental.vehicle.application.port.out.ReadVehiclePort vehicleReads;
     @Autowired private com.carrental.availability.api.AvailabilityDirectory availability;
+    @Autowired private com.carrental.pricing.application.port.out.ReadQuotePort quoteReads;
+
+    /** BR-122: lấy chủ từ token; body giả chủ không chuyển quyền, khách khác nhận cùng lỗi với mã thiếu. */
+    @Test
+    void quoteBelongsToAuthenticatedCreatorAndIsHiddenFromAnotherCustomer() throws Exception {
+        String otherToken = tokens.anotherCustomerToken(clock);
+        var otherAccount = success(sendAsCustomer("GET", "/api/v1/client/accounts/me", null, otherToken), 200);
+        var ownerAccount = success(send("GET", "/api/v1/client/accounts/me", null, null), 200);
+        assertNotEquals(ownerAccount.path("code").asString(), otherAccount.path("code").asString());
+        var body = payload(vehicle(1_000_000, true), "DAILY", "2026-11-10T08:00", "2026-11-10T18:00");
+        body.put("customerAccountCode", otherAccount.path("code").asString());
+        var created = quoteSuccess(post(PATH, body), 201);
+        String code = created.path("code").asString();
+        assertEquals(ownerAccount.path("code").asString(), quoteReads.findByCode(code).orElseThrow().customerAccountCode());
+        assertFalse(created.has("customerAccountCode")); // Không đổi hợp đồng response.
+        assertEquals(created, quoteSuccess(send("GET", PATH + "/" + code, null, null), 200));
+        var other = sendAsCustomer("GET", PATH + "/" + code, null, otherToken);
+        var missing = sendAsCustomer("GET", PATH + "/BG-2610-MISS99", null, otherToken);
+        error(other, 404, "QUOTE_NOT_FOUND"); error(missing, 404, "QUOTE_NOT_FOUND");
+        assertEquals(mapper.readTree(missing.body()), mapper.readTree(other.body()));
+        var otherQuote = quoteSuccess(sendAsCustomer("POST", PATH, mapper.writeValueAsString(body), otherToken), 201);
+        String otherCode = otherQuote.path("code").asString();
+        assertEquals(otherAccount.path("code").asString(), quoteReads.findByCode(otherCode).orElseThrow().customerAccountCode());
+        assertEquals(otherQuote, quoteSuccess(sendAsCustomer("GET", PATH + "/" + otherCode, null, otherToken), 200));
+        error(send("GET", PATH + "/" + otherCode, null, null), 404, "QUOTE_NOT_FOUND");
+    }
+
+    /** Dùng JWT ký thật của khách được chọn, không thay CallerDirectory hoặc bỏ filter. */
+    private HttpResponse<String> sendAsCustomer(String method, String path, String body, String token) throws Exception {
+        var request = HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + path))
+                .timeout(Duration.ofSeconds(10)).header("Authorization", "Bearer " + token)
+                .header("Accept", "application/json").header("Content-Type", "application/json")
+                .header("X-Client-Platform", "web").header("X-Client-Version", "0.0.1")
+                .method(method, body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofString(body));
+        return client.send(request.build(), HttpResponse.BodyHandlers.ofString());
+    }
 
     /** BR-120: báo giá cần CUSTOMER; ADMIN thuần không có quyền khách và không tự nhận thêm vai. */
     @ParameterizedTest
@@ -163,7 +199,7 @@ class QuoteApiIntegrationTest {
         error(post(PATH, body), 422, code);
     }
 
-    /** Dùng đúng điều kiện booking: tối thiểu, giờ chi nhánh và cửa sổ nhận xe. */
+    /** Dùng đúng điều kiện rental: tối thiểu, giờ chi nhánh và cửa sổ nhận xe. */
     @ParameterizedTest
     @CsvSource({"HOURLY,2026-11-10T08:00,2026-11-10T11:00,RENTAL_DURATION_TOO_SHORT",
             "DAILY,2026-11-10T23:30,2026-11-11T10:00,OUTSIDE_BRANCH_HOURS",

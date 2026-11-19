@@ -5,13 +5,14 @@
 - BR-122: báo giá bất biến, có hạn dùng; đổi giá xe/cấu hình không đổi báo giá đã tạo.
 - BR-114/218/235–237: giá gói giờ/ngày, loại ngày, giờ lẻ và làm tròn riêng từng dòng.
 - BR-231: bảo hiểm là khoản riêng, không nằm trong `rentalAmount`.
-- BR-113/119/121/125: dùng cùng điều kiện thuê của `booking.api.RentalTermsDirectory`.
+- BR-113/119/121/125: dùng cùng điều kiện thuê của `rental.api.RentalTermsDirectory`.
 - Không thu tiền, giữ chỗ hoặc kiểm lịch xe. Báo giá không cam kết xe còn trống (ADR-0005).
 - Namespace `/client` cần access token hợp lệ có vai `CUSTOMER` (BR-120/801).
   Gửi `Authorization: Bearer <access-token>`; thiếu/token sai trả `401 UNAUTHENTICATED`,
   sai quyền namespace trả `403 ACCESS_DENIED`, giữ response envelope chung.
-- Báo giá chưa gắn chủ thể sở hữu: khách đã xác thực có mã vẫn đọc được báo giá đó.
-  Chỉ dùng dữ liệu giả ở local; xác thực không thay thế kiểm quyền sở hữu tài nguyên.
+- BR-122: chủ báo giá lấy từ danh tính CUSTOMER đã xác thực, không nhận từ body.
+  Khách khác dùng mã báo giá trả `404 QUOTE_NOT_FOUND`, giống mã không tồn tại.
+  Báo giá lịch sử trước V015 chưa có chủ cũng trả lỗi này; khách xin báo giá mới, không gán chủ đoán.
 - Không có phí tài xế/giao xe, giảm giá, cọc, phần còn lại hoặc thế chấp trong lát cắt này.
 
 ## Endpoint
@@ -26,6 +27,8 @@ Mọi endpoint áp dụng [X-Request-Id](http-headers.md) và response envelope 
 Mã `BG-<yymm>-<6>`: `yymm` là tháng **tạo báo giá theo giờ Việt Nam**, không phải tháng nhận xe.
 Không đưa khóa chính số lên URL hoặc response. Tham chiếu xe lưu bằng `vehicle_code` vì chỉ cần
 đối chiếu/hiển thị; không lưu thêm ID, không có FK hoặc JOIN chéo schema (ADR-0008).
+Chủ lưu bằng `customer_account_code` (`TK-<6>`) trong schema pricing, không FK sang identity.
+V015 giữ NULL cho lịch sử; CHECK `NOT VALID` vẫn ép báo giá mới phải có chủ. Không sửa V009.
 
 ## Tạo báo giá
 
@@ -46,12 +49,15 @@ Cả sáu trường bắt buộc, không nhận null; mã xe không được tr�
 hai mốc là giờ nhận/trả thực tế, không cộng đệm. `endAt` phải sau `startAt`.
 Hai mốc phải biểu diễn được tới micro giây (tối đa sáu chữ số thập phân có nghĩa);
 phần nhỏ hơn micro giây trả 400 `INVALID_REQUEST`. Không tự làm tròn vì có thể đổi số giờ tính tiền BR-237.
-Các trường ngoài hợp đồng bị bỏ qua: client không quyết định mã báo giá, số tiền hoặc hạn dùng.
+Các trường ngoài hợp đồng bị bỏ qua: client không quyết định mã báo giá, số tiền, hạn dùng hoặc chủ.
+Ví dụ gửi `customerAccountCode` của người khác không đổi chủ; báo giá vẫn thuộc tài khoản gửi token.
 
 Lát cắt 1 hỗ trợ `HOURLY`, `DAILY`, `SELF_DRIVE`, `BRANCH`.
 Các giá trị enum đã biết nhưng chưa hỗ trợ bị từ chối bằng mã riêng; enum không đọc được trả 400.
 
 Thứ tự kiểm lỗi tất định:
+
+Biên xác thực/namespace và use case xác nhận CUSTOMER trước khi thực hiện nghiệp vụ báo giá.
 
 1. JSON và cấu trúc command: đủ trường, mã có nội dung, khoảng dương.
 2. Lựa chọn chưa hỗ trợ: MONTHLY → WITH_DRIVER → DELIVERY.
@@ -136,8 +142,18 @@ POST không dùng `Idempotency-Key`: tạo lại cùng đầu vào là **báo gi
 ## Đọc báo giá
 
 GET giữ nguyên hợp đồng trên, đọc header/dòng từ schema `pricing`, không tra giá xe hoặc cấu hình mới.
-Báo giá quá hạn **vẫn trả 200**. Kiểm `QUOTE_EXPIRED` khi đặt xe thuộc task booking, không thuộc GET này.
+Báo giá của đúng chủ dù quá hạn **vẫn trả 200**. Không trả thông tin snapshot hoặc hạn cho khách khác.
+Kiểm `QUOTE_EXPIRED` khi dùng báo giá để đặt xe, không thuộc GET này.
 Mã có nội dung được giữ nguyên khi tra cứu; không cắt khoảng trắng/đổi hoa thường.
+
+Cổng nội bộ `pricing.api.QuoteDirectory.getForBooking(code, customerAccountCode, at)` nhận mã khách
+đã xác thực và mốc tạo đơn từ use case booking. Kiểm chủ trước hạn: sai chủ/thiếu chủ/thiếu mã →
+`QUOTE_NOT_FOUND`; đúng chủ nhưng `at >= expiresAt` → `422 QUOTE_EXPIRED`. Trả snapshot đã lưu,
+không đọc lại cấu hình, không tính lại giá và không tự giữ chỗ. Cổng này không phải endpoint REST mới.
+
+Để đặt xe bằng báo giá, dùng [`POST /api/v1/client/bookings`](booking.md) với body `quoteCode`
+và header `Idempotency-Key`. Booking mới kiểm lại chủ/hạn, giấy tờ, điều kiện thuê và giữ chỗ;
+không dùng GET báo giá như một cam kết xe còn trống. Cọc và phần còn lại xuất hiện trên response đơn.
 
 Snapshot lưu giá ngày, tập cuối tuần, hai mức tăng, cách tính/giá trị/số ngày bảo hiểm và hạn dùng;
 từng dòng lưu loại ngày/mức tăng đã áp. Không lưu toàn bộ lịch lễ vào mỗi báo giá; lịch sử lễ thuộc ADR-0013.
@@ -149,7 +165,7 @@ Không có endpoint cập nhật báo giá. V009 cũng chặn UPDATE header/dòn
 |---|---|---|
 | 400 | INVALID_REQUEST | JSON/enum/thời điểm sai, thiếu/null trường, mã trắng hoặc khoảng không dương |
 | 404 | VEHICLE_NOT_FOUND | Xe không tồn tại hoặc không ACTIVE |
-| 404 | QUOTE_NOT_FOUND | GET không tìm thấy mã báo giá |
+| 404 | QUOTE_NOT_FOUND | Mã không tồn tại, không thuộc khách đang gọi, hoặc lịch sử chưa có chủ |
 | 422 | QUOTE_RENTAL_TYPE_NOT_SUPPORTED | MONTHLY chưa hỗ trợ |
 | 422 | QUOTE_DRIVE_MODE_NOT_SUPPORTED | WITH_DRIVER chưa hỗ trợ |
 | 422 | QUOTE_PICKUP_METHOD_NOT_SUPPORTED | DELIVERY chưa hỗ trợ |
@@ -163,6 +179,17 @@ Không có endpoint cập nhật báo giá. V009 cũng chặn UPDATE header/dòn
 Thông điệp tiếng Anh; không trả class, stack trace, SQL hoặc chi tiết kết nối ra response.
 
 ## Kiểm bằng Postman và SQL
+
+Kiểm quyền sở hữu bằng [collection Task 9](../../../postman/task-09-booking.postman_collection.json),
+folder **Part 2 - Quote ownership (BR-122)**, sau khi backend áp V015. Chọn environment **Car Rental - Local**.
+Chạy riêng từng folder con A → B → C → D bằng Runner, một iteration: A dùng ADMIN; B/D cùng CUSTOMER A;
+C dùng CUSTOMER B khác A. Chọn token ở Authorization của folder, request con kế thừa; không lưu token
+vào biến hoặc Share/Sync token. Mã chi nhánh/xe/báo giá và mã khách truyền tự động qua collection.
+Khoảng thuê sinh theo ngày chạy, nhận lúc 10:00 giờ VN sau hai ngày, trả sau 24 giờ; dữ liệu fixture
+duy nhất mỗi lượt. Nếu khoảng này vượt lịch lễ đã khai báo, cập nhật cấu hình lịch lễ local trước khi thử.
+Các request phá hoại phải có test xanh với **404 QUOTE_NOT_FOUND**, không phải chỉ nhận bất kỳ 4xx nào.
+Biên hết hạn và dữ liệu cũ thiếu chủ được kiểm trong `QuoteQueryServiceTest`, `QuoteServiceIntegrationTest`
+và `QuoteOwnerMigrationIntegrationTest` trên PostgreSQL container.
 
 Import [collection Task 7](../../../postman/task-07-pricing.postman_collection.json) cùng
 [environment local](../../../postman/local.postman_environment.json), chọn **Car Rental - Local**.

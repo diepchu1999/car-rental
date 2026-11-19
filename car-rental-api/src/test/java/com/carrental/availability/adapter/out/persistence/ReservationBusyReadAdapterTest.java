@@ -59,6 +59,7 @@ class ReservationBusyReadAdapterTest {
         }
         verify(loader).load(ReservationSqlPaths.FIND_BUSY_VEHICLE_IDS);
         verify(loader).load(ReservationSqlPaths.FIND_BY_CODE);
+        verify(loader).load(ReservationSqlPaths.FIND_EXPIRED_HOLDS);
         verifyNoMoreInteractions(loader, jdbc);
     }
 

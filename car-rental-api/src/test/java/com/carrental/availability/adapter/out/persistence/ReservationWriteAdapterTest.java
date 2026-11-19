@@ -80,7 +80,7 @@ class ReservationWriteAdapterTest {
         verify(loader).load(ReservationSqlPaths.INSERT);
         verify(loader).load(ReservationSqlPaths.UPDATE_STATUS);
         verify(loader).load(ReservationSqlPaths.MOVE_COMPLIANCE_HOLD_START);
-        verify(loader).load(ReservationSqlPaths.RELEASE_EXPIRED_HOLDS);
+        verify(loader).load(ReservationSqlPaths.RELEASE_EXPIRED_HOLD);
         verifyNoMoreInteractions(loader);
         verify(jdbc, times(2)).queryForList(eq(sql), any(SqlParameterSource.class), eq(Long.class));
         verifyNoMoreInteractions(jdbc);

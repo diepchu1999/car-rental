@@ -52,7 +52,7 @@ class ReservationWriteAdapter implements WriteReservationPort {
     private final String insertSql;
     private final String updateStatusSql;
     private final String moveComplianceHoldStartSql;
-    private final String releaseExpiredHoldsSql;
+    private final String releaseExpiredHoldSql;
     private final TransactionTemplate nestedWrite;
 
     /**
@@ -72,7 +72,7 @@ class ReservationWriteAdapter implements WriteReservationPort {
         this.insertSql = sqlLoader.load(ReservationSqlPaths.INSERT);
         this.updateStatusSql = sqlLoader.load(ReservationSqlPaths.UPDATE_STATUS);
         this.moveComplianceHoldStartSql = sqlLoader.load(ReservationSqlPaths.MOVE_COMPLIANCE_HOLD_START);
-        this.releaseExpiredHoldsSql = sqlLoader.load(ReservationSqlPaths.RELEASE_EXPIRED_HOLDS);
+        this.releaseExpiredHoldSql = sqlLoader.load(ReservationSqlPaths.RELEASE_EXPIRED_HOLD);
         this.nestedWrite = new TransactionTemplate(transactionManager);
         this.nestedWrite.setPropagationBehavior(TransactionDefinition.PROPAGATION_NESTED);
     }
@@ -204,26 +204,18 @@ class ReservationWriteAdapter implements WriteReservationPort {
                 "Expected to move zero or one compliance hold, but got: " + affected);
     }
 
-    /**
-     * Nhả HELD đến hạn theo mốc application cung cấp; không đọc hoặc tính lại hạn.
-     *
-     * <p>Điều kiện ngay trong UPDATE bảo vệ trước job khác và xác nhận đồng thời.
-     * Dùng savepoint trong transaction bên gọi, chỉ thử lại 40P01 với cùng mốc dọn.
-     * Không đổi lỗi lưu trữ thành xe bận.
-     *
-     * @param expiredAt mốc dọn và mốc đổi trạng thái, không null
-     * @return số dòng cập nhật không âm
-     */
+
+    /** Ghi đúng một dòng qua cùng helper savepoint/retry; không nhả bằng kết quả đọc ứng viên cũ. */
     @Override
-    public int releaseExpiredHolds(Instant expiredAt) {
-        Objects.requireNonNull(expiredAt, "expiredAt must not be null.");
-        MapSqlParameterSource parameters = new MapSqlParameterSource()
+    public boolean releaseExpiredHold(String code, Instant expiredAt) {
+        Objects.requireNonNull(code, "code");
+        Objects.requireNonNull(expiredAt, "expiredAt");
+        var parameters = new MapSqlParameterSource().addValue("code", code, Types.VARCHAR)
                 .addValue("expiredAt", toOffsetDateTime(expiredAt), Types.TIMESTAMP_WITH_TIMEZONE);
-        int affected = executeWrite(() -> jdbcTemplate.update(releaseExpiredHoldsSql, parameters));
-        if (affected < 0) {
-            throw new IncorrectUpdateSemanticsDataAccessException("Expected a non-negative expired hold count.");
-        }
-        return affected;
+        int affected = executeWrite(() -> jdbcTemplate.update(releaseExpiredHoldSql, parameters));
+        if (affected == 0) return false;
+        if (affected == 1) return true;
+        throw new IncorrectUpdateSemanticsDataAccessException("Expected zero or one expired hold.");
     }
 
     /**

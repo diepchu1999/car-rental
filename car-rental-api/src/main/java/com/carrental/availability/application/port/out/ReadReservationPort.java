@@ -1,9 +1,12 @@
 package com.carrental.availability.application.port.out;
 
+import com.carrental.availability.api.ExpiredHoldRef;
 import com.carrental.availability.domain.Reservation;
 import com.carrental.availability.domain.ReservationPeriod;
 
+import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -15,6 +18,9 @@ import java.util.Set;
  * của PostgreSQL và không được dùng để đọc kiểm trống trước khi giữ chỗ.
  */
 public interface ReadReservationPort {
+
+    /** Chỉ HELD có hạn <= mốc dọn; không khoá hoặc cập nhật, không dùng để quyết định xe trống. */
+    List<ExpiredHoldRef> findExpiredHolds(Instant expiredAt);
 
     /**
      * Tải nguyên trạng một khóa lịch bằng mã reservation duy nhất.

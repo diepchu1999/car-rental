@@ -41,7 +41,7 @@ final class QuoteRowMappers {
                 new InsuranceTerms(InsuranceCalculation.valueOf(rs.getString("insurance_calculation")),
                         rs.getBigDecimal("insurance_value")), rs.getInt("insurance_billing_days"),
                 Duration.ofSeconds(whole, nanos));
-        return new Header(rs.getLong("id"), rs.getString("code"), rs.getString("vehicle_code"),
+        return new Header(rs.getLong("id"), rs.getString("code"), rs.getString("customer_account_code"), rs.getString("vehicle_code"),
                 instant(rs, "start_at"), instant(rs, "end_at"), RentalType.valueOf(rs.getString("rental_type")),
                 DriveMode.valueOf(rs.getString("drive_mode")), PickupMethod.valueOf(rs.getString("pickup_method")),
                 snapshot, rs.getLong("rental_amount"), rs.getLong("insurance_fee"), rs.getLong("total_amount"),
@@ -54,12 +54,12 @@ final class QuoteRowMappers {
     }
 
     /** Dữ liệu ghép nội bộ adapter; ID chỉ dùng đọc dòng con trong cùng schema. */
-    record Header(long id, String code, String vehicleCode, Instant startAt, Instant endAt,
+    record Header(long id, String code, String customerAccountCode, String vehicleCode, Instant startAt, Instant endAt,
             RentalType rentalType, DriveMode driveMode, PickupMethod pickupMethod, QuoteSnapshot snapshot,
             long rentalAmount, long insuranceFee, long totalAmount, Instant createdAt, Instant expiresAt) {
         /** Xác nhận tổng khớp các dòng đã lưu trước khi trả mô hình đọc cho application. */
         QuoteDetail detail(List<QuoteLine> lines) {
-            return new QuoteDetail(code, vehicleCode, startAt, endAt, rentalType, driveMode, pickupMethod,
+            return new QuoteDetail(code, customerAccountCode, vehicleCode, startAt, endAt, rentalType, driveMode, pickupMethod,
                     snapshot, new CalculatedPrice(lines, rentalAmount, insuranceFee, totalAmount), createdAt, expiresAt);
         }
     }

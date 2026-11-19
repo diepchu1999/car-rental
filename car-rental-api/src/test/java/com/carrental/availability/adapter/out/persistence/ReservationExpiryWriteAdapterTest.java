@@ -42,19 +42,21 @@ class ReservationExpiryWriteAdapterTest {
             return new SimpleTransactionStatus();
         });
         SqlLoader loader = new SqlLoader();
-        sql = loader.load(ReservationSqlPaths.RELEASE_EXPIRED_HOLDS);
+        sql = loader.load(ReservationSqlPaths.RELEASE_EXPIRED_HOLD);
         adapter = new ReservationWriteAdapter(jdbc, loader, transactions);
     }
 
-    /** Kiểm một lệnh ghi với mốc UTC đúng kiểu, trả đúng số dòng và dùng scope NESTED. */
+    /** Kiểm một lệnh ghi với mốc UTC đúng kiểu, trả đúng boolean và dùng scope NESTED. */
     @ParameterizedTest
-    @ValueSource(ints = {0, 1, 20})
+    @ValueSource(ints = {0, 1})
     void bindsSingleCutoffAndReturnsCount(int count) {
         when(jdbc.update(eq(sql), any(SqlParameterSource.class))).thenReturn(count);
-        assertEquals(count, adapter.releaseExpiredHolds(NOW));
+        assertEquals(count == 1, adapter.releaseExpiredHold("KL-EXP001", NOW));
         var captor = ArgumentCaptor.forClass(SqlParameterSource.class);
         verify(jdbc).update(eq(sql), captor.capture());
-        assertArrayEquals(new String[]{"expiredAt"}, captor.getValue().getParameterNames());
+        assertArrayEquals(new String[]{"code", "expiredAt"}, captor.getValue().getParameterNames());
+        assertEquals("KL-EXP001", captor.getValue().getValue("code"));
+        assertEquals(Types.VARCHAR, captor.getValue().getSqlType("code"));
         assertEquals(NOW.atOffset(ZoneOffset.UTC), captor.getValue().getValue("expiredAt"));
         assertEquals(Types.TIMESTAMP_WITH_TIMEZONE, captor.getValue().getSqlType("expiredAt"));
         verifyNoMoreInteractions(jdbc);
@@ -66,15 +68,16 @@ class ReservationExpiryWriteAdapterTest {
     /** Kiểm thiếu mốc dọn bị từ chối trước JDBC. */
     @Test
     void rejectsNullCutoff() {
-        assertThrows(NullPointerException.class, () -> adapter.releaseExpiredHolds(null));
+        assertThrows(NullPointerException.class, () -> adapter.releaseExpiredHold("KL-EXP001", null));
         verifyNoInteractions(jdbc, transactions);
     }
 
-    /** Kiểm số dòng âm bất thường phải lỗi, không diễn giải thành một lượt dọn thành công. */
-    @Test
-    void rejectsNegativeCount() {
-        when(jdbc.update(eq(sql), any(SqlParameterSource.class))).thenReturn(-1);
-        assertThrows(IncorrectUpdateSemanticsDataAccessException.class, () -> adapter.releaseExpiredHolds(NOW));
+    /** Kiểm số dòng khác 0/1 phải lỗi, không diễn giải thành một lượt dọn thành công. */
+    @ParameterizedTest
+    @ValueSource(ints = {-1, 2})
+    void rejectsUnexpectedCount(int count) {
+        when(jdbc.update(eq(sql), any(SqlParameterSource.class))).thenReturn(count);
+        assertThrows(IncorrectUpdateSemanticsDataAccessException.class, () -> adapter.releaseExpiredHold("KL-EXP001", NOW));
     }
 
     /** Kiểm lỗi kết nối truyền nguyên trạng, không được thử lại như deadlock. */
@@ -83,7 +86,7 @@ class ReservationExpiryWriteAdapterTest {
         var failure = new DataAccessResourceFailureException("Storage unavailable.");
         when(jdbc.update(eq(sql), any(SqlParameterSource.class))).thenThrow(failure);
         assertSame(failure, assertThrows(DataAccessResourceFailureException.class,
-                () -> adapter.releaseExpiredHolds(NOW)));
+                () -> adapter.releaseExpiredHold("KL-EXP001", NOW)));
         verify(jdbc).update(eq(sql), any(SqlParameterSource.class));
         verifyNoMoreInteractions(jdbc);
     }

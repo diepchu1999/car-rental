@@ -1,6 +1,6 @@
 package com.carrental.shared.rental;
 
-/** Cách nhận xe theo BR-121 và BR-126; quy tắc thời gian thuộc booking. */
+/** Cách nhận xe theo BR-121 và BR-126; quy tắc thời gian thuộc rental. */
 public enum PickupMethod {
     /** Khách nhận xe tại chi nhánh. */
     BRANCH,

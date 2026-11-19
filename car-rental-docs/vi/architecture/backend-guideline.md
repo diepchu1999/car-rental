@@ -94,6 +94,9 @@ Mã lỗi là **hợp đồng ổn định** — mobile bản cũ hiển thị t
 | `RESERVATION_INVALID_STATUS_TRANSITION` | 422 | Trạng thái khoá lịch không cho phép thao tác — status-flow §2, BR-015 |
 | `RESERVATION_INVALID_STATUS_TRANSITION` | 409 | Khoá lịch đã đổi giữa lúc đọc và lúc ghi có điều kiện (đổi trạng thái, dời mốc khoá giấy tờ); đọc lại, không tự thử lại |
 | `BOOKING_INVALID_STATUS_TRANSITION` | 422 | Nhảy cóc trạng thái |
+| `BOOKING_NOT_FOUND` | 404 | Không tìm thấy đơn theo mã `DT-<yymm>-<6>`, hoặc đơn không thuộc người gọi |
+| `BOOKING_PENDING_PAYMENT_EXISTS` | 409 | Khách đã có một đơn chờ trả cọc (BR-131) |
+| `IDEMPOTENCY_KEY_REUSED` | 409 | Cùng `Idempotency-Key` nhưng nội dung khác lần đầu (api-guideline §5) |
 | `CANCELLATION_WINDOW_PASSED` | 422 | Ngoài cửa sổ huỷ |
 | `DRIVER_LICENSE_NOT_VERIFIED` | 403 | Chưa xác minh GPLX (BR-106) |
 | `DRIVER_LICENSE_EXPIRES_BEFORE_TRIP_END` | 422 | GPLX hết hạn trước khi chuyến kết thúc (BR-106b, BR-503b) |

@@ -69,6 +69,8 @@ car-rental/
 │   └── pom.xml · src/                    # build ra .jar, nạp vào container Keycloak; bytecode Java 21
 │                                         # theo Java của image Keycloak, không theo Java của backend
 ├── customer-web/ · admin-web/            # React + TypeScript
+├── web-shared/                           # gói dùng chung hai app: client API sinh từ OpenAPI, auth, lỗi
+├── pnpm-workspace.yaml                   # gom customer-web, admin-web, web-shared (frontend-guideline §1a)
 └── mobile/                               # React Native
 ```
 

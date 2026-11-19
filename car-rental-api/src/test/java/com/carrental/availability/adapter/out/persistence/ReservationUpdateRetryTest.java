@@ -53,7 +53,7 @@ class ReservationUpdateRetryTest {
 
     /** Kiểm một/hai deadlock được rollback trước lần kế tiếp và mọi lần dùng đúng cùng bộ tham số. */
     @ParameterizedTest
-    @CsvSource({"status, 1", "status, 2", "expiry, 1", "expiry, 2", "move, 1", "move, 2"})
+    @CsvSource({"status, 1", "status, 2", "move, 1", "move, 2", "singleExpiry, 1", "singleExpiry, 2"})
     void retriesAfterRollbackWithIdenticalParameters(String operation, int deadlocks) {
         String sql = sqlFor(operation);
         int[] calls = {0};
@@ -84,7 +84,7 @@ class ReservationUpdateRetryTest {
 
     /** Kiểm dừng đúng lần ba và ném lại object deadlock đầu tiên, không biến thành false hoặc số không. */
     @ParameterizedTest
-    @ValueSource(strings = {"status", "expiry", "move"})
+    @ValueSource(strings = {"status", "move", "singleExpiry"})
     void exhaustsThreeAttemptsAndRethrowsFirstDeadlock(String operation) {
         String sql = sqlFor(operation);
         DataAccessException first = postgresFailure("40P01");
@@ -102,9 +102,8 @@ class ReservationUpdateRetryTest {
 
     /** Kiểm SQLSTATE khác, kể cả lock timeout và exclusion violation, không được thử lại hay đổi lỗi. */
     @ParameterizedTest
-    @CsvSource({"status, 55P03", "expiry, 55P03", "status, 40001", "expiry, 40001",
-            "status, 23P01", "expiry, 23P01", "status, 08006", "expiry, 08006",
-            "move, 55P03", "move, 40001", "move, 23P01", "move, 08006"})
+    @CsvSource({"status, 55P03", "status, 40001", "status, 23P01", "status, 08006", "move, 55P03", "move, 40001", "move, 23P01", "move, 08006",
+            "singleExpiry, 55P03", "singleExpiry, 40001", "singleExpiry, 23P01", "singleExpiry, 08006"})
     void doesNotRetryOtherSqlStates(String operation, String state) {
         String sql = sqlFor(operation);
         DataAccessException failure = postgresFailure(state);
@@ -118,7 +117,7 @@ class ReservationUpdateRetryTest {
 
     /** Kiểm không suy deadlock từ thông báo hoặc SQLException không phải của driver PostgreSQL. */
     @ParameterizedTest
-    @ValueSource(strings = {"status", "expiry", "move"})
+    @ValueSource(strings = {"status", "move", "singleExpiry"})
     void doesNotInferDeadlockFromMessageOrNonPostgresCause(String operation) {
         String sql = sqlFor(operation);
         var failure = new PessimisticLockingFailureException("40P01 deadlock detected",
@@ -131,7 +130,7 @@ class ReservationUpdateRetryTest {
 
     /** Kiểm sau deadlock, lỗi timeout phải truyền đúng object timeout và dừng ngay. */
     @ParameterizedTest
-    @ValueSource(strings = {"status", "expiry", "move"})
+    @ValueSource(strings = {"status", "move", "singleExpiry"})
     void stopsOnDifferentFailureAfterDeadlock(String operation) {
         String sql = sqlFor(operation);
         DataAccessException timeout = postgresFailure("55P03");
@@ -145,7 +144,7 @@ class ReservationUpdateRetryTest {
 
     /** Kiểm retry có thể kết thúc bằng không dòng khớp: giữ semantics CAS hoặc lượt dọn rỗng. */
     @ParameterizedTest
-    @ValueSource(strings = {"status", "expiry", "move"})
+    @ValueSource(strings = {"status", "move", "singleExpiry"})
     void preservesZeroRowsAfterDeadlock(String operation) {
         String sql = sqlFor(operation);
         DataAccessException deadlock = postgresFailure("40P01");
@@ -163,7 +162,7 @@ class ReservationUpdateRetryTest {
     private String sqlFor(String operation) {
         return loader.load(switch (operation) {
             case "status" -> ReservationSqlPaths.UPDATE_STATUS;
-            case "expiry" -> ReservationSqlPaths.RELEASE_EXPIRED_HOLDS;
+            case "singleExpiry" -> ReservationSqlPaths.RELEASE_EXPIRED_HOLD;
             case "move" -> ReservationSqlPaths.MOVE_COMPLIANCE_HOLD_START;
             default -> throw new IllegalArgumentException("Unknown operation: " + operation);
         });
@@ -174,7 +173,7 @@ class ReservationUpdateRetryTest {
         return switch (operation) {
             case "status" -> adapter.updateStatus("KL-RETRY1", ReservationStatus.HELD,
                     ReservationStatus.CONFIRMED, CHANGED) ? 1 : 0;
-            case "expiry" -> adapter.releaseExpiredHolds(CHANGED);
+            case "singleExpiry" -> adapter.releaseExpiredHold("KL-RETRY1", CHANGED) ? 1 : 0;
             case "move" -> adapter.moveComplianceHoldStart("KL-RETRY1", CHANGED, CHANGED.plusSeconds(86400)) ? 1 : 0;
             default -> throw new IllegalArgumentException("Unknown operation: " + operation);
         };

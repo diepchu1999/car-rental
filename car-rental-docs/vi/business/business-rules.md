@@ -673,7 +673,11 @@ Thế chấp hoàn **100%** ngay sau khi khách trả xe và hoàn tất kiểm 
 Giai đoạn hiện tại, nhân viên xác nhận đã nhận tiền bằng tay. Thao tác này là **ghi tiền**, nên bắt
 buộc: idempotent (xác nhận hai lần không nhân đôi), ghi audit đầy đủ (ai, khi nào, số tiền), và
 không cho phép xác nhận lại một khoản đã xác nhận.
-*Nguồn: §8.*
+
+**Ai xác nhận cọc:** khách chuyển khoản cọc vào tài khoản công ty, nên **`ACCOUNTANT`** xác nhận — kế toán là
+người đối chiếu sao kê ngân hàng. `BRANCH_MANAGER` xác nhận thay khi cần (BR-217); `ADMIN` làm được tất cả.
+**Phần còn lại** thu tại chi nhánh lúc bàn giao do `BRANCH_STAFF` xác nhận (BR-204) — hai khoản, hai người.
+*Nguồn: §8. Ai xác nhận cọc: Tech Owner duyệt 15/11/2026.*
 
 ### BR-214 — Khách phải đăng ký tài khoản ngân hàng ✅ GĐ1
 Khách phải đăng ký sẵn số tài khoản ngân hàng trong app. Mọi khoản hoàn tiền chuyển về tài khoản này.
@@ -1551,7 +1555,10 @@ Kết quả tìm kiếm chỉ ghi "cách 3,2 km" thì khách không biết đó 
   khoá **tăng dần** (mỗi 5 lần sai cộng thêm 15 phút). **Không khoá vĩnh viễn** — khoá vĩnh viễn cho phép
   người ngoài cố tình làm tê liệt tài khoản nhân viên. Thời gian khoá **tối đa 1 giờ**; `ADMIN` mở khoá
   sớm được.
-*Nguồn: Tech Owner duyệt 12/10/2026. Khoá khi đoán mật khẩu: duyệt 20/10/2026, review Task 8a phát hiện.*
+- **Tìm tài khoản theo số điện thoại:** chỉ `ADMIN`, và **mỗi lần tìm ghi audit** (ai tìm, số nào, lúc nào).
+  Số điện thoại là dữ liệu cá nhân; tìm tự do là cách dò xem một người có dùng dịch vụ không.
+*Nguồn: Tech Owner duyệt 12/10/2026. Khoá khi đoán mật khẩu: duyệt 20/10/2026, review Task 8a phát hiện.
+Tìm tài khoản: duyệt 15/11/2026.*
 
 ### BR-810 — Quyền trên chi nhánh và danh mục xe ✅ GĐ1
 | Thao tác | Vai được phép |

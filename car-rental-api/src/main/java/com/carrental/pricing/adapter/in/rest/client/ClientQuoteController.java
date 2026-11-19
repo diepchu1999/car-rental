@@ -12,7 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.net.URI;
 
-/** API báo giá BR-122; namespace client chưa có xác thực, identity sẽ bổ sung ở lát cắt sau. */
+/** API báo giá BR-122; identity xác thực CUSTOMER, use case kiểm chủ báo giá. */
 @RestController
 @RequestMapping(path = ClientQuoteController.BASE_PATH, produces = MediaType.APPLICATION_JSON_VALUE)
 class ClientQuoteController {

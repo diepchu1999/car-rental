@@ -5,7 +5,7 @@ package com.carrental.shared.rental;
  * Không chứa quy tắc; chỉ *PolicyResolver được rẽ nhánh trên enum này.
  */
 public enum RentalType {
-    /** Thuê theo giờ; điều kiện tối thiểu do policy của booking kiểm. */
+    /** Thuê theo giờ; điều kiện tối thiểu do policy của rental kiểm. */
     HOURLY,
     /** Thuê theo ngày. */
     DAILY,

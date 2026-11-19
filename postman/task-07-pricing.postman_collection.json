@@ -1315,7 +1315,7 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/v1/client/accounts/me",
-                "description": "BR-120/801, api-guideline §2: xác nhận token CUSTOMER và tài khoản có bằng chứng đồng ý điều khoản trước khi gọi báo giá; không gán chủ báo giá trong task này."
+                "description": "BR-120/122/801: xác nhận CUSTOMER đã consent; dùng cùng tài khoản ở các folder khách vì chỉ chủ được đọc báo giá."
               },
               "event": [
                 {
@@ -1565,7 +1565,7 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/v1/client/accounts/me",
-                "description": "BR-120/801, api-guideline §2: xác nhận token CUSTOMER và tài khoản có bằng chứng đồng ý điều khoản trước khi gọi báo giá; không gán chủ báo giá trong task này."
+                "description": "BR-120/122/801: xác nhận CUSTOMER đã consent; dùng cùng tài khoản ở các folder khách vì chỉ chủ được đọc báo giá."
               },
               "event": [
                 {
@@ -2274,7 +2274,7 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/v1/client/accounts/me",
-                "description": "BR-120/801, api-guideline §2: xác nhận token CUSTOMER và tài khoản có bằng chứng đồng ý điều khoản trước khi gọi báo giá; không gán chủ báo giá trong task này."
+                "description": "BR-120/122/801: xác nhận CUSTOMER đã consent; dùng cùng tài khoản ở các folder khách vì chỉ chủ được đọc báo giá."
               },
               "event": [
                 {
@@ -3874,7 +3874,7 @@
                   }
                 ],
                 "url": "{{baseUrl}}/api/v1/client/accounts/me",
-                "description": "BR-120/801, api-guideline §2: xác nhận token CUSTOMER và tài khoản có bằng chứng đồng ý điều khoản trước khi gọi báo giá; không gán chủ báo giá trong task này."
+                "description": "BR-120/122/801: xác nhận CUSTOMER đã consent; dùng cùng tài khoản ở các folder khách vì chỉ chủ được đọc báo giá."
               },
               "event": [
                 {

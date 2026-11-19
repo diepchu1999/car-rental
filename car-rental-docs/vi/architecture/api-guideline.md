@@ -70,6 +70,12 @@ Không có hai header này thì không trả lời được câu "còn bao nhiê
 Mạng di động rớt giữa chừng là chuyện thường và client sẽ thử lại. Không có key thì thử lại nghĩa là
 đặt hai đơn hoặc thu tiền hai lần.
 
+- Phạm vi key: **theo người gọi** (khách hoặc nhân viên + key), không dùng chung giữa các tài khoản.
+- Cùng key, khác nội dung → **409 `IDEMPOTENCY_KEY_REUSED`**. Cùng key, cùng nội dung → trả lại **kết quả
+  lần đầu**, không thực hiện lại.
+- Giữ key **24 giờ** (Tech Owner chốt 09/11/2026). Đủ dư cho việc gửi lại vì rớt mạng; sau đó không còn cam
+  kết phát lại kết quả cũ. Báo giá chỉ sống 15 phút (BR-122), nên gửi lại muộn hơn đằng nào cũng hết hạn.
+
 ## 6. Mã HTTP
 
 - 200 · 201 · 204
@@ -106,6 +112,11 @@ Cursor cho danh sách lớn (kết quả tìm xe, lịch sử đơn). Offset ch�
 
 Kích thước trang: mặc định **20**, tối đa **100** — chung cho mọi danh sách. Vượt tối đa thì báo lỗi đầu
 vào, không tự cắt về 100: client tưởng đã nhận đủ trong khi bị cắt im lặng.
+
+## 8a. Đặc tả OpenAPI
+Backend sinh đặc tả OpenAPI từ code bằng **springdoc** (chốt 15/11/2026). Frontend sinh kiểu và client từ đặc tả
+này, không viết tay (frontend-guideline §3). Đặc tả là hợp đồng máy đọc; danh mục `../api/` là hợp đồng người đọc —
+hai thứ phải khớp.
 
 ## 9. Danh mục endpoint
 

@@ -100,14 +100,14 @@ class FailureSummaryTest {
     /** Tên job lấy từ ngữ cảnh, không biến mất khi nguyên nhân gốc chỉ có frame của driver. */
     @Test
     void includesJobIdentityWithoutApplicationRootFrame() {
-        MDC.put(RequestIdFilter.API_MDC_KEY, "ReservationHoldExpiryScheduler.sweep");
+        MDC.put(RequestIdFilter.API_MDC_KEY, "BookingHoldExpiryScheduler.sweep");
         var failure = new IllegalStateException("Driver failure");
         failure.setStackTrace(new StackTraceElement[] {
                 new StackTraceElement("org.example.Driver", "execute", "Driver.java", 11)
         });
         String summary = FailureSummary.format(failure, "-", "-");
         assertTrue(summary.contains("source=\"-\""));
-        assertTrue(summary.contains("api=\"ReservationHoldExpiryScheduler.sweep\""));
+        assertTrue(summary.contains("api=\"BookingHoldExpiryScheduler.sweep\""));
     }
 
     /** Frame thiếu thông tin debug được mô tả rõ, không ném lỗi khi đang xử lý lỗi khác. */

@@ -30,7 +30,7 @@ import java.util.UUID;
 public class SearchIntegrationTestConfiguration {
     /**
      * Dùng 07:00 Việt Nam để kiểm cửa sổ đặt mà không phụ thuộc ngày chạy build.
-     * Qualifier giúp cả availability (tiêm có tên) dùng cùng đồng hồ với booking/vehicle.
+     * Qualifier giúp cả availability (tiêm có tên) dùng cùng đồng hồ với rental/vehicle.
      */
     @Bean
     @Primary

@@ -4,6 +4,12 @@ import com.carrental.availability.api.AvailabilityDirectory;
 import com.carrental.availability.api.BlockKind;
 import com.carrental.availability.api.Period;
 import com.carrental.availability.api.ReservationRef;
+import com.carrental.availability.api.ExpiredHoldRef;
+import com.carrental.availability.api.HoldExpiryResult;
+import com.carrental.availability.application.command.ExpireReservationHoldCommand;
+import com.carrental.availability.application.query.ListExpiredReservationHoldsQuery;
+import com.carrental.availability.application.port.in.ExpireReservationHoldUseCase;
+import com.carrental.availability.application.port.in.ListExpiredReservationHoldsUseCase;
 import com.carrental.availability.application.command.BlockReservationCommand;
 import com.carrental.availability.application.command.CompleteReservationCommand;
 import com.carrental.availability.application.command.ConfirmReservationCommand;
@@ -59,6 +65,8 @@ class AvailabilityDirectoryAdapterTest {
     private MoveComplianceHoldStartUseCase complianceMoves;
     private ListBusyVehiclesUseCase queries;
     private AvailabilityDirectory directory;
+    private ListExpiredReservationHoldsUseCase expiredHolds;
+    private ExpireReservationHoldUseCase expiry;
 
     /** Tạo adapter với các cổng riêng để phát hiện gọi nhầm hoặc đọc trước khi giữ chỗ. */
     @BeforeEach
@@ -71,15 +79,34 @@ class AvailabilityDirectoryAdapterTest {
         completions = mock(CompleteReservationUseCase.class);
         complianceMoves = mock(MoveComplianceHoldStartUseCase.class);
         queries = mock(ListBusyVehiclesUseCase.class);
+        expiredHolds = mock(ListExpiredReservationHoldsUseCase.class);
+        expiry = mock(ExpireReservationHoldUseCase.class);
         directory = new AvailabilityDirectoryAdapter(holds, blocks, confirmations, releases,
-                departures, completions, queries, complianceMoves);
+                departures, completions, queries, complianceMoves, expiredHolds, expiry);
+    }
+
+    /** Không tự nhả khi đọc danh sách và giữ nguyên hạn từ use case. */
+    @Test
+    void delegatesExpiredHoldListing() {
+        var result = List.of(new ExpiredHoldRef("KL-EXP001", "DT-3010-EXP001", START));
+        when(expiredHolds.list(new ListExpiredReservationHoldsQuery(START))).thenReturn(result);
+        assertSame(result, directory.findExpiredHolds(START));
+        assertExactlyOneInvocation();
+    }
+
+    /** Mỗi kết quả được chuyển nguyên vẹn, không biến NOT_ELIGIBLE thành thành công. */
+    @ParameterizedTest @EnumSource(HoldExpiryResult.class)
+    void delegatesSingleHoldExpiry(HoldExpiryResult result) {
+        when(expiry.expire(new ExpireReservationHoldCommand("KL-EXP001", START))).thenReturn(result);
+        assertEquals(result, directory.expireHold("KL-EXP001", START));
+        assertExactlyOneInvocation();
     }
 
     /** Kiểm giữ nguyên khoảng chưa cộng đệm, bookingCode, trả đúng ref và không gọi cổng tra cứu. */
     @Test
     void mapsHoldWithoutApplyingBufferOrCheckingAvailability() {
         var command = HoldReservationCommand.from(41L, START, END, Duration.ofHours(2), " booking-code ");
-        var ref = new ReservationRef(91L, "KL-ABC123");
+        var ref = new ReservationRef(91L, "KL-ABC123", START.plusSeconds(3600));
         when(holds.hold(command)).thenReturn(ref);
         assertSame(ref, directory.hold(41L, PERIOD, Duration.ofHours(2), " booking-code "));
         verify(holds).hold(command);
@@ -93,7 +120,7 @@ class AvailabilityDirectoryAdapterTest {
         var period = kind == BlockKind.COMPLIANCE_HOLD ? new Period(START, null) : PERIOD;
         var command = BlockReservationCommand.from(41L, START, period.endExclusive(),
                 ReservationKind.valueOf(kind.name()), " Scheduled work ");
-        var ref = new ReservationRef(92L, "KL-DEF456");
+        var ref = new ReservationRef(92L, "KL-DEF456", null);
         when(blocks.block(command)).thenReturn(ref);
         assertSame(ref, directory.block(41L, period, kind, " Scheduled work "));
         verify(blocks).block(command);
@@ -245,7 +272,7 @@ class AvailabilityDirectoryAdapterTest {
 
     /** Liệt kê dependency để bắt mọi lời gọi ngoài đúng một cổng cần ủy quyền. */
     private Object[] dependencies() {
-        return new Object[]{holds, blocks, confirmations, releases, departures, completions, queries, complianceMoves};
+        return new Object[]{holds, blocks, confirmations, releases, departures, completions, queries, complianceMoves, expiredHolds, expiry};
     }
 
     /** Khẳng định tổng cộng đúng một tương tác, kể cả khi use case ném lỗi. */

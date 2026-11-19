@@ -4,7 +4,7 @@ import com.carrental.PostgresTestConfiguration;
 import com.carrental.availability.api.AvailabilityDirectory;
 import com.carrental.availability.api.Period;
 import com.carrental.availability.api.ReservationRef;
-import com.carrental.booking.api.RentalTermsDirectory;
+import com.carrental.rental.api.RentalTermsDirectory;
 import com.carrental.search.SearchIntegrationTestConfiguration;
 import com.carrental.search.SearchTestQueries;
 import com.carrental.search.application.port.in.SearchVehiclesUseCase;

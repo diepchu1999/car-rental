@@ -1,6 +1,7 @@
 package com.carrental.availability.adapter.out.persistence;
 
 import com.carrental.availability.application.port.out.ReadReservationPort;
+import com.carrental.availability.api.ExpiredHoldRef;
 import com.carrental.availability.domain.Reservation;
 import com.carrental.availability.domain.ReservationPeriod;
 import com.carrental.shared.sql.SqlLoader;
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Repository;
 
 import java.sql.Types;
 import java.time.ZoneOffset;
+import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +31,7 @@ class ReservationReadAdapter implements ReadReservationPort {
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final String findByCodeSql;
     private final String findBusyVehicleIdsSql;
+    private final String findExpiredHoldsSql;
 
     /**
      * Nhận JDBC và tải tài nguyên truy vấn một lần.
@@ -39,6 +43,16 @@ class ReservationReadAdapter implements ReadReservationPort {
         this.jdbcTemplate = jdbcTemplate;
         this.findByCodeSql = sqlLoader.load(ReservationSqlPaths.FIND_BY_CODE);
         this.findBusyVehicleIdsSql = sqlLoader.load(ReservationSqlPaths.FIND_BUSY_VEHICLE_IDS);
+        this.findExpiredHoldsSql = sqlLoader.load(ReservationSqlPaths.FIND_EXPIRED_HOLDS);
+    }
+
+    /** Đọc mã nghiệp vụ và đúng hạn đã lưu; không JOIN schema booking hoặc tính lại TTL. */
+    @Override
+    public List<ExpiredHoldRef> findExpiredHolds(Instant expiredAt) {
+        return jdbcTemplate.query(findExpiredHoldsSql, new MapSqlParameterSource()
+                .addValue("expiredAt", expiredAt.atOffset(ZoneOffset.UTC), Types.TIMESTAMP_WITH_TIMEZONE),
+                (rs, row) -> new ExpiredHoldRef(rs.getString("code"), rs.getString("booking_code"),
+                        rs.getObject("hold_expires_at", OffsetDateTime.class).toInstant()));
     }
 
     /**

@@ -2,7 +2,7 @@ package com.carrental.search.application.service;
 
 import com.carrental.availability.api.AvailabilityDirectory;
 import com.carrental.availability.api.Period;
-import com.carrental.booking.api.RentalTermsDirectory;
+import com.carrental.rental.api.RentalTermsDirectory;
 import com.carrental.branch.api.BranchDirectory;
 import com.carrental.branch.api.BranchSearchView;
 import com.carrental.pricing.api.RentalPricingDirectory;

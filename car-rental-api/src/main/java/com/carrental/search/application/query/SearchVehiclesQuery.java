@@ -12,7 +12,7 @@ import java.time.Instant;
 /**
  * Đầu vào tìm kiếm BR-125/126, không nhận loại sở hữu và không chấp nhận khoảng vô hạn.
  * Mặc định trang 20, tối đa 100 theo api-guideline §8; bán kính mặc định thuộc cấu hình.
- * Điều kiện thuê theo giờ chi nhánh/cửa sổ đặt do booking kiểm, không lặp tại query này.
+ * Điều kiện thuê theo giờ chi nhánh/cửa sổ đặt do rental kiểm, không lặp tại query này.
  */
 public record SearchVehiclesQuery(Double latitude, Double longitude,
         Instant startInclusive, Instant endExclusive, RentalType rentalType, DriveMode driveMode,

@@ -29,3 +29,18 @@ hiện ra.
 - BR-427 (gia hạn) tuân theo: gia hạn tạo **bản ghi riêng** với bộ giá trị của thời điểm gia hạn,
   không sửa bộ giá trị của đơn gốc.
 - Kết hợp với ADR-0013: cấu hình giữ lịch sử, đơn giữ bản sao. Hai lớp bảo vệ cho cùng một mục đích.
+
+## Làm rõ 09/11/2026 — lát cắt 1 chưa đóng băng giá trị quyết toán
+
+Lát cắt 1 (Task 9) đóng băng: tiền thuê theo từng dòng, bảo hiểm, tổng, tỷ lệ cọc, cọc, phần còn lại
+(BR-201), giá ngày, điều kiện thuê đã áp (khoảng đệm…) và hạn giữ chỗ.
+
+**Chưa đóng băng** giới hạn km (BR-115, BR-401), mức phí trả trễ (BR-118, BR-408) và chính sách nhiên liệu
+(BR-409, BR-414, BR-117) — chưa có cổng nào cung cấp các giá trị này. Lát cắt 2 (quyết toán) bổ sung.
+
+Hệ quả bắt buộc:
+- **Đơn thiếu giá trị quyết toán thì không được quyết toán** — báo lỗi rõ ràng, **không** đọc cấu hình hiện
+  tại thay vào. Đọc cấu hình hiện tại chính là lỗi quyết định này sinh ra để tránh.
+- Chấp nhận được vì mọi đơn tạo trong lát cắt 1 là dữ liệu thử ở local, chưa có khách thật.
+- **Trước khi chạy với khách thật, đơn phải đóng băng đủ mọi giá trị quyết toán.**
+

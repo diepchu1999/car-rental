@@ -4,7 +4,7 @@ import com.carrental.PostgresTestConfiguration;
 import com.carrental.availability.api.AvailabilityDirectory;
 import com.carrental.availability.api.BlockKind;
 import com.carrental.availability.api.Period;
-import com.carrental.booking.api.RentalTermsDirectory;
+import com.carrental.rental.api.RentalTermsDirectory;
 import com.carrental.search.SearchIntegrationTestConfiguration;
 import com.carrental.search.SearchTestQueries;
 import com.carrental.search.application.port.in.SearchVehiclesUseCase;
@@ -34,7 +34,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Kiểm search → booking/branch/vehicle/availability → SQL/PostGIS thật theo BR-125.
+ * Kiểm search → rental/branch/vehicle/availability → SQL/PostGIS thật theo BR-125.
  * Mỗi test rollback fixture; không mock directory, không đọc hoặc sửa database local.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
@@ -201,7 +201,7 @@ class SearchVehiclesIntegrationTest {
         assertCodes(search.search(input.build()), vehicle.code());
     }
 
-    /** BR-113/119/121: lỗi điều kiện thuê phải đi qua booking thật kể cả khi không có ứng viên. */
+    /** BR-113/119/121: lỗi điều kiện thuê phải đi qua rental thật kể cả khi không có ứng viên. */
     @ParameterizedTest
     @CsvSource({
             "HOURLY,2030-01-15T03:00:00Z,2030-01-15T06:59:59Z,RENTAL_DURATION_TOO_SHORT",

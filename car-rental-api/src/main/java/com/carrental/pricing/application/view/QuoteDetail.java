@@ -7,7 +7,7 @@ import com.carrental.shared.rental.PickupMethod;
 import com.carrental.shared.rental.RentalType;
 import java.time.Instant;
 
-/** Mô hình đọc báo giá đã lưu, tách khỏi aggregate đầu vào của cổng ghi và response HTTP. */
-public record QuoteDetail(String code, String vehicleCode, Instant startAt, Instant endAt,
+/** Mô hình đọc snapshot; customerAccountCode chỉ null với lịch sử trước V015, không được cấp cho khách. */
+public record QuoteDetail(String code, String customerAccountCode, String vehicleCode, Instant startAt, Instant endAt,
         RentalType rentalType, DriveMode driveMode, PickupMethod pickupMethod,
         QuoteSnapshot snapshot, CalculatedPrice price, Instant createdAt, Instant expiresAt) { }

@@ -80,6 +80,14 @@ class QuoteConstraintIntegrationTest {
                 "23514", "chk_quote_immutable", "quote");
     }
 
+    /** V015 không mở lối đổi chủ của một báo giá đã lưu, kể cả qua SQL trực tiếp. */
+    @Test
+    void savedOwnerCannotBeChanged() {
+        insertHeader();
+        violation(() -> jdbc.update(loader.load("sql/pricing/update_quote_owner_for_constraint_test.sql"), header()),
+                "23514", "chk_quote_immutable", "quote");
+    }
+
     /** Không sửa được từng dòng sau khi đã lưu. */
     @Test
     void savedLineCannotBeUpdated() {
@@ -98,6 +106,7 @@ class QuoteConstraintIntegrationTest {
     /** Dữ liệu header đúng, không cần xe thật vì mã tham chiếu không có FK chéo schema. */
     private static MapSqlParameterSource header() {
         return new MapSqlParameterSource().addValue("code", "BG-2611-CON001", Types.VARCHAR)
+                .addValue("customerAccountCode", "TK-OWNER1", Types.VARCHAR)
                 .addValue("vehicleCode", "XE-TEST01", Types.VARCHAR)
                 .addValue("startAt", OffsetDateTime.parse("2026-11-13T03:00:00Z"), Types.TIMESTAMP_WITH_TIMEZONE)
                 .addValue("endAt", OffsetDateTime.parse("2026-11-15T03:00:00Z"), Types.TIMESTAMP_WITH_TIMEZONE)
@@ -155,6 +164,10 @@ class QuoteConstraintIntegrationTest {
     /** Mọi CHECK header đều có trường hợp sai, gồm số NUMERIC đặc biệt không được xem là giá hợp lệ. */
     private static Stream<Arguments> invalidHeaders() {
         return Stream.of(
+                Arguments.of("customerAccountCode", null, "chk_quote_owner_required"),
+                Arguments.of("customerAccountCode", "", "chk_quote_customer_account_code"),
+                Arguments.of("customerAccountCode", "TK-owner1", "chk_quote_customer_account_code"),
+                Arguments.of("customerAccountCode", "XE-TEST01", "chk_quote_customer_account_code"),
                 Arguments.of("code", "BG-2613-CON001", "chk_quote_code_format"),
                 Arguments.of("vehicleCode", "123", "chk_quote_vehicle_code"),
                 Arguments.of("endAt", OffsetDateTime.parse("2026-11-13T03:00:00Z"), "chk_quote_period"),

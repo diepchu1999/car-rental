@@ -22,8 +22,11 @@ final class ReservationSqlPaths {
     /** Đường dẫn dời mốc khóa giấy tờ có điều kiện mốc cũ theo BR-015. */
     static final String MOVE_COMPLIANCE_HOLD_START = "sql/availability/move_compliance_hold_start.sql";
 
-    /** Đường dẫn nhả HELD quá hạn bằng một UPDATE có điều kiện. */
-    static final String RELEASE_EXPIRED_HOLDS = "sql/availability/release_expired_holds.sql";
+    /** Đọc ứng viên HELD theo hạn đã lưu, không nhả chỗ trong lúc đọc. */
+    static final String FIND_EXPIRED_HOLDS = "sql/availability/find_expired_holds.sql";
+
+    /** Nhả đúng một HELD còn đủ điều kiện tại câu ghi, dùng savepoint/retry. */
+    static final String RELEASE_EXPIRED_HOLD = "sql/availability/release_expired_hold.sql";
 
     /**
      * Ngăn khởi tạo vì lớp chỉ chứa các hằng đường dẫn.
